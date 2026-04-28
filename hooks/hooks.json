@@ -1,0 +1,28 @@
+{
+  "description": "Scout connector telemetry and session-token accounting hooks. Activate only inside scheduled scout runs (the Python hook short-circuits when SCOUT_MODE is unset).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/bin/scoutctl hook connector-log",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/bin/scoutctl hook session-tokens",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

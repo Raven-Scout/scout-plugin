@@ -89,11 +89,11 @@ def test_build_manifest_subcommands_sorted_for_stability() -> None:
 
 
 def test_action_items_kb_tui_features_enabled() -> None:
-    """Plan 2 lights these three. Other Plan 1 placeholders remain False."""
+    """Plan 2 lights these three; Plan 4 lights session_tokens + connector_health."""
     m = build_manifest()
     assert m.features["action_items_cli_v1"] is True
     assert m.features["kb_ontology_v1"] is True
     assert m.features["tui_v1"] is True
-    # Plan 3 lights these — still False after Plan 2.
-    assert m.features["session_tokens_v1"] is False
-    assert m.features["connector_health_v1"] is False
+    # Plan 4 lights these — flipped True after the connector subsystem + hooks port land.
+    assert m.features["session_tokens_v1"] is True
+    assert m.features["connector_health_v1"] is True

@@ -176,7 +176,7 @@ connectors:
           2. Bridge crashed — `launchctl kickstart` to restart.
           3. macOS Network Extension permissions reset — re-grant in System Settings.
 
-        Setup docs: ~/scout-plugin/docs/connectors/whatsapp-setup.md
+        Setup docs: engine/scout/docs/connectors/whatsapp-setup.md
 
   notify:telegram:
     display_name: Telegram (outbound)
@@ -189,7 +189,7 @@ connectors:
         Telegram outbound is a Bot API curl wrapped behind `scoutctl notify telegram`.
         Token + numeric chat ID stored in ~/.scout-secrets/ (gitignored, mode 600).
 
-        Setup walkthrough: ~/scout-plugin/docs/connectors/telegram-setup.md
+        Setup walkthrough: engine/scout/docs/connectors/telegram-setup.md
         (one-time @BotFather flow + chat-ID capture).
 
         Bidirectional Telegram (the inbound return-bridge for replies as feedback
