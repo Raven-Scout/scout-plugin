@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "generated_from": "scout-plugin@cc11548",
+  "connectors": [
+    {
+      "key": "mcp:claude_ai_Slack",
+      "display_name": "Slack",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude_ai_Linear",
+      "display_name": "Linear",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude_ai_Gmail",
+      "display_name": "Gmail",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude_ai_Google_Calendar",
+      "display_name": "Google Calendar",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude_ai_Granola",
+      "display_name": "Granola",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude_ai_Google_Drive",
+      "display_name": "Google Drive",
+      "tier": "official"
+    },
+    {
+      "key": "github",
+      "display_name": "GitHub (gh CLI)",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:claude-in-chrome",
+      "display_name": "Chrome (Google Messages)",
+      "tier": "official"
+    },
+    {
+      "key": "mcp:whatsapp-mcp",
+      "display_name": "WhatsApp",
+      "tier": "official"
+    },
+    {
+      "key": "notify:telegram",
+      "display_name": "Telegram (outbound)",
+      "tier": "official"
+    }
+  ]
+}

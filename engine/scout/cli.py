@@ -9,6 +9,7 @@ the subcommand functions, not at module level.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import typer
 
@@ -161,6 +162,38 @@ def _register_connectors() -> None:
 
         load_registry()  # exercise the path; raises ConfigError on bad YAML
         typer.echo("reloaded")
+
+    @connectors_app.command("snapshot")
+    def cli_connectors_snapshot(
+        target: Path = typer.Option(
+            Path.home() / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json",
+            "--target",
+            "-t",
+            help="Where to write the snapshot.",
+        ),
+        check: bool = typer.Option(
+            False,
+            "--check",
+            help="Exit 1 if on-disk differs from would-write; print unified diff.",
+        ),
+    ) -> None:
+        """Write or verify connectors.snapshot.json (consumed by scout-app)."""
+        from scout.scripts.connectors_snapshot import check_snapshot, write_snapshot
+
+        if check:
+            ok, diff = check_snapshot(target)
+            if ok:
+                typer.echo(f"connectors snapshot OK: {target}")
+                return
+            typer.echo(diff, err=True)
+            typer.echo(
+                f"Drift detected: regenerate with `scoutctl connectors snapshot --target {target}`.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        write_snapshot(target)
+        typer.echo(f"Wrote: {target}")
 
 
 _register_connectors()
