@@ -18,7 +18,8 @@ def test_no_scout_mode_short_circuits(tmp_path, monkeypatch):
     assert result is None
     # No JSONL file written.
     log_dir = tmp_path / ".scout-logs"
-    assert not list(log_dir.glob("connector-calls-*.jsonl")) if log_dir.exists() else True
+    if log_dir.exists():
+        assert not list(log_dir.glob("connector-calls-*.jsonl"))
 
 
 def test_classify_bash_uses_first_token(tmp_path):
@@ -95,7 +96,7 @@ def test_run_handles_malformed_payload_silently(tmp_path, monkeypatch):
     assert result is None
 
 
-def test_classify_truncates_err_snippet_at_160_chars(tmp_path, monkeypatch):
+def test_run_truncates_err_snippet_at_160_chars(tmp_path, monkeypatch):
     monkeypatch.setenv("SCOUT_MODE", "manual")
     monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
     long_err = "X" * 500
@@ -109,3 +110,4 @@ def test_classify_truncates_err_snippet_at_160_chars(tmp_path, monkeypatch):
     )
     event = run(stdin=io.StringIO(payload))
     assert len(event.payload["err"]) == 160
+    assert event.payload["err"] == "X" * 160

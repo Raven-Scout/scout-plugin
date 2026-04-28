@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from datetime import UTC, datetime
 from typing import IO, Any
+from zoneinfo import ZoneInfo
 
 from scout import paths
 from scout.events import Event, now_iso
@@ -117,15 +117,8 @@ def run(*, stdin: IO[str] | None = None) -> Event | None:
 
 
 def _et_date() -> str:
-    """Eastern-Time date string YYYY-MM-DD. Matches bash original's TZ behavior."""
-    result = subprocess.run(
-        ["date", "+%Y-%m-%d"],
-        env={**os.environ, "TZ": "America/New_York"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.stdout.strip() or datetime.now().date().isoformat()
+    """Eastern-Time date string YYYY-MM-DD."""
+    return datetime.now(ZoneInfo("America/New_York")).date().isoformat()
 
 
 def main() -> int:
