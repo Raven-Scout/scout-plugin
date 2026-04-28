@@ -42,6 +42,18 @@ FAKE_CHAT_ID = "987654321"
 # ----- fixtures -------------------------------------------------------------
 
 
+def _write_secret(path: Path, content: str) -> None:
+    """Write a secret file and chmod 600 it.
+
+    ``_read_secret`` enforces mode 600 — any non-owner permission bit
+    triggers ``ConfigError``. Tests that bypass this helper and rely on
+    the umask default (typically 644) will fail with ``ConfigError``,
+    not with the assertion they expected.
+    """
+    path.write_text(content)
+    path.chmod(0o600)
+
+
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
@@ -52,8 +64,8 @@ def secrets_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Hermetic secrets dir with valid fake credentials."""
     d = tmp_path / "secrets"
     d.mkdir()
-    (d / "telegram-bot-token").write_text(FAKE_TOKEN)
-    (d / "telegram-chat-id").write_text(FAKE_CHAT_ID)
+    _write_secret(d / "telegram-bot-token", FAKE_TOKEN)
+    _write_secret(d / "telegram-chat-id", FAKE_CHAT_ID)
     monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
     return d
 
@@ -119,7 +131,7 @@ def test_send_missing_token_raises_config_error(empty_secrets_dir: Path) -> None
 def test_send_missing_chat_id_raises_config_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     d = tmp_path / "secrets"
     d.mkdir()
-    (d / "telegram-bot-token").write_text(FAKE_TOKEN)
+    _write_secret(d / "telegram-bot-token", FAKE_TOKEN)
     # chat-id deliberately absent
     monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
 
@@ -310,3 +322,116 @@ def test_event_is_serializable_via_asdict(secrets_dir: Path) -> None:
     d = dataclasses.asdict(ev)
     assert d["kind"] == "notification.sent"
     assert "id" in d and "ts" in d
+
+
+# ----- Secret-handling defenses (token redaction + mode 600) ----------------
+
+
+def test_dry_run_does_not_leak_token_to_stderr(secrets_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The Telegram URL embeds the token in its path; dry-run prints the
+    URL; therefore dry-run must redact the token. Operators reading shell
+    history or stderr-redirected logs should never see the raw token.
+    """
+    notify_telegram.send(tier="info", body="hi", dry_run=True)
+    captured = capsys.readouterr()
+    # The fake token from the fixture must NOT appear anywhere in stderr.
+    assert FAKE_TOKEN not in captured.err
+    # And the redacted form IS present, so the operator can see what
+    # would have been POSTed.
+    assert "<REDACTED>" in captured.err
+    # Belt-and-braces: stdout should also be token-free (it's empty for
+    # send() — only the CLI wraps it with stdout JSON).
+    assert FAKE_TOKEN not in captured.out
+
+
+def test_cli_http_error_does_not_leak_token(runner: CliRunner, secrets_dir: Path) -> None:
+    """An HTTP 401 (revoked token) must not leak the bot token to stderr.
+
+    ``str(requests.HTTPError)`` includes the request URL, and the
+    Telegram URL embeds the token. The CLI handler must rebuild its
+    error message without ``str(e)``.
+    """
+    import requests as _requests
+
+    fake_url = f"https://api.telegram.org/bot{FAKE_TOKEN}/sendMessage"
+    fake_resp = MagicMock()
+    fake_resp.status_code = 401
+    fake_resp.reason = "Unauthorized"
+    fake_resp.url = fake_url
+    # str(HTTPError) renders as: "<message>" — when constructed with a
+    # response, it includes "for url: <url>" via raise_for_status. We
+    # simulate that by setting the response and a message that mentions
+    # the URL (matching real requests behaviour).
+    err = _requests.HTTPError(
+        f"401 Client Error: Unauthorized for url: {fake_url}",
+        response=fake_resp,
+    )
+    fake_resp.raise_for_status = MagicMock(side_effect=err)
+
+    with patch("scout.scripts.notify_telegram.requests.post", return_value=fake_resp):
+        # mix_stderr=False so result.stderr is captured separately. Default
+        # CliRunner merges them, which would also satisfy our assertion,
+        # but separating makes the intent unambiguous.
+        result = runner.invoke(
+            cli.app,
+            ["notify", "telegram", "--tier", "info", "--body", "x"],
+        )
+
+    # Non-zero exit on HTTP failure.
+    assert result.exit_code == 2
+    # The full output (stdout + stderr in mix-mode) MUST NOT contain
+    # the token. ``result.output`` is the merged stream by default.
+    assert FAKE_TOKEN not in result.output
+    # The redacted message IS present so operators still get a useful
+    # error.
+    assert "401" in result.output
+    assert "Unauthorized" in result.output
+
+
+def test_read_secret_rejects_insecure_permissions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A secret file with mode 644 (default umask) must be rejected.
+
+    The setup doc tells operators to ``chmod 600``; the reader enforces
+    it. The error message must include a ``chmod 600`` hint so operators
+    know the exact fix.
+    """
+    d = tmp_path / "secrets"
+    d.mkdir()
+    bad = d / "telegram-bot-token"
+    bad.write_text(FAKE_TOKEN)
+    bad.chmod(0o644)  # world-readable — DEFAULT umask outcome, not safe
+    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+
+    with pytest.raises(ConfigError) as exc_info:
+        notify_telegram._read_secret("telegram-bot-token")
+    msg = str(exc_info.value)
+    assert "insecure permissions" in msg
+    # Hint MUST include the exact chmod command and path.
+    assert "chmod 600" in msg
+    assert str(bad) in msg
+
+
+def test_read_secret_rejects_group_readable_mode_640(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mode 640 (group-readable) is also rejected — 0o077 catches any
+    group/other bit, not just 'world-readable'."""
+    d = tmp_path / "secrets"
+    d.mkdir()
+    bad = d / "telegram-bot-token"
+    bad.write_text(FAKE_TOKEN)
+    bad.chmod(0o640)
+    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+
+    with pytest.raises(ConfigError, match="insecure permissions"):
+        notify_telegram._read_secret("telegram-bot-token")
+
+
+def test_read_secret_accepts_mode_600(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mode 600 (owner-only) is accepted — sanity check on the gate."""
+    d = tmp_path / "secrets"
+    d.mkdir()
+    ok = d / "telegram-bot-token"
+    ok.write_text(FAKE_TOKEN)
+    ok.chmod(0o600)
+    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+
+    assert notify_telegram._read_secret("telegram-bot-token") == FAKE_TOKEN

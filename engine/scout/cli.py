@@ -215,9 +215,28 @@ def _register_notify() -> None:
         except ValueError as e:
             typer.echo(f"scoutctl notify telegram: {e}", err=True)
             raise typer.Exit(code=1) from e
+        except _requests.HTTPError as e:
+            # ``str(HTTPError)`` includes the request URL, and the Telegram
+            # URL embeds the bot token in its path
+            # (``/bot<token>/sendMessage``). On a 401 (revoked token) or
+            # any 4xx/5xx the raw token would dump to stderr — the worst
+            # leak path because it's exactly what operators debug live.
+            # Rebuild the message from status_code + reason instead of
+            # ``str(e)`` so the URL never appears.
+            status = getattr(e.response, "status_code", "?")
+            reason = getattr(e.response, "reason", "Unknown")
+            typer.echo(
+                f"scoutctl notify telegram: HTTP {status} {reason} (token redacted in URL)",
+                err=True,
+            )
+            raise typer.Exit(code=2) from e
         except _requests.RequestException as e:
-            # Real network failures during a live send. Exit non-zero with a
-            # clear stderr line instead of dumping a stack trace into the
+            # Non-HTTP failures during a live send: timeout, DNS, connection
+            # refused, SSL. ``str()`` of these does not include the request
+            # URL (the URL lives on the PreparedRequest / Response, neither
+            # of which is rendered by the exception's ``__str__``), so
+            # ``e`` is safe to print here. Exit non-zero with a clear
+            # stderr line instead of dumping a stack trace into the
             # runner's prompt.
             typer.echo(f"scoutctl notify telegram: HTTP error: {e}", err=True)
             raise typer.Exit(code=2) from e

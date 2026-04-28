@@ -58,14 +58,24 @@ def _read_secret(name: str) -> str:
     """Read a secret file from ``SECRETS_DIR``.
 
     Raises ``ConfigError`` (exit code 10) with an actionable message if the
-    file is missing or unreadable. The error names the file path so the
-    operator knows exactly what to create.
+    file is missing, unreadable, empty, or has insecure permissions. The
+    error names the file path so the operator knows exactly what to fix.
+
+    Permission check: the setup doc tells operators to ``chmod 600`` the
+    secret file. We enforce that here — any non-owner permission bit set
+    (group/other read/write/execute) is rejected with a chmod hint. A
+    token saved with default umask (644) is silently world-readable by
+    every other process on the host, so refusing to read it is the
+    right default.
     """
     path = SECRETS_DIR / name
     if not path.exists():
         raise ConfigError(
             f"Missing secret: {path}. Create it (mode 600) — see engine/scout/docs/connectors/telegram-setup.md."
         )
+    mode = path.stat().st_mode & 0o777
+    if mode & 0o077:
+        raise ConfigError(f"{path} has insecure permissions {oct(mode)}; expected 600. Run: chmod 600 {path}")
     try:
         value = path.read_text(encoding="utf-8").strip()
     except OSError as e:
@@ -173,9 +183,14 @@ def send(
     if dry_run:
         # Dry-run preamble goes to STDERR so stdout stays pure JSON for
         # downstream parsers (the CLI prints the Event to stdout after).
+        # The Telegram URL embeds the bot token in the path
+        # (``/bot<token>/sendMessage``), so we MUST redact it before
+        # printing — operators reading shell history or stderr-redirected
+        # logs should never see the raw token.
+        redacted_url = f"{TELEGRAM_API}/bot<REDACTED>/sendMessage"
         for chunk in chunks:
             payload = _build_payload(chat_id=chat_id, text=chunk, tier=tier)
-            print(f"[dry-run] POST {url}", file=sys.stderr)
+            print(f"[dry-run] POST {redacted_url}", file=sys.stderr)
             print(
                 f"[dry-run] body: {json.dumps(payload, ensure_ascii=False)}",
                 file=sys.stderr,
@@ -240,7 +255,16 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:
         print(f"notify-telegram: {e}")
         return 1
+    except requests.HTTPError as e:
+        # ``str(HTTPError)`` includes the request URL, which embeds the
+        # bot token. Rebuild the message from status_code + reason.
+        status = getattr(e.response, "status_code", "?")
+        reason = getattr(e.response, "reason", "Unknown")
+        print(f"notify-telegram: HTTP {status} {reason} (token redacted in URL)")
+        return 2
     except requests.RequestException as e:
+        # Non-HTTP failures (timeout, DNS, connection refused) — these
+        # don't carry the URL in their str() representation.
         print(f"notify-telegram: HTTP error: {e}")
         return 2
 
