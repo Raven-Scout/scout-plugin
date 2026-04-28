@@ -77,6 +77,14 @@ def hook_connector_log() -> None:
     raise typer.Exit(connector_log_main())
 
 
+@hook_app.command("session-tokens")
+def hook_session_tokens() -> None:
+    """Stop hook: sum message.usage and append a row to .scout-logs/session-tokens.jsonl."""
+    from scout.hooks.session_tokens import main as session_tokens_main
+
+    raise typer.Exit(session_tokens_main())
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""
