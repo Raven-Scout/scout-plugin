@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Scout WhatsApp bridge — launchd plist TEMPLATE.
+
+  Copy this file to ~/Library/LaunchAgents/com.scout.whatsapp-bridge.plist
+  and fill in the placeholders below before loading with:
+    launchctl load -w ~/Library/LaunchAgents/com.scout.whatsapp-bridge.plist
+
+  Placeholders to replace:
+    __WHATSAPP_MCP_DIR__   Absolute path to the cloned whatsapp-mcp repo.
+                           Recommended default:
+                             /Users/<you>/.local/share/whatsapp-mcp
+                           This must be the parent of the whatsapp-bridge/
+                           directory and must be an absolute path
+                           (`~` does NOT expand inside plists).
+    __USER_HOME__          Output of `echo $HOME`, e.g. /Users/yourname.
+                           Used as a sane fallback for $HOME inside the
+                           launched process; LaunchAgents already inherit
+                           the user but some Go libraries read $HOME
+                           explicitly.
+
+  Notes:
+    - The bridge binary is `whatsapp-bridge` in the whatsapp-bridge/
+      subdirectory of the cloned repo (produced by `go build -o
+      whatsapp-bridge` per the upstream README). If a future upstream
+      release renames the binary, update the ProgramArguments below to
+      match.
+    - KeepAlive uses SuccessfulExit:false so that a clean exit (e.g. you
+      manually `Ctrl-C` while debugging) does NOT respawn the process,
+      but a crash (non-zero exit) does.
+    - RunAtLoad:true starts the bridge immediately when you `launchctl
+      load -w` and on every login thereafter.
+    - TZ is pinned to America/New_York so log timestamps match the rest
+      of Scout's logging convention. Adjust if you live elsewhere.
+    - We deliberately do NOT set <key>UserName</key> — per-user
+      LaunchAgents already run as you.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scout.whatsapp-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__WHATSAPP_MCP_DIR__/whatsapp-bridge/whatsapp-bridge</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WHATSAPP_MCP_DIR__/whatsapp-bridge</string>
+
+    <key>StandardOutPath</key>
+    <string>__WHATSAPP_MCP_DIR__/bridge.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__WHATSAPP_MCP_DIR__/bridge.err.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TZ</key>
+        <string>America/New_York</string>
+        <key>HOME</key>
+        <string>__USER_HOME__</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
