@@ -166,6 +166,72 @@ def _register_connectors() -> None:
 _register_connectors()
 
 
+def _register_notify() -> None:
+    """scoutctl notify {telegram} — outbound notification commands.
+
+    `notify:telegram` is registered in connectors.yaml with capabilities=[outbound].
+    The Claude session calls `scoutctl notify telegram` from inside its prompt at
+    session-wrap time (Bash tool). Plan 7 will Pythonize the runner; for v0.4 the
+    CLI command IS the integration point.
+    """
+    notify_app = typer.Typer(help="Outbound notifications (Telegram, etc.).")
+    app.add_typer(notify_app, name="notify")
+
+    @notify_app.command("telegram")
+    def cli_notify_telegram(
+        tier: str = typer.Option(
+            "info",
+            "--tier",
+            help="info (silent) | action_required (loud)",
+        ),
+        body: str = typer.Option(
+            ...,
+            "--body",
+            help="Message body. Newlines preserved.",
+        ),
+        dry_run: bool = typer.Option(
+            False,
+            "--dry-run",
+            help="Print the request without POSTing. Still requires secrets.",
+        ),
+    ) -> None:
+        """Send a Telegram message via the configured bot."""
+        import json as _json
+        from dataclasses import asdict
+
+        import requests as _requests
+
+        from scout.errors import ConfigError as _ConfigError
+        from scout.scripts.notify_telegram import send
+
+        try:
+            ev = send(tier=tier, body=body, dry_run=dry_run)
+        except _ConfigError as e:
+            # Map ScoutError exit codes at the command boundary so the CLI
+            # surface stays consistent with cli.main()'s ScoutError handler.
+            # The runner relies on exit 10 to know secrets are missing.
+            typer.echo(f"scoutctl notify telegram: {e}", err=True)
+            raise typer.Exit(code=_ConfigError.exit_code) from e
+        except ValueError as e:
+            typer.echo(f"scoutctl notify telegram: {e}", err=True)
+            raise typer.Exit(code=1) from e
+        except _requests.RequestException as e:
+            # Real network failures during a live send. Exit non-zero with a
+            # clear stderr line instead of dumping a stack trace into the
+            # runner's prompt.
+            typer.echo(f"scoutctl notify telegram: HTTP error: {e}", err=True)
+            raise typer.Exit(code=2) from e
+
+        # Print the resulting Event JSON to stdout. Dry-run preamble (the
+        # [dry-run] lines) is intentionally routed through stderr inside
+        # send() so this stdout is always pure JSON and parsable by tests
+        # / downstream scripts.
+        typer.echo(_json.dumps(asdict(ev), indent=2))
+
+
+_register_notify()
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""
