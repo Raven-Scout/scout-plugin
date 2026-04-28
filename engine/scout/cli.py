@@ -100,6 +100,72 @@ def hook_kb_pre_filter(
     raise typer.Exit(kb_pre_filter_main([session_type]))
 
 
+# Top-level command — `connector-health-report` is a script, not a hook
+# (it runs AFTER the scheduled session ends, mirroring the bash invocation
+# from run-scout.sh). Single-token name keeps the runner-side migration
+# path simple: replace `scripts/connector-health-report.sh` with
+# `scoutctl connector-health-report`.
+@app.command("connector-health-report")
+def connector_health_report_cmd() -> None:
+    """Roll up connector-calls JSONL into knowledge-base/connector-health.md and fire alerts."""
+    from scout.scripts.connector_health_report import main as chr_main
+
+    raise typer.Exit(chr_main())
+
+
+def _register_connectors() -> None:
+    """scoutctl connectors {list,show,reload} — read-only roster ops in v0.4."""
+    connectors_app = typer.Typer(help="Connector roster operations (read-only in v0.4).")
+    app.add_typer(connectors_app, name="connectors")
+
+    @connectors_app.command("list")
+    def cli_connectors_list() -> None:
+        """List the registered connector roster."""
+        from scout.connectors import load_registry
+
+        reg = load_registry()
+        for key in sorted(reg.keys()):
+            c = reg[key]
+            typer.echo(f"{key}\t{c.tier.value}\t{c.display_name}")
+
+    @connectors_app.command("show")
+    def cli_connectors_show(key: str) -> None:
+        """Show one connector's full record as JSON."""
+        import json as _json
+
+        from scout.connectors import load_registry
+        from scout.errors import ConfigError
+
+        reg = load_registry()
+        if key not in reg:
+            raise ConfigError(f"unknown connector: {key}")
+        c = reg[key]
+        record = {
+            "key": c.key,
+            "display_name": c.display_name,
+            "tier": c.tier.value,
+            "capabilities": [cap.value for cap in c.capabilities],
+            "required_in": "all" if c.required_in == "all" else list(c.required_in),
+            "remediation": {
+                "first_fix": c.remediation.first_fix,
+                "detail": c.remediation.detail,
+            },
+            "notes": c.notes,
+        }
+        typer.echo(_json.dumps(record, indent=2))
+
+    @connectors_app.command("reload")
+    def cli_connectors_reload() -> None:
+        """Force-reload the YAML (operational signal; load_registry is uncached in v0.4)."""
+        from scout.connectors import load_registry
+
+        load_registry()  # exercise the path; raises ConfigError on bad YAML
+        typer.echo("reloaded")
+
+
+_register_connectors()
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""
