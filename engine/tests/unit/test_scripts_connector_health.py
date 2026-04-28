@@ -80,9 +80,7 @@ def _seed_session(
     records = []
     for connector, (n_ok, n_err) in calls.items():
         for i in range(n_ok):
-            records.append(
-                _make_call(ts + timedelta(seconds=i), sid, mode, connector, error=False)
-            )
+            records.append(_make_call(ts + timedelta(seconds=i), sid, mode, connector, error=False))
         for i in range(n_err):
             records.append(
                 _make_call(
@@ -196,9 +194,7 @@ def test_pattern_48_suppression_never_wired(fake_data_dir, monkeypatch):
     # → Pattern #48 suppression.
     alerts = event.payload["alerts"]
     granola_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"]
-    assert granola_alerts == [], (
-        f"Pattern #48 should suppress; got: {granola_alerts}"
-    )
+    assert granola_alerts == [], f"Pattern #48 should suppress; got: {granola_alerts}"
 
 
 # ----- Test 4: Slack 1 run dark, 2/2 prior healthy → CRITICAL --------------
@@ -308,12 +304,8 @@ def test_chronic_skip_only_in_required_mode(fake_data_dir, monkeypatch):
     assert isinstance(event, Event)
 
     alerts = event.payload["alerts"]
-    granola_alerts = [
-        a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"
-    ]
-    assert granola_alerts == [], (
-        "Granola is not required in weekend-briefing — should not fire chronic-skip."
-    )
+    granola_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"]
+    assert granola_alerts == [], "Granola is not required in weekend-briefing — should not fire chronic-skip."
 
 
 # ----- Test 6: WARNING rule (4 calls, 3 errors > 50% → WARNING) -----------
@@ -389,12 +381,8 @@ def test_no_baseline_no_alert(fake_data_dir, monkeypatch):
     assert isinstance(event, Event)
 
     alerts = event.payload["alerts"]
-    granola_alerts = [
-        a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"
-    ]
-    assert granola_alerts == [], (
-        "0 prior same-mode runs → no baseline → no alert."
-    )
+    granola_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"]
+    assert granola_alerts == [], "0 prior same-mode runs → no baseline → no alert."
 
 
 # ----- Renderer hermeticity ------------------------------------------------

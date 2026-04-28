@@ -127,11 +127,7 @@ def cleanup_old_jsonl(
     cutoff = n - timedelta(days=retain_days)
     for path in glob.glob(f"{log_dir}/connector-calls-*.jsonl"):
         try:
-            date_str = (
-                os.path.basename(path)
-                .replace("connector-calls-", "")
-                .replace(".jsonl", "")
-            )
+            date_str = os.path.basename(path).replace("connector-calls-", "").replace(".jsonl", "")
             fdate = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
             if fdate < cutoff:
                 os.remove(path)
@@ -243,9 +239,7 @@ def mode_baseline(
 
     Healthy = ok_count >= 3.
     """
-    same = [
-        sid for sid, _ in prior_sessions if sessions_by_id[sid][0].get("mode") == mode
-    ][-n:]
+    same = [sid for sid, _ in prior_sessions if sessions_by_id[sid][0].get("mode") == mode][-n:]
     healthy = sum(1 for sid in same if stats[c][sid]["ok"] >= HEALTHY_OK_THRESHOLD)
     return len(same), healthy
 
@@ -287,9 +281,7 @@ def compute_critical_alerts(
         if curr_ok != 0:
             continue
         gap = dark_runs(stats, c, session_list)
-        samples, healthy = mode_baseline(
-            stats, c, prior_sessions, current_mode, sessions_by_id, n=3
-        )
+        samples, healthy = mode_baseline(stats, c, prior_sessions, current_mode, sessions_by_id, n=3)
         if samples >= 3:
             should_alert = healthy >= 2
         elif samples >= 1:
@@ -309,9 +301,7 @@ def compute_critical_alerts(
         if total_ok_ever(stats, c, prior_sessions, current_sid) == 0:
             continue
 
-        last_ok = last_healthy_ts(
-            stats, c, prior_sessions, sessions_by_id, HEALTHY_OK_THRESHOLD
-        )
+        last_ok = last_healthy_ts(stats, c, prior_sessions, sessions_by_id, HEALTHY_OK_THRESHOLD)
         reason = (
             f"0 successful calls in `{current_mode}` run; "
             f"{healthy}/{samples} prior `{current_mode}` runs were healthy; "
@@ -361,9 +351,7 @@ def compute_warning_alerts(
 
 def _compact_mode(mode: str) -> str:
     return (
-        mode.replace("consolidation-", "c-")
-        .replace("morning-briefing", "morning")
-        .replace("weekend-briefing", "wknd")
+        mode.replace("consolidation-", "c-").replace("morning-briefing", "morning").replace("weekend-briefing", "wknd")
     )
 
 
@@ -399,8 +387,7 @@ def render_health_md(
         "Parent: [[knowledge-base]]",
         "",
         f"**Last updated:** {now.astimezone(ET).strftime('%Y-%m-%d %H:%M ET')}",
-        f"**Window:** last 14 days, scheduled scout runs only "
-        f"(`{len(recent)}` of `{len(session_list)}` shown).",
+        f"**Window:** last 14 days, scheduled scout runs only (`{len(recent)}` of `{len(session_list)}` shown).",
         "",
     ]
 
@@ -428,8 +415,7 @@ def render_health_md(
     lines += [
         "## Status (last 10 scheduled runs)",
         "",
-        "`✅ N` = N successful calls · `⚠️ ok/tot` = errors >50% · "
-        "`❌` = 0 calls this run · `·` = no attempts",
+        "`✅ N` = N successful calls · `⚠️ ok/tot` = errors >50% · `❌` = 0 calls this run · `·` = no attempts",
         "",
     ]
 
@@ -457,9 +443,7 @@ def render_health_md(
     for c, connector in alertable.items():
         cells = [_matrix_cell(stats, c, sid) for sid in recent_ids]
         total7 = ok7[c] + err7[c]
-        rate = (
-            f"{int(ok7[c] / total7 * 100)}% ({ok7[c]}/{total7})" if total7 else "—"
-        )
+        rate = f"{int(ok7[c] / total7 * 100)}% ({ok7[c]}/{total7})" if total7 else "—"
         lines.append(f"| {connector.display_name} | " + " | ".join(cells) + f" | {rate} |")
 
     lines += [
@@ -513,9 +497,7 @@ def render_pending_alerts_md(
         lines.append(f"   ↳ *Try first:* {first_fix}")
         if a.err_sample:
             lines.append(f"   ↳ *Last error:* `{a.err_sample}`")
-    lines.append(
-        "_Full matrix + detailed remediation: `knowledge-base/connector-health.md`._"
-    )
+    lines.append("_Full matrix + detailed remediation: `knowledge-base/connector-health.md`._")
     return "\n".join(lines) + "\n"
 
 
@@ -587,13 +569,9 @@ def run(
     current_sid = session_list[-1][0]
     current_mode = sessions_by_id[current_sid][0].get("mode", "unknown")
 
-    critical_alerts = compute_critical_alerts(
-        stats, session_list, dict(sessions_by_id), alertable, records
-    )
+    critical_alerts = compute_critical_alerts(stats, session_list, dict(sessions_by_id), alertable, records)
     critical_keys = {a.connector_key for a in critical_alerts}
-    warning_alerts = compute_warning_alerts(
-        stats, current_sid, alertable, records, critical_keys
-    )
+    warning_alerts = compute_warning_alerts(stats, current_sid, alertable, records, critical_keys)
     alerts = critical_alerts + warning_alerts
 
     # Render connector-health.md.
@@ -618,17 +596,13 @@ def run(
         try:
             with alerts_path.open("a", encoding="utf-8") as f:
                 for a in alerts:
-                    f.write(
-                        f"{ts_str} [{a.level}] run={current_mode} {a.name}: {a.reason}\n"
-                    )
+                    f.write(f"{ts_str} [{a.level}] run={current_mode} {a.name}: {a.reason}\n")
         except OSError:
             pass
 
         try:
             pending_path.write_text(
-                render_pending_alerts_md(
-                    alerts, current_mode=current_mode, now=n, registry=registry
-                ),
+                render_pending_alerts_md(alerts, current_mode=current_mode, now=n, registry=registry),
                 encoding="utf-8",
             )
         except OSError:
@@ -671,9 +645,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         n_alerts = len(event.payload.get("alerts", []))
         n_sessions = event.payload.get("sessions_in_window", 0)
-        print(
-            f"connector-health: {n_sessions} sessions in window, {n_alerts} alert(s)"
-        )
+        print(f"connector-health: {n_sessions} sessions in window, {n_alerts} alert(s)")
         return 0
     except Exception as e:  # pragma: no cover — defensive
         print(f"connector-health: fatal error: {type(e).__name__}: {e}")
