@@ -178,7 +178,9 @@ def test_generated_from_falls_back_to_unknown_when_git_missing():
 def test_main_writes_target_default_path_argument(tmp_path):
     """The `--target` flag overrides the default path."""
     target = tmp_path / "fixtures" / "snap.json"
-    rc = snap.main(["--target", str(target)])
+    # --no-also-write-app-fixture keeps the test isolated from the dev
+    # machine's ~/scout-app checkout (default behavior dual-writes there).
+    rc = snap.main(["--target", str(target), "--no-also-write-app-fixture"])
     assert rc == 0
     assert target.exists()
     parsed = json.loads(target.read_text())
@@ -212,3 +214,107 @@ def test_serialize_format_indent_two_with_trailing_newline():
     assert text.endswith("\n")
     # Spot-check indent: the second line should start with two spaces.
     assert text.split("\n")[1].startswith('  "')
+
+
+# ----- Plan 4 Task 8 followup: canonical path + dual-write -------------------
+
+
+def test_canonical_snapshot_path_points_at_engine_scout():
+    """The canonical snapshot lives at engine/scout/connectors.snapshot.json.
+    CI verifies this exact file with `--check`."""
+    canonical = snap.canonical_snapshot_path()
+    parts = canonical.parts
+    # Last three components must be engine/scout/connectors.snapshot.json.
+    assert parts[-3:] == ("engine", "scout", "connectors.snapshot.json")
+
+
+def test_app_fixture_snapshot_path_points_at_scout_app():
+    """The scout-app fixture path lives at
+    ~/scout-app/ScoutTests/Fixtures/connectors.snapshot.json."""
+    fixture = snap.app_fixture_snapshot_path()
+    parts = fixture.parts
+    assert parts[-4:] == (
+        "scout-app",
+        "ScoutTests",
+        "Fixtures",
+        "connectors.snapshot.json",
+    )
+
+
+def test_main_dual_writes_when_app_fixture_dir_exists(tmp_path, monkeypatch):
+    """Default behavior: writing to --target ALSO writes to the scout-app
+    bundled fixture (best-effort) so a single invocation keeps both repos
+    in sync."""
+    # Stand up a fake scout-app checkout under tmp_path and point the helper
+    # at it for the duration of the test.
+    fake_app_fixture = tmp_path / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json"
+    fake_app_fixture.parent.mkdir(parents=True)
+    monkeypatch.setattr(snap, "app_fixture_snapshot_path", lambda: fake_app_fixture)
+
+    primary = tmp_path / "primary.json"
+    rc = snap.main(["--target", str(primary)])
+    assert rc == 0
+    assert primary.exists()
+    assert fake_app_fixture.exists()
+    # Both files should have identical content (same builder, same SHA).
+    assert primary.read_text(encoding="utf-8") == fake_app_fixture.read_text(encoding="utf-8")
+
+
+def test_main_skips_app_fixture_with_warning_when_dir_missing(tmp_path, monkeypatch, capsys):
+    """If the scout-app fixture parent doesn't exist, the dual-write is
+    skipped with a stderr warning rather than failing."""
+    bogus = tmp_path / "nonexistent-scout-app" / "Fixtures" / "connectors.snapshot.json"
+    monkeypatch.setattr(snap, "app_fixture_snapshot_path", lambda: bogus)
+
+    primary = tmp_path / "primary.json"
+    rc = snap.main(["--target", str(primary)])
+    assert rc == 0
+    assert primary.exists()
+    assert not bogus.exists()
+    captured = capsys.readouterr()
+    assert "skipped scout-app fixture write" in captured.err
+    assert "--no-also-write-app-fixture" in captured.err
+
+
+def test_main_no_also_write_app_fixture_skips_dual_write(tmp_path, monkeypatch):
+    """`--no-also-write-app-fixture` disables the secondary write entirely,
+    even when the path is viable."""
+    fake_app_fixture = tmp_path / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json"
+    fake_app_fixture.parent.mkdir(parents=True)
+    monkeypatch.setattr(snap, "app_fixture_snapshot_path", lambda: fake_app_fixture)
+
+    primary = tmp_path / "primary.json"
+    rc = snap.main(["--target", str(primary), "--no-also-write-app-fixture"])
+    assert rc == 0
+    assert primary.exists()
+    assert not fake_app_fixture.exists()
+
+
+def test_main_dual_write_no_op_when_target_equals_app_fixture(tmp_path, monkeypatch, capsys):
+    """If the operator passes --target pointing at the app fixture itself,
+    the primary write covers it — no double-write, no warning."""
+    fake_app_fixture = tmp_path / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json"
+    fake_app_fixture.parent.mkdir(parents=True)
+    monkeypatch.setattr(snap, "app_fixture_snapshot_path", lambda: fake_app_fixture)
+
+    rc = snap.main(["--target", str(fake_app_fixture)])
+    assert rc == 0
+    assert fake_app_fixture.exists()
+    captured = capsys.readouterr()
+    # Exactly one "Wrote:" line (the primary), no second one for the app fixture.
+    assert captured.out.count("Wrote:") == 1
+    assert "skipped" not in captured.err
+
+
+def test_main_default_target_is_canonical_snapshot_path(tmp_path, monkeypatch):
+    """When --target is omitted, main() writes the canonical snapshot path.
+
+    Redirect the canonical helper to tmp_path so the test doesn't actually
+    touch the repo's committed snapshot.
+    """
+    fake_canonical = tmp_path / "engine" / "scout" / "connectors.snapshot.json"
+    monkeypatch.setattr(snap, "canonical_snapshot_path", lambda: fake_canonical)
+    # Disable the dual-write so we only assert on the primary path here.
+    rc = snap.main(["--no-also-write-app-fixture"])
+    assert rc == 0
+    assert fake_canonical.exists()

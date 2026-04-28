@@ -31,10 +31,36 @@ Determinism:
     by a single trailing newline. ``--check`` does a byte-identical compare,
     so both the writer and the verifier MUST go through ``serialize()``.
 
-The default ``--target`` path is hardcoded to ``~/scout-app/ScoutTests/Fixtures/
-connectors.snapshot.json`` to match Jordan's dev machine. This is acceptable
-for v0.4 because ``scoutctl connectors snapshot`` is a developer tool, not a
-production pathway. CI invokes the command with an explicit ``--target``.
+Operator handoff when YAML changes
+----------------------------------
+
+When ``engine/scout/connectors.yaml`` is edited, two snapshot files must
+stay in sync (one in each repo) and both must be committed:
+
+  1. **Edit** ``engine/scout/connectors.yaml`` (this repo, ``scout-plugin``).
+  2. **Regenerate** both snapshot copies:
+        $ scoutctl connectors snapshot
+     The default invocation writes the canonical snapshot at
+     ``engine/scout/connectors.snapshot.json`` AND, best-effort, the
+     scout-app fixture at ``~/scout-app/ScoutTests/Fixtures/
+     connectors.snapshot.json``. Pass ``--no-also-write-app-fixture`` to
+     skip the cross-repo write (e.g. on a build agent without scout-app
+     checked out). If scout-app isn't checked out, the cross-repo write
+     is skipped with a warning rather than failing.
+  3. **Commit BOTH** repos. CI in scout-plugin verifies (1)+(2)
+     consistency on the canonical snapshot via ``--check``. Nothing
+     auto-verifies that scout-app's bundled fixture matches; cross-repo
+     drift between the two committed copies is detectable only by
+     re-running this command and noticing a non-empty git diff in
+     scout-app.
+  4. (CI) Scout-plugin's ``test`` workflow runs::
+        python -m scout.scripts.connectors_snapshot --check \\
+            --target scout/connectors.snapshot.json
+     This guards step (1)+(2) for the canonical file only.
+
+The ``--target`` flag overrides the canonical destination. CI passes an
+explicit ``--target`` so the resolution is independent of cwd. Tests pass
+``--target tmp_path/...`` to avoid touching either repo.
 """
 
 from __future__ import annotations
@@ -50,6 +76,29 @@ from typing import Any
 from scout.connectors import Tier, load_registry
 
 SCHEMA_VERSION = 1
+
+
+def canonical_snapshot_path() -> Path:
+    """Return the canonical snapshot path inside scout-plugin.
+
+    This is the file CI verifies with ``--check``. It is the source of truth
+    for the cross-repo contract: scout-app's bundled fixture must match this
+    file byte-for-byte (modulo the ``generated_from`` SHA, which is excluded
+    from comparisons — see ``check_snapshot``).
+    """
+    # engine/scout/scripts/connectors_snapshot.py -> engine/scout/scripts ->
+    # engine/scout, so parents[1] / "connectors.snapshot.json" is the canonical.
+    return Path(__file__).resolve().parents[1] / "connectors.snapshot.json"
+
+
+def app_fixture_snapshot_path() -> Path:
+    """Return scout-app's bundled fixture path.
+
+    Best-effort secondary write target. Hardcoded to Jordan's dev-machine
+    layout (``~/scout-app/...``); skipped with a warning if scout-app isn't
+    checked out at that location.
+    """
+    return Path.home() / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json"
 
 
 def _short_sha(repo_dir: Path) -> str:
@@ -173,13 +222,34 @@ def main(argv: list[str] | None = None) -> int:
         "--target",
         "-t",
         type=Path,
-        default=Path.home() / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json",
-        help="Where to write the snapshot.",
+        default=canonical_snapshot_path(),
+        help=(
+            "Where to write the snapshot. Defaults to scout-plugin's canonical "
+            "engine/scout/connectors.snapshot.json (the file CI verifies)."
+        ),
     )
     parser.add_argument(
         "--check",
         action="store_true",
         help="Exit 1 if on-disk file differs from what would be written.",
+    )
+    parser.add_argument(
+        "--also-write-app-fixture",
+        dest="also_write_app_fixture",
+        action="store_true",
+        default=True,
+        help=(
+            "Also write the scout-app bundled fixture at "
+            "~/scout-app/ScoutTests/Fixtures/connectors.snapshot.json. "
+            "Best-effort: silently skipped (with a warning) if the path "
+            "doesn't exist on this machine. Default: enabled."
+        ),
+    )
+    parser.add_argument(
+        "--no-also-write-app-fixture",
+        dest="also_write_app_fixture",
+        action="store_false",
+        help="Disable the secondary write to scout-app's bundled fixture.",
     )
     args = parser.parse_args(argv)
 
@@ -194,6 +264,26 @@ def main(argv: list[str] | None = None) -> int:
 
     write_snapshot(args.target)
     print(f"Wrote: {args.target}")
+
+    # Best-effort dual-write to the scout-app fixture so a single invocation
+    # keeps both repos' copies in sync. Skip silently (with a warning) if the
+    # secondary path isn't a viable destination on this machine.
+    if args.also_write_app_fixture:
+        app_fixture = app_fixture_snapshot_path()
+        if app_fixture == args.target:
+            # The operator passed --target pointing at the app fixture; the
+            # primary write already covered it. No-op to avoid double-writes.
+            pass
+        elif app_fixture.parent.is_dir():
+            write_snapshot(app_fixture)
+            print(f"Wrote: {app_fixture}")
+        else:
+            sys.stderr.write(
+                f"warning: skipped scout-app fixture write — {app_fixture.parent} "
+                "is not a directory on this machine. Pass --no-also-write-app-fixture "
+                "to silence.\n"
+            )
+
     return 0
 
 

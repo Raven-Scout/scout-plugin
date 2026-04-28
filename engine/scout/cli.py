@@ -165,35 +165,80 @@ def _register_connectors() -> None:
 
     @connectors_app.command("snapshot")
     def cli_connectors_snapshot(
-        target: Path = typer.Option(
-            Path.home() / "scout-app" / "ScoutTests" / "Fixtures" / "connectors.snapshot.json",
+        target: Path | None = typer.Option(
+            None,
             "--target",
             "-t",
-            help="Where to write the snapshot.",
+            help=(
+                "Where to write the snapshot. Defaults to scout-plugin's "
+                "canonical engine/scout/connectors.snapshot.json (the file "
+                "CI verifies)."
+            ),
         ),
         check: bool = typer.Option(
             False,
             "--check",
             help="Exit 1 if on-disk differs from would-write; print unified diff.",
         ),
+        also_write_app_fixture: bool = typer.Option(
+            True,
+            "--also-write-app-fixture/--no-also-write-app-fixture",
+            help=(
+                "Also write the scout-app bundled fixture at "
+                "~/scout-app/ScoutTests/Fixtures/connectors.snapshot.json. "
+                "Best-effort: silently skipped (with a warning) if the path "
+                "doesn't exist on this machine. Default: enabled."
+            ),
+        ),
     ) -> None:
-        """Write or verify connectors.snapshot.json (consumed by scout-app)."""
-        from scout.scripts.connectors_snapshot import check_snapshot, write_snapshot
+        """Write or verify connectors.snapshot.json (consumed by scout-app).
+
+        Default behavior writes BOTH the canonical snapshot in scout-plugin
+        AND the scout-app bundled fixture, so a single invocation keeps both
+        repos in sync after a connectors.yaml edit. Pass
+        --no-also-write-app-fixture on a build agent that doesn't have
+        scout-app checked out.
+        """
+        from scout.scripts.connectors_snapshot import (
+            app_fixture_snapshot_path,
+            canonical_snapshot_path,
+            check_snapshot,
+            write_snapshot,
+        )
+
+        resolved_target = target if target is not None else canonical_snapshot_path()
 
         if check:
-            ok, diff = check_snapshot(target)
+            ok, diff = check_snapshot(resolved_target)
             if ok:
-                typer.echo(f"connectors snapshot OK: {target}")
+                typer.echo(f"connectors snapshot OK: {resolved_target}")
                 return
             typer.echo(diff, err=True)
             typer.echo(
-                f"Drift detected: regenerate with `scoutctl connectors snapshot --target {target}`.",
+                f"Drift detected: regenerate with `scoutctl connectors snapshot --target {resolved_target}`.",
                 err=True,
             )
             raise typer.Exit(code=1)
 
-        write_snapshot(target)
-        typer.echo(f"Wrote: {target}")
+        write_snapshot(resolved_target)
+        typer.echo(f"Wrote: {resolved_target}")
+
+        # Best-effort dual-write so a single invocation keeps both repos in sync.
+        if also_write_app_fixture:
+            app_fixture = app_fixture_snapshot_path()
+            if app_fixture == resolved_target:
+                # Operator pointed --target at the app fixture; primary write covered it.
+                pass
+            elif app_fixture.parent.is_dir():
+                write_snapshot(app_fixture)
+                typer.echo(f"Wrote: {app_fixture}")
+            else:
+                typer.echo(
+                    f"warning: skipped scout-app fixture write — {app_fixture.parent} "
+                    "is not a directory on this machine. Pass --no-also-write-app-fixture "
+                    "to silence.",
+                    err=True,
+                )
 
 
 _register_connectors()
