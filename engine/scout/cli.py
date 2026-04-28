@@ -65,6 +65,18 @@ def _register_action_items() -> None:
 _register_action_items()
 
 
+hook_app = typer.Typer(help="PostToolUse / lifecycle hook entry points (invoked by Claude Code).")
+app.add_typer(hook_app, name="hook")
+
+
+@hook_app.command("connector-log")
+def hook_connector_log() -> None:
+    """PostToolUse hook: log one JSONL row per tool call to .scout-logs/."""
+    from scout.hooks.connector_log import main as connector_log_main
+
+    raise typer.Exit(connector_log_main())
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""

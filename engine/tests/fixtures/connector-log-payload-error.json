@@ -1,0 +1,6 @@
+{
+  "session_id": "abc-123-err",
+  "tool_name": "mcp__claude_ai_Gmail__search_threads",
+  "tool_input": {"q": "..."},
+  "tool_response": {"isError": true, "error": "auth expired"}
+}
