@@ -85,6 +85,21 @@ def hook_session_tokens() -> None:
     raise typer.Exit(session_tokens_main())
 
 
+@hook_app.command("kb-pre-filter")
+def hook_kb_pre_filter(
+    session_type: str = typer.Option(
+        "dreaming",
+        "--session-type",
+        "-s",
+        help="Session type label written to the cache header (briefing | consolidation | dreaming).",
+    ),
+) -> None:
+    """UserPromptSubmit hook: score KB freshness and write .scout-cache/kb-filter.md."""
+    from scout.hooks.kb_pre_filter import main as kb_pre_filter_main
+
+    raise typer.Exit(kb_pre_filter_main([session_type]))
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""
