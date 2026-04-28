@@ -30,6 +30,11 @@ from scout import paths
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
+# Eastern Time — bash uses this implicitly via the system TZ when parsing
+# wall-clock dates with `date -j -f ... +%s`, then subtracts UTC-epoch seconds.
+# We must replicate the UTC-epoch arithmetic to stay correct across DST.
+ET = ZoneInfo("America/New_York")
+
 # Per-filename freshness budget (in hours). Bash lines 33-37.
 FRESHNESS_OVERRIDES: dict[str, int] = {
     "linear-issues.md": 6,
@@ -130,7 +135,8 @@ def extract_date_string(path: Path) -> str:
     head = _read_head(path)
     line = ""
     for raw in head:
-        if re.search(r"last\s+updated|last\s+verified", raw, re.IGNORECASE):
+        # Single space (not \s+) for strict bash parity — bash uses literal " ".
+        if re.search(r"last updated|last verified", raw, re.IGNORECASE):
             line = raw
             break
     if not line:
@@ -234,11 +240,14 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
     if parsed is None:
         return ("NO_DATE", {"rel": rel})
 
-    # If the input now is timezone-aware, drop tzinfo for the comparison.
-    # parse_date returns naive datetimes (strptime with no %z); make them
-    # comparable by stripping tz from now too.
-    now_naive = now.replace(tzinfo=None) if now.tzinfo is not None else now
-    age_seconds = (now_naive - parsed).total_seconds()
+    # Bash interprets the wall-clock date in ET via `date -j -f` then subtracts
+    # UTC-epoch seconds. We must do the same: attach ET to the parsed wall-clock
+    # date, attach ET to `now` if naive, then subtract via .timestamp() to get
+    # UTC-elapsed seconds (NOT wall-clock seconds — same-zone aware subtraction
+    # in Python returns wall-clock delta, which drifts 1h across DST boundaries).
+    parsed_et = parsed.replace(tzinfo=ET)
+    now_et = now if now.tzinfo is not None else now.replace(tzinfo=ET)
+    age_seconds = now_et.timestamp() - parsed_et.timestamp()
     age_hours = int(age_seconds // 3600)
     budget = freshness_hours_for(path)
 

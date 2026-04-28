@@ -316,6 +316,48 @@ def test_classify_no_date_when_unparseable(tmp_path):
     assert label == "NO_DATE"
 
 
+def test_classify_age_is_dst_correct_across_spring_forward(tmp_path):
+    """Bash uses UTC-elapsed seconds via `date -j -f ... +%s` — Python must too.
+
+    Concrete scenario: file dated Jan 1, 2026 12:00 PM (EST, UTC-5),
+    "now" = Apr 28, 2026 12:00 PM (EDT, UTC-4). Spring-forward in March 2026
+    makes this case sensitive:
+
+      - Wall-clock delta: 117 days × 24h = 2808h  (NAIVE Python — wrong)
+      - UTC-elapsed delta: 117*24 - 1 = 2807h     (BASH — correct)
+
+    Same-zone tz-aware subtraction in Python *also* returns wall-clock delta
+    (Python docs: "If both are aware and have different tzinfo attributes,
+    a-b acts as if a and b were first converted to naive UTC datetimes" —
+    so SAME tzinfo means no conversion). The fix must convert via
+    `.timestamp()` (or via UTC) to match bash.
+    """
+    et = ZoneInfo("America/New_York")
+    f = tmp_path / "thing.md"
+    f.write_text("---\npriority: 🔴 Urgent\n---\n**Last Updated:** January 1, 2026 12:00 PM\n")
+    now = datetime(2026, 4, 28, 12, 0, tzinfo=et)
+    label, details = classify(f, now=now, scout_dir=tmp_path)
+    # Bash gives 2807h for this case (verified with `date -j -f`).
+    # Naive Python or same-zone aware subtraction would give 2808h.
+    assert details["age_hours"] == 2807, (
+        f"Expected 2807h (UTC-elapsed, matches bash) but got {details['age_hours']}h. "
+        f"2808h indicates wall-clock subtraction (DST drift bug)."
+    )
+    # 2807h > 72h budget for a 🔴 file → STALE
+    assert label == "STALE"
+
+
+def test_classify_age_naive_now_treated_as_et(tmp_path):
+    """When `now` is passed in naive, classify() should interpret it as ET
+    (matching the behavior bash gets implicitly via system TZ)."""
+    f = tmp_path / "thing.md"
+    f.write_text("---\npriority: 🔴 Urgent\n---\n**Last Updated:** January 1, 2026 12:00 PM\n")
+    now_naive = datetime(2026, 4, 28, 12, 0)  # naive
+    _, details = classify(f, now=now_naive, scout_dir=tmp_path)
+    # Same expectation as DST test: 2807h via UTC-epoch arithmetic.
+    assert details["age_hours"] == 2807
+
+
 # -- run ----------------------------------------------------------------------
 
 
