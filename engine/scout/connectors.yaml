@@ -1,0 +1,196 @@
+# scout connector roster — single source of truth for hooks, scripts, and scout-app.
+#
+# Schema (v1):
+#   schema_version: integer
+#   connectors:
+#     <key>:
+#       display_name: string
+#       tier: official | auto_discovered | community
+#       capabilities: [inbound, outbound, ...]   # see §"Capabilities" below
+#       required_in: all | [mode, mode, ...]     # which scheduled-run modes this connector is critical for
+#       remediation:
+#         first_fix: string  (≤180 chars; goes into Slack/Telegram DMs)
+#         detail:    string  (multi-line allowed; goes into connector-health.md)
+#       notes: string (optional)
+#
+# `key` is the value emitted by hooks/connector_log.py's classify() — i.e.,
+# what the JSONL `connector` field will read as. Hooks compute the key from
+# the tool name; scripts and scout-app look the key up here.
+#
+# Capabilities vocabulary:
+#   inbound    — the connector pulls signals INTO Scout (Slack messages, Linear updates, etc.)
+#   outbound   — the connector pushes signals OUT of Scout (Slack DM, Telegram bot DM)
+#   meta       — the connector reports about Scout itself (e.g. github via gh CLI for PR queue)
+#
+# Modes vocabulary (must match the runner's $SCOUT_MODE values):
+#   morning-briefing, weekend-briefing
+#   consolidation-11am, consolidation-1pm, consolidation-5pm, consolidation-7pm
+#   manual, weekend-manual
+
+schema_version: 1
+
+connectors:
+  mcp:claude_ai_Slack:
+    display_name: Slack
+    tier: official
+    capabilities: [inbound, outbound]
+    required_in: all
+    remediation:
+      first_fix: "Reconnect Slack at https://claude.ai/settings/connectors — claude.ai Slack OAuth likely expired."
+      detail: |
+        Slack is a claude.ai MCP connector for scheduled scout runs (the local
+        Claude Code plugin path is only used in interactive ~/Scout sessions).
+        Reconnect at https://claude.ai/settings/connectors → click Reconnect on
+        the Slack row. If the connector is missing entirely, add it back via the
+        Add connector flow.
+
+  mcp:claude_ai_Linear:
+    display_name: Linear
+    tier: official
+    capabilities: [inbound]
+    required_in: all
+    remediation:
+      first_fix: "Reconnect Linear at https://claude.ai/settings/connectors — claude.ai Linear OAuth likely expired."
+      detail: |
+        Linear is a claude.ai MCP connector for scheduled scout runs. Reconnect at
+        https://claude.ai/settings/connectors → click Reconnect on the Linear row.
+        If a Linear workspace switch happened, the OAuth scope may need re-grant.
+
+  mcp:claude_ai_Gmail:
+    display_name: Gmail
+    tier: official
+    capabilities: [inbound]
+    required_in: all
+    remediation:
+      first_fix: "Reconnect Gmail at https://claude.ai/settings/connectors — Google OAuth likely needs refresh."
+      detail: |
+        Gmail is a claude.ai MCP connector. Go to https://claude.ai/settings/connectors
+        and click Reconnect on the Gmail row. Common triggers: Google account password
+        changed, 2FA reset, or the token went idle >7 days. After reconnecting, the next
+        scheduled scout run should regain access.
+
+  mcp:claude_ai_Google_Calendar:
+    display_name: Google Calendar
+    tier: official
+    capabilities: [inbound]
+    required_in: all
+    remediation:
+      first_fix: "Reconnect Google Calendar at https://claude.ai/settings/connectors (same Google auth as Gmail)."
+      detail: |
+        Google Calendar uses the same claude.ai connector pattern as Gmail — usually
+        if one Google connector breaks, they all do. Reconnect at
+        https://claude.ai/settings/connectors.
+
+  mcp:claude_ai_Granola:
+    display_name: Granola
+    tier: official
+    capabilities: [inbound]
+    required_in:
+      # Skip on weekends — meeting transcripts are work-week-only.
+      - morning-briefing
+      - consolidation-11am
+      - consolidation-1pm
+      - consolidation-5pm
+      - consolidation-7pm
+      - manual
+    remediation:
+      first_fix: "Reconnect Granola at https://claude.ai/settings/connectors — Granola tokens expire periodically."
+      detail: |
+        Granola is a claude.ai MCP connector with tokens that expire more often than
+        Google's. Reconnect at https://claude.ai/settings/connectors.
+
+  mcp:claude_ai_Google_Drive:
+    display_name: Google Drive
+    tier: official
+    capabilities: [inbound]
+    required_in:
+      # Same weekday-only scope as Granola — Phase 1e weekday-mandatory.
+      - morning-briefing
+      - consolidation-11am
+      - consolidation-1pm
+      - consolidation-5pm
+      - consolidation-7pm
+      - manual
+    remediation:
+      first_fix: "Reconnect Google Drive at https://claude.ai/settings/connectors."
+      detail: "Google Drive connector — same reconnect flow as Gmail at https://claude.ai/settings/connectors."
+
+  github:
+    display_name: GitHub (gh CLI)
+    tier: official
+    capabilities: [inbound, meta]
+    required_in: all
+    remediation:
+      first_fix: "Run `gh auth status`; if expired, `gh auth login` to re-auth. Token lives in macOS keychain."
+      detail: |
+        GitHub access is via the local `gh` CLI (not an MCP). Token expiry is the usual
+        cause. `gh auth status` shows current state; `gh auth login` refreshes it. After a
+        Keboola SAML re-auth, the personal token may need a separate refresh.
+
+  mcp:claude-in-chrome:
+    display_name: Chrome (Google Messages)
+    tier: official
+    capabilities: [inbound]
+    required_in:
+      # Required only when the briefing scans personal-context surfaces.
+      - morning-briefing
+      - weekend-briefing
+      - consolidation-11am
+      - consolidation-1pm
+      - consolidation-5pm
+      - consolidation-7pm
+      - manual
+    remediation:
+      first_fix: "Make sure Chrome is running with the Claude-in-Chrome extension enabled at chrome://extensions. If the Mac was asleep, waking it is enough."
+      detail: |
+        Chrome MCP requires (a) Chrome.app actually running, (b) the Claude-in-Chrome
+        extension loaded and enabled at chrome://extensions. Most false positives come
+        from overnight sleep or a Chrome crash. Quick check: open messages.google.com/web/
+        in Chrome manually — if that loads, the extension should reconnect on next
+        scout run. If not, reload the extension (toggle off/on at chrome://extensions).
+    notes: |
+      Promoted from OPTIONAL to CRITICAL on 2026-04-25. Google Messages is a
+      first-class personal-task source (vet appointments, family commitments)
+      that no work connector replaces.
+
+  mcp:whatsapp-mcp:
+    display_name: WhatsApp
+    tier: official
+    capabilities: [inbound]
+    required_in:
+      # Personal-context scans are briefing-time only — consolidation runs
+      # are work-focused. Adjust per user preference via the v0.8 overlay.
+      - morning-briefing
+      - weekend-briefing
+    remediation:
+      first_fix: "Check the WhatsApp MCP bridge: `launchctl list | grep com.scout.whatsapp-bridge`. Restart with `launchctl kickstart -k gui/$UID/com.scout.whatsapp-bridge` if the bridge is down."
+      detail: |
+        WhatsApp inbound runs via the verygoodplugins/whatsapp-mcp server — a local
+        Go bridge (whatsmeow library, persistent ~20-day session after one-time QR pair)
+        plus a Python MCP server that the scheduled session connects to via stdio.
+        Bridge runs as a launchctl service (com.scout.whatsapp-bridge.plist). If the
+        bridge is down, the MCP startup fails and the connector goes dark.
+
+        Common failure modes:
+          1. Session expired (~20 days) — re-pair QR via interactive bridge run.
+          2. Bridge crashed — `launchctl kickstart` to restart.
+          3. macOS Network Extension permissions reset — re-grant in System Settings.
+
+        Setup docs: engine/scout/docs/connectors/whatsapp-setup.md
+
+  notify:telegram:
+    display_name: Telegram (outbound)
+    tier: official
+    capabilities: [outbound]
+    required_in: []   # never required — outbound notifications never make a run "fail"
+    remediation:
+      first_fix: "Check `~/.scout-secrets/telegram-bot-token` exists (mode 600); test with `scoutctl notify telegram --tier info --body 'health check'`."
+      detail: |
+        Telegram outbound is a Bot API curl wrapped behind `scoutctl notify telegram`.
+        Token + numeric chat ID stored in ~/.scout-secrets/ (gitignored, mode 600).
+
+        Setup walkthrough: engine/scout/docs/connectors/telegram-setup.md
+        (one-time @BotFather flow + chat-ID capture).
+
+        Bidirectional Telegram (the inbound return-bridge for replies as feedback
+        signals) is v0.7 territory per the v0.5+ event-architecture spec.

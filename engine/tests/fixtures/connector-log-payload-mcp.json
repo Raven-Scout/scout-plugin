@@ -1,0 +1,6 @@
+{
+  "session_id": "abc-123-mcp",
+  "tool_name": "mcp__plugin_slack_slack__slack_send_message",
+  "tool_input": {"channel": "C123", "text": "hello"},
+  "tool_response": {"isError": false, "content": [{"type": "text", "text": "ok"}]}
+}

@@ -53,7 +53,7 @@ def build_manifest() -> EngineManifest:
     """Construct the manifest from package state.
 
     Feature flags reflect what this version of the engine promises.
-    Plans 2 and 3 flip individual flags to True as subsystems land.
+    Plans 2 and 4 flip individual flags to True as subsystems land.
     Subcommands are derived from the live Typer app — adding a
     command in scout.cli automatically updates the manifest.
     """
@@ -61,8 +61,8 @@ def build_manifest() -> EngineManifest:
         version=__version__,
         schema_version=1,
         features={
-            "session_tokens_v1": False,  # Plan 3
-            "connector_health_v1": False,  # Plan 3
+            "session_tokens_v1": True,  # Plan 4
+            "connector_health_v1": True,  # Plan 4
             "action_items_cli_v1": True,  # Plan 2
             "kb_ontology_v1": True,  # Plan 2
             "tui_v1": True,  # Plan 2
