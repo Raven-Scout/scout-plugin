@@ -389,6 +389,37 @@ def _register_schedule() -> None:
             typer.echo(f"plist already exists at {e}; use --force to overwrite", err=True)
             raise typer.Exit(code=1) from e
 
+    @schedule_app.command("install-wake-schedule")
+    def cli_schedule_install_wake_schedule(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+        dry_run: bool = typer.Option(False, "--dry-run"),
+    ) -> None:
+        """Install (or remove) a pmset repeat rule that wakes the Mac for the earliest weekday slot.
+
+        AC-only: macOS standby suppresses wake timers when on battery + lid closed.
+        Keep the laptop plugged in if you need guaranteed live firing.
+        """
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+        from scout.scripts.install_wake_schedule import (
+            install_wake_schedule as _i,
+        )
+        from scout.scripts.install_wake_schedule import (
+            uninstall_wake_schedule as _u,
+        )
+
+        if uninstall:
+            typer.echo(_u(dry_run=dry_run))
+            return
+        vault = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault) if vault.exists() else load_default_schedule()
+        typer.echo(
+            "Note: pmset wake-schedule is AC-only. On battery + lid closed, "
+            "Apple Silicon laptops enter standby and ignore wake timers. "
+            "Keep the laptop plugged in if you need guaranteed live firing."
+        )
+        typer.echo(_i(sched, dry_run=dry_run))
+
 
 _register_schedule()
 
