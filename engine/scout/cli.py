@@ -340,6 +340,24 @@ def _register_schedule() -> None:
         load_default_schedule()
         typer.echo("reloaded")
 
+    @schedule_app.command("tick")
+    def cli_schedule_tick() -> None:
+        """Run a single dispatch tick. Invoked by com.scout.schedule-tick.plist every 5 min."""
+        from scout.scripts.schedule_tick import main as _main
+
+        raise typer.Exit(code=_main())
+
+    @schedule_app.command("fire-now")
+    def cli_schedule_fire_now(slot_key: str) -> None:
+        """Manually fire a slot, bypassing the dispatcher's policy logic."""
+        from scout.scripts.schedule_tick import fire_now as _fire_now
+
+        ev = _fire_now(slot_key)
+        if ev.kind == "slot.fire_failed":
+            typer.echo(f"failed: {(ev.payload or {}).get('error', 'unknown')}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"fired: {slot_key}")
+
 
 _register_schedule()
 
