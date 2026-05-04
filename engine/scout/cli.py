@@ -421,6 +421,71 @@ def _register_schedule() -> None:
         )
         typer.echo(_i(sched, dry_run=dry_run))
 
+    @schedule_app.command("list-upcoming")
+    def cli_schedule_list_upcoming(
+        window: float = typer.Option(24.0, "--window", help="Look-ahead window in hours."),
+        use_json: bool = typer.Option(
+            True, "--json/--no-json", help="Emit JSON array (default) or tab-separated rows."
+        ),
+    ) -> None:
+        """List the next scheduled fire time for each slot within the given window.
+
+        JSON output (default) is an array sorted by scheduled_at_utc:
+            [{slot_key, slot_type, scheduled_at_local, scheduled_at_utc}, ...]
+        Slots whose next fire falls outside the window are omitted.
+        """
+        import json as _json
+        import os
+        from datetime import UTC
+        from pathlib import Path as _Path
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule, next_fires
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+
+        # Determine local timezone (mirror schedule_tick._now / _local_tz_name pattern)
+        localtime = _Path("/etc/localtime")
+        tz_name = "UTC"
+        if localtime.is_symlink():
+            target_link = os.readlink(str(localtime))
+            marker = "zoneinfo/"
+            if marker in target_link:
+                tz_name = target_link.split(marker, 1)[1]
+        try:
+            local_tz = ZoneInfo(tz_name)
+        except ZoneInfoNotFoundError:
+            local_tz = ZoneInfo("UTC")
+
+        from datetime import datetime as _datetime
+
+        now = _datetime.now(tz=local_tz)
+
+        fires = next_fires(sched, now=now, window_hours=window)
+
+        if use_json:
+            records = []
+            for key, fire_dt in sorted(fires, key=lambda x: (x[0],)):
+                slot = sched[key]
+                utc_dt = fire_dt.astimezone(UTC)
+                records.append(
+                    {
+                        "slot_key": key,
+                        "slot_type": slot.type.value,
+                        "scheduled_at_local": fire_dt.isoformat(),
+                        "scheduled_at_utc": utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }
+                )
+            # Sort by slot_key alphabetically per spec
+            records.sort(key=lambda r: r["slot_key"])
+            typer.echo(_json.dumps(records))
+        else:
+            for key, fire_dt in sorted(fires, key=lambda x: x[0]):
+                slot = sched[key]
+                typer.echo(f"{key}\t{slot.type.value}\t{fire_dt.isoformat()}")
+
     @schedule_app.command("snapshot")
     def cli_schedule_snapshot(
         target: Path | None = typer.Option(

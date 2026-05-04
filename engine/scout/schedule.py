@@ -18,7 +18,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -230,3 +230,56 @@ def _build_slot(key: str, raw: dict[str, Any]) -> Slot:
         )
     except (KeyError, ValueError) as e:
         raise ConfigError(f"slot {key}: malformed entry: {e}") from e
+
+
+_WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def next_fires(
+    schedule: Schedule,
+    *,
+    now: datetime,
+    window_hours: float = 24.0,
+) -> list[tuple[str, datetime]]:
+    """Return (slot_key, next_fire_datetime) pairs for slots firing within window.
+
+    For each slot, finds the soonest fire time strictly in the future that
+    falls within ``now + window_hours``. Results are sorted chronologically.
+    Does NOT consult the tracker — this is pure forward-looking schema math.
+
+    Args:
+        schedule: The loaded Schedule to scan.
+        now: Timezone-aware datetime representing the current moment.
+        window_hours: How many hours ahead to look (default 24).
+
+    Returns:
+        List of (slot_key, fire_datetime) tuples, sorted by fire_datetime.
+    """
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+
+    cutoff = now + timedelta(hours=window_hours)
+    results: list[tuple[str, datetime]] = []
+
+    for key, slot in schedule.items():
+        slot_tz = ZoneInfo(slot.tz) if slot.tz else now.tzinfo
+        hh, mm = slot.fires_at_local.split(":")
+        hour = int(hh)
+        minute = int(mm)
+
+        for day_offset in range(8):
+            candidate_day = (now + timedelta(days=day_offset)).astimezone(slot_tz)
+            weekday_name = _WEEKDAY_NAMES[candidate_day.weekday()]
+            if weekday_name not in slot.weekdays:
+                continue
+            # Build the target datetime on that calendar day in the slot's tz
+            target = candidate_day.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if target <= now:
+                continue
+            # Found the next eligible fire for this slot
+            if target <= cutoff:
+                results.append((key, target))
+            break  # whether inside or outside window, this slot is done
+
+    results.sort(key=lambda x: x[1])
+    return results

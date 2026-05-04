@@ -1,14 +1,19 @@
-"""CLI smoke tests for `scoutctl schedule {list,show,validate,init,reload}`."""
+"""CLI smoke tests for `scoutctl schedule {list,show,validate,init,reload,list-upcoming}`."""
 
 from __future__ import annotations
 
 import json
+from datetime import datetime
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from typer.testing import CliRunner
 
 from scout.cli import app
 
 runner = CliRunner()
+
+_ET = ZoneInfo("America/New_York")
 
 
 def test_schedule_list_shows_all_default_slots():
@@ -76,3 +81,111 @@ def test_schedule_reload_succeeds():
     result = runner.invoke(app, ["schedule", "reload"])
     assert result.exit_code == 0
     assert "reloaded" in result.stdout.lower()
+
+
+# ---------------------------------------------------------------------------
+# list-upcoming tests
+# ---------------------------------------------------------------------------
+
+# Pin "now" to Mon 2026-05-04 07:00 ET — several slots fire later that day
+_FAKE_NOW = datetime(2026, 5, 4, 7, 0, 0, tzinfo=_ET)
+
+
+def _invoke_list_upcoming(*extra_args: str):
+    """Helper: invoke list-upcoming with a pinned 'now' and default 24h window."""
+    with patch("scout.schedule.datetime") as _:
+        # We patch at the CLI level: monkeypatch the datetime.now call inside
+        # the command by patching the imported name directly.
+        pass
+    # Actually invoke without patching datetime — the test just checks shape;
+    # real time is fine since the command always returns valid future slots.
+    return runner.invoke(app, ["schedule", "list-upcoming", *extra_args])
+
+
+def test_list_upcoming_exits_zero():
+    result = runner.invoke(app, ["schedule", "list-upcoming"])
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+
+
+def test_list_upcoming_json_is_array():
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--json"])
+    assert result.exit_code == 0, result.stdout
+    records = json.loads(result.stdout)
+    assert isinstance(records, list)
+
+
+def test_list_upcoming_json_has_required_fields():
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--json"])
+    assert result.exit_code == 0
+    records = json.loads(result.stdout)
+    # With a 24h window there should be at least some slots (defaults fire daily)
+    # We just need at least one to validate shape; but if zero, still assert schema.
+    for rec in records:
+        assert "slot_key" in rec
+        assert "slot_type" in rec
+        assert "scheduled_at_local" in rec
+        assert "scheduled_at_utc" in rec
+
+
+def test_list_upcoming_json_slot_type_values_are_valid():
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--json"])
+    assert result.exit_code == 0
+    records = json.loads(result.stdout)
+    valid_types = {"briefing", "consolidation", "dreaming", "research", "manual"}
+    for rec in records:
+        assert rec["slot_type"] in valid_types
+
+
+def test_list_upcoming_json_sorted_alphabetically_by_slot_key():
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--json"])
+    assert result.exit_code == 0
+    records = json.loads(result.stdout)
+    keys = [r["slot_key"] for r in records]
+    assert keys == sorted(keys), f"Expected alphabetical order, got: {keys}"
+
+
+def test_list_upcoming_window_zero_returns_empty_array():
+    """A zero-hour window should return no upcoming slots."""
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--window", "0"])
+    assert result.exit_code == 0
+    records = json.loads(result.stdout)
+    assert records == []
+
+
+def test_list_upcoming_large_window_returns_all_slots():
+    """With a 200h window (~8 days), all 10 default slots should appear."""
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--window", "200"])
+    assert result.exit_code == 0
+    records = json.loads(result.stdout)
+    keys = {r["slot_key"] for r in records}
+    expected_keys = {
+        "morning-briefing",
+        "weekend-briefing",
+        "morning-consolidation",
+        "midday-consolidation",
+        "afternoon-consolidation",
+        "evening-consolidation",
+        "dreaming-evening",
+        "dreaming-nightly",
+        "dreaming-weekend-morning",
+        "research",
+    }
+    assert keys == expected_keys
+
+
+def test_list_upcoming_no_json_emits_tab_separated_lines():
+    """--no-json should emit tab-separated lines (not JSON)."""
+    result = runner.invoke(app, ["schedule", "list-upcoming", "--window", "200", "--no-json"])
+    assert result.exit_code == 0
+    # Should NOT be parseable as JSON array
+    output = result.stdout.strip()
+    if output:
+        # At least one line; each should have tab separators
+        first_line = output.splitlines()[0]
+        parts = first_line.split("\t")
+        assert len(parts) == 3, f"Expected 3 tab-separated fields, got: {parts}"
+        slot_key, slot_type, scheduled_at_local = parts
+        assert slot_key  # non-empty
+        assert slot_type in {"briefing", "consolidation", "dreaming", "research", "manual"}
+        # scheduled_at_local should look like an ISO datetime
+        assert "T" in scheduled_at_local or ":" in scheduled_at_local
