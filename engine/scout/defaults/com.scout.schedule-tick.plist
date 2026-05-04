@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.scout.schedule-tick.plist — runs `scoutctl schedule tick` every 5 min.
+
+  Installed by `scoutctl schedule install-plist`, which fills __USER_HOME__
+  at install time. Replaces the 7 per-slot legacy plists deleted in Task 11.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.scout.schedule-tick</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__USER_HOME__/scout-plugin/.venv/bin/scoutctl</string>
+        <string>schedule</string>
+        <string>tick</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__USER_HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>__USER_HOME__</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>__USER_HOME__/Scout/.scout-logs/launchd-schedule-tick-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__USER_HOME__/Scout/.scout-logs/launchd-schedule-tick-stderr.log</string>
+</dict>
+</plist>

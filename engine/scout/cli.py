@@ -358,6 +358,37 @@ def _register_schedule() -> None:
             raise typer.Exit(code=1)
         typer.echo(f"fired: {slot_key}")
 
+    @schedule_app.command("install-plist")
+    def cli_schedule_install_plist(
+        force: bool = typer.Option(False, "--force", "-f"),
+        bootstrap: bool = typer.Option(
+            True,
+            "--bootstrap/--no-bootstrap",
+            help="Run launchctl bootstrap to load the job after writing the plist.",
+        ),
+        uninstall: bool = typer.Option(
+            False,
+            "--uninstall",
+            help="Remove the plist (and bootout the job) instead of installing.",
+        ),
+    ) -> None:
+        """Install or remove com.scout.schedule-tick.plist in ~/Library/LaunchAgents/."""
+        from pathlib import Path as _Path
+
+        from scout.scripts.install_schedule_plist import install_plist as _i
+        from scout.scripts.install_schedule_plist import uninstall_plist as _u
+
+        if uninstall:
+            _u(bootout=bootstrap)
+            typer.echo("uninstalled com.scout.schedule-tick.plist")
+            return
+        try:
+            target = _i(home=_Path.home(), force=force, bootstrap=bootstrap)
+            typer.echo(f"installed: {target}")
+        except FileExistsError as e:
+            typer.echo(f"plist already exists at {e}; use --force to overwrite", err=True)
+            raise typer.Exit(code=1) from e
+
 
 _register_schedule()
 
