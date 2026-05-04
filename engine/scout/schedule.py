@@ -152,9 +152,15 @@ def load_schedule(
     connectors overlay pattern). Validation runs after the merge.
     """
     seed = _load_yaml(canonical_path)
+    version = seed.get("schema_version", 1)
+    if version != 1:
+        raise ConfigError(f"schedule.yaml at {canonical_path} has schema_version {version}; engine supports 1")
     merged: dict[str, Any] = dict(seed.get("slots", {}))
     if overlay is not None and overlay.exists():
         ov = _load_yaml(overlay)
+        ov_version = ov.get("schema_version", 1)
+        if ov_version != 1:
+            raise ConfigError(f"schedule.yaml at {overlay} has schema_version {ov_version}; engine supports 1")
         for key, override in ov.get("slots", {}).items():
             if key in merged:
                 merged[key] = {**merged[key], **override}
@@ -201,15 +207,24 @@ def _build_slot(key: str, raw: dict[str, Any]) -> Slot:
                 ZoneInfo(tz)
             except ZoneInfoNotFoundError as e:
                 raise ConfigError(f"slot {key}: unknown tz {tz!r}") from e
+        runner = raw["runner"]
+        if not isinstance(runner, str) or not runner.strip():
+            raise ConfigError(f"slot {key}: runner must be a non-empty string")
+        mw = int(raw["missed_window_hours"])
+        if mw <= 0:
+            raise ConfigError(f"slot {key}: missed_window_hours must be > 0, got {mw}")
+        cd = int(raw["cooldown_minutes"])
+        if cd < 0:
+            raise ConfigError(f"slot {key}: cooldown_minutes must be >= 0, got {cd}")
         return Slot(
             key=key,
             type=slot_type,
-            runner=raw["runner"],
+            runner=runner,
             fires_at_local=fires_at_raw,
             weekdays=tuple(weekdays_raw),
-            missed_window_hours=int(raw["missed_window_hours"]),
+            missed_window_hours=mw,
             on_miss=on_miss,
-            cooldown_minutes=int(raw["cooldown_minutes"]),
+            cooldown_minutes=cd,
             budget_usd=raw.get("budget_usd"),
             tz=tz,
         )

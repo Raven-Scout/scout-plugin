@@ -184,6 +184,88 @@ def test_schedule_get_priority_for_slot_type():
     assert morning.priority > consolidation.priority
 
 
+def test_by_type_filters_to_matching_slot_type():
+    sched = load_default_schedule()
+    briefings = sched.by_type(SlotType.BRIEFING)
+    assert len(briefings) == 2  # morning-briefing + weekend-briefing
+    assert all(s.type == SlotType.BRIEFING for s in briefings)
+    consolidations = sched.by_type(SlotType.CONSOLIDATION)
+    assert len(consolidations) == 4  # morning/midday/afternoon/evening
+    assert sched.by_type(SlotType.MANUAL) == []
+
+
+def test_missed_window_hours_must_be_positive(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  bad-slot:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n"
+        "    missed_window_hours: 0\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    with pytest.raises(ConfigError, match="missed_window_hours"):
+        load_schedule(bad)
+
+
+def test_negative_cooldown_minutes_raises(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  bad-slot:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: -5\n"
+    )
+    with pytest.raises(ConfigError, match="cooldown_minutes"):
+        load_schedule(bad)
+
+
+def test_unknown_schema_version_raises(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "schema_version: 999\n"
+        "slots:\n"
+        "  any-slot:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    with pytest.raises(ConfigError, match="schema_version"):
+        load_schedule(bad)
+
+
+def test_empty_runner_raises(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  bad-slot:\n"
+        "    type: briefing\n"
+        "    runner: ''\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    with pytest.raises(ConfigError, match="runner"):
+        load_schedule(bad)
+
+
 def test_overlay_path_layered_on_seed_when_present(tmp_path, monkeypatch):
     """If <vault>/.scout-state/schedule.local.yaml exists, layer on top of the canonical."""
     canonical = tmp_path / "schedule.yaml"
