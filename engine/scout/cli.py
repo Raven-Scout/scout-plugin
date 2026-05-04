@@ -147,6 +147,7 @@ def _register_connectors() -> None:
             "tier": c.tier.value,
             "capabilities": [cap.value for cap in c.capabilities],
             "required_in": "all" if c.required_in == "all" else list(c.required_in),
+            "required_in_types": [t.value for t in c.required_in_types],
             "remediation": {
                 "first_fix": c.remediation.first_fix,
                 "detail": c.remediation.detail,
