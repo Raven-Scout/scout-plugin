@@ -35,6 +35,7 @@ from scout import paths
 from scout.connectors import Capability, Connector, ConnectorRegistry, load_registry
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
+from scout.schedule import SlotType
 
 ET = ZoneInfo("America/New_York")
 DEFAULT_WINDOW_DAYS = 14
@@ -167,6 +168,33 @@ def compute_stats(session_list: SessionList, alertable_keys: Iterable[str]) -> S
     return stats
 
 
+def _current_slot_type(mode: str, *, data_dir: Path | None = None) -> SlotType:
+    """Look up ``mode`` (a slot key) in the active schedule and return its SlotType.
+
+    Falls back to the plugin-shipped default schedule if the vault file is
+    absent (e.g. on a fresh install or in a test fixture). Returns
+    ``SlotType.MANUAL`` for unrecognized slot keys — manual is intentionally
+    excluded from any connector's ``required_in_types``, so an unknown mode
+    never accidentally fires a chronic-skip alert.
+
+    Lazy imports (``scout.schedule``) keep this side-effect-free at module
+    import time and avoid any circular-import surprises.
+    """
+    from scout.schedule import load_default_schedule, load_schedule
+
+    target = data_dir if data_dir is not None else paths.data_dir()
+    vault_schedule = paths.state_dir(target) / "schedule.yaml"
+    try:
+        sched = load_schedule(vault_schedule) if vault_schedule.exists() else load_default_schedule()
+    except Exception:
+        # Defensive: a malformed vault schedule should not crash the health
+        # report. Fall back to defaults.
+        sched = load_default_schedule()
+    if mode in sched:
+        return sched[mode].type
+    return SlotType.MANUAL
+
+
 def _alertable_registry(registry: ConnectorRegistry) -> dict[str, Connector]:
     """Connectors that can be alerting subjects.
 
@@ -267,6 +295,8 @@ def compute_critical_alerts(
     sessions_by_id: dict[str, list[dict[str, Any]]],
     alertable: dict[str, Connector],
     records: list[dict[str, Any]],
+    *,
+    data_dir: Path | None = None,
 ) -> list[Alert]:
     """Mode-aware critical-connector rule + chronic-skip override + Pattern #48."""
     alerts: list[Alert] = []
@@ -275,6 +305,10 @@ def compute_critical_alerts(
     current_sid = session_list[-1][0]
     current_mode = sessions_by_id[current_sid][0].get("mode", "unknown")
     prior_sessions = session_list[:-1]
+
+    # Plan 5: connectors are required by SLOT TYPE, not slot key. Resolve the
+    # current run's slot type once via the schedule (vault → defaults).
+    current_slot_type = _current_slot_type(current_mode, data_dir=data_dir)
 
     for c, connector in alertable.items():
         curr_ok = _ok_count(stats, c, current_sid)
@@ -289,8 +323,9 @@ def compute_critical_alerts(
         else:
             should_alert = False
 
-        # Chronic-skip override: dark for >=3 runs in a required mode.
-        mode_required = connector.required_in_mode(current_mode)
+        # Chronic-skip override: dark for >=3 runs in a slot type that requires
+        # this connector.
+        mode_required = connector.required_in_type(current_slot_type)
         if not should_alert and gap >= DARK_GAP_THRESHOLD and mode_required:
             should_alert = True
 
@@ -569,7 +604,9 @@ def run(
     current_sid = session_list[-1][0]
     current_mode = sessions_by_id[current_sid][0].get("mode", "unknown")
 
-    critical_alerts = compute_critical_alerts(stats, session_list, dict(sessions_by_id), alertable, records)
+    critical_alerts = compute_critical_alerts(
+        stats, session_list, dict(sessions_by_id), alertable, records, data_dir=target_data
+    )
     critical_keys = {a.connector_key for a in critical_alerts}
     warning_alerts = compute_warning_alerts(stats, current_sid, alertable, records, critical_keys)
     alerts = critical_alerts + warning_alerts

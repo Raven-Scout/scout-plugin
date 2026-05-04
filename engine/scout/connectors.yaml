@@ -7,7 +7,7 @@
 #       display_name: string
 #       tier: official | auto_discovered | community
 #       capabilities: [inbound, outbound, ...]   # see §"Capabilities" below
-#       required_in: all | [mode, mode, ...]     # which scheduled-run modes this connector is critical for
+#       required_in_types: [slot_type, ...]      # which slot TYPES this connector is critical for
 #       remediation:
 #         first_fix: string  (≤180 chars; goes into Slack/Telegram DMs)
 #         detail:    string  (multi-line allowed; goes into connector-health.md)
@@ -22,10 +22,13 @@
 #   outbound   — the connector pushes signals OUT of Scout (Slack DM, Telegram bot DM)
 #   meta       — the connector reports about Scout itself (e.g. github via gh CLI for PR queue)
 #
-# Modes vocabulary (must match the runner's $SCOUT_MODE values):
-#   morning-briefing, weekend-briefing
-#   consolidation-11am, consolidation-1pm, consolidation-5pm, consolidation-7pm
-#   manual, weekend-manual
+# Slot type vocabulary (must be one of the fixed plugin slot types in
+# scout.schedule.SlotType — i.e. references the TYPE not the user-renameable
+# slot key):
+#   briefing | consolidation | dreaming | research | manual
+#
+# `manual` is intentionally excluded from required_in_types lists — manual
+# sessions are ad-hoc and no connector is REQUIRED for them.
 
 schema_version: 1
 
@@ -34,7 +37,7 @@ connectors:
     display_name: Slack
     tier: official
     capabilities: [inbound, outbound]
-    required_in: all
+    required_in_types: [briefing, consolidation, dreaming, research]
     remediation:
       first_fix: "Reconnect Slack at https://claude.ai/settings/connectors — claude.ai Slack OAuth likely expired."
       detail: |
@@ -48,7 +51,7 @@ connectors:
     display_name: Linear
     tier: official
     capabilities: [inbound]
-    required_in: all
+    required_in_types: [briefing, consolidation, dreaming, research]
     remediation:
       first_fix: "Reconnect Linear at https://claude.ai/settings/connectors — claude.ai Linear OAuth likely expired."
       detail: |
@@ -60,7 +63,7 @@ connectors:
     display_name: Gmail
     tier: official
     capabilities: [inbound]
-    required_in: all
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Reconnect Gmail at https://claude.ai/settings/connectors — Google OAuth likely needs refresh."
       detail: |
@@ -73,7 +76,7 @@ connectors:
     display_name: Google Calendar
     tier: official
     capabilities: [inbound]
-    required_in: all
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Reconnect Google Calendar at https://claude.ai/settings/connectors (same Google auth as Gmail)."
       detail: |
@@ -85,14 +88,12 @@ connectors:
     display_name: Granola
     tier: official
     capabilities: [inbound]
-    required_in:
-      # Skip on weekends — meeting transcripts are work-week-only.
-      - morning-briefing
-      - consolidation-11am
-      - consolidation-1pm
-      - consolidation-5pm
-      - consolidation-7pm
-      - manual
+    # Skip on weekends — meeting transcripts are work-week-only. Briefing +
+    # consolidation slot types cover both weekday and weekend briefings; the
+    # weekend briefing's `runner` is responsible for not calling Granola on
+    # Sat/Sun. (The "required" list is the safety net — if it WERE called and
+    # failed, alerting still fires.)
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Reconnect Granola at https://claude.ai/settings/connectors — Granola tokens expire periodically."
       detail: |
@@ -103,14 +104,8 @@ connectors:
     display_name: Google Drive
     tier: official
     capabilities: [inbound]
-    required_in:
-      # Same weekday-only scope as Granola — Phase 1e weekday-mandatory.
-      - morning-briefing
-      - consolidation-11am
-      - consolidation-1pm
-      - consolidation-5pm
-      - consolidation-7pm
-      - manual
+    # Same weekday-oriented scope as Granola — Phase 1e weekday-mandatory.
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Reconnect Google Drive at https://claude.ai/settings/connectors."
       detail: "Google Drive connector — same reconnect flow as Gmail at https://claude.ai/settings/connectors."
@@ -119,7 +114,9 @@ connectors:
     display_name: GitHub (gh CLI)
     tier: official
     capabilities: [inbound, meta]
-    required_in: all
+    # Used in briefing + consolidation for PR queue review and in research for
+    # deep PR/issue dives. Not required for dreaming (introspection-only).
+    required_in_types: [briefing, consolidation, research]
     remediation:
       first_fix: "Run `gh auth status`; if expired, `gh auth login` to re-auth. Token lives in macOS keychain."
       detail: |
@@ -131,15 +128,9 @@ connectors:
     display_name: Chrome (Google Messages)
     tier: official
     capabilities: [inbound]
-    required_in:
-      # Required only when the briefing scans personal-context surfaces.
-      - morning-briefing
-      - weekend-briefing
-      - consolidation-11am
-      - consolidation-1pm
-      - consolidation-5pm
-      - consolidation-7pm
-      - manual
+    # Required only when the run scans personal-context surfaces (briefings +
+    # consolidations). Dreaming and research don't touch Google Messages.
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Make sure Chrome is running with the Claude-in-Chrome extension enabled at chrome://extensions. If the Mac was asleep, waking it is enough."
       detail: |
@@ -157,11 +148,9 @@ connectors:
     display_name: WhatsApp
     tier: official
     capabilities: [inbound]
-    required_in:
-      # Personal-context scans are briefing-time only — consolidation runs
-      # are work-focused. Adjust per user preference via the v0.8 overlay.
-      - morning-briefing
-      - weekend-briefing
+    # Personal-context scans run during briefings + consolidations. Adjust per
+    # user preference via the v0.8 overlay.
+    required_in_types: [briefing, consolidation]
     remediation:
       first_fix: "Check the WhatsApp MCP bridge: `launchctl list | grep com.scout.whatsapp-bridge`. Restart with `launchctl kickstart -k gui/$UID/com.scout.whatsapp-bridge` if the bridge is down."
       detail: |
@@ -182,7 +171,7 @@ connectors:
     display_name: Telegram (outbound)
     tier: official
     capabilities: [outbound]
-    required_in: []   # never required — outbound notifications never make a run "fail"
+    required_in_types: []   # outbound notifier — never required for any slot type
     remediation:
       first_fix: "Check `~/.scout-secrets/telegram-bot-token` exists (mode 600); test with `scoutctl notify telegram --tier info --body 'health check'`."
       detail: |

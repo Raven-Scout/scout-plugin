@@ -11,6 +11,7 @@ from scout.connectors import (
     Tier,
     load_registry,
 )
+from scout.schedule import SlotType
 
 
 def test_load_registry_returns_official_tier_seed():
@@ -42,28 +43,35 @@ def test_connector_fields_typed():
     assert Capability.OUTBOUND in slack.capabilities
 
 
-def test_required_in_all_means_every_mode_is_required():
+def test_slack_required_in_briefing_and_consolidation_types():
+    """Slack is required across the four operational slot types."""
     reg = load_registry()
     slack = reg["mcp:claude_ai_Slack"]
-    assert slack.required_in_mode("morning-briefing")
-    assert slack.required_in_mode("weekend-briefing")
-    assert slack.required_in_mode("consolidation-11am")
-    assert slack.required_in_mode("manual")
+    assert slack.required_in_type(SlotType.BRIEFING)
+    assert slack.required_in_type(SlotType.CONSOLIDATION)
+    assert slack.required_in_type(SlotType.DREAMING)
+    assert slack.required_in_type(SlotType.RESEARCH)
+    # Manual is never required for any connector.
+    assert not slack.required_in_type(SlotType.MANUAL)
 
 
-def test_required_in_specific_modes():
+def test_required_in_specific_types_granola_briefing_consolidation_only():
+    """Granola: briefing + consolidation only — never dreaming/research."""
     reg = load_registry()
     granola = reg["mcp:claude_ai_Granola"]
-    assert granola.required_in_mode("morning-briefing")
-    assert not granola.required_in_mode("weekend-briefing")
-    assert not granola.required_in_mode("weekend-manual")
+    assert granola.required_in_type(SlotType.BRIEFING)
+    assert granola.required_in_type(SlotType.CONSOLIDATION)
+    assert not granola.required_in_type(SlotType.DREAMING)
+    assert not granola.required_in_type(SlotType.RESEARCH)
 
 
-def test_required_in_empty_means_never_critical():
+def test_outbound_only_connector_required_in_no_type():
+    """Telegram is outbound-only — never required for any slot type."""
     reg = load_registry()
     tg = reg["notify:telegram"]
-    assert not tg.required_in_mode("morning-briefing")
-    assert not tg.required_in_mode("manual")
+    assert tg.required_in_types == ()
+    for st in SlotType:
+        assert not tg.required_in_type(st)
 
 
 def test_remediation_fields_under_180_chars():
@@ -75,12 +83,18 @@ def test_remediation_fields_under_180_chars():
         )
 
 
-def test_critical_connectors_filter():
+def test_critical_connectors_filter_by_slot_type():
     reg = load_registry()
-    critical = reg.critical_in_mode("morning-briefing")
+    critical = reg.critical_for_slot_type(SlotType.BRIEFING)
     assert "mcp:claude_ai_Slack" in critical
     assert "mcp:claude_ai_Granola" in critical
     assert "notify:telegram" not in critical  # outbound, never critical
+    # Dreaming requires a smaller set: Slack + Linear only.
+    dreaming_critical = reg.critical_for_slot_type(SlotType.DREAMING)
+    assert "mcp:claude_ai_Slack" in dreaming_critical
+    assert "mcp:claude_ai_Linear" in dreaming_critical
+    assert "mcp:claude_ai_Granola" not in dreaming_critical
+    assert "github" not in dreaming_critical  # gh used in research, not dreaming
 
 
 def test_unknown_connector_raises():
