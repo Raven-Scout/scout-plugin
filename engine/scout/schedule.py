@@ -247,6 +247,12 @@ def next_fires(
     falls within ``now + window_hours``. Results are sorted chronologically.
     Does NOT consult the tracker — this is pure forward-looking schema math.
 
+    DST note: on spring-forward day, a ``fires_at_local`` that lands in the
+    missing hour (e.g. '02:30' on 2026-03-08 in America/New_York) silently
+    uses the pre-shift UTC offset via ``datetime.replace``. Acceptable for
+    Scout's defaults (no slot fires in the gap); revisit if a slot ever
+    schedules in that window.
+
     Args:
         schedule: The loaded Schedule to scan.
         now: Timezone-aware datetime representing the current moment.

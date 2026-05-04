@@ -435,31 +435,23 @@ def _register_schedule() -> None:
         Slots whose next fire falls outside the window are omitted.
         """
         import json as _json
-        import os
         from datetime import UTC
-        from pathlib import Path as _Path
+        from datetime import datetime as _datetime
         from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
         from scout import paths as _paths
         from scout.schedule import load_default_schedule, load_schedule, next_fires
+        from scout.scripts.schedule_tick import _local_tz_name
 
         vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
         sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
 
-        # Determine local timezone (mirror schedule_tick._now / _local_tz_name pattern)
-        localtime = _Path("/etc/localtime")
-        tz_name = "UTC"
-        if localtime.is_symlink():
-            target_link = os.readlink(str(localtime))
-            marker = "zoneinfo/"
-            if marker in target_link:
-                tz_name = target_link.split(marker, 1)[1]
+        # Reuse the canonical local-tz resolver from schedule_tick — keeps
+        # CLI and dispatcher in lockstep if the helper grows fallbacks.
         try:
-            local_tz = ZoneInfo(tz_name)
+            local_tz: ZoneInfo = ZoneInfo(_local_tz_name())
         except ZoneInfoNotFoundError:
             local_tz = ZoneInfo("UTC")
-
-        from datetime import datetime as _datetime
 
         now = _datetime.now(tz=local_tz)
 

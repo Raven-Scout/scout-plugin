@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from unittest.mock import patch
-from zoneinfo import ZoneInfo
 
 from typer.testing import CliRunner
 
 from scout.cli import app
 
 runner = CliRunner()
-
-_ET = ZoneInfo("America/New_York")
 
 
 def test_schedule_list_shows_all_default_slots():
@@ -86,20 +81,6 @@ def test_schedule_reload_succeeds():
 # ---------------------------------------------------------------------------
 # list-upcoming tests
 # ---------------------------------------------------------------------------
-
-# Pin "now" to Mon 2026-05-04 07:00 ET — several slots fire later that day
-_FAKE_NOW = datetime(2026, 5, 4, 7, 0, 0, tzinfo=_ET)
-
-
-def _invoke_list_upcoming(*extra_args: str):
-    """Helper: invoke list-upcoming with a pinned 'now' and default 24h window."""
-    with patch("scout.schedule.datetime") as _:
-        # We patch at the CLI level: monkeypatch the datetime.now call inside
-        # the command by patching the imported name directly.
-        pass
-    # Actually invoke without patching datetime — the test just checks shape;
-    # real time is fine since the command always returns valid future slots.
-    return runner.invoke(app, ["schedule", "list-upcoming", *extra_args])
 
 
 def test_list_upcoming_exits_zero():
