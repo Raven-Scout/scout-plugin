@@ -267,6 +267,40 @@ def test_read_last_fire_index_is_empty_when_tracker_missing(tmp_path):
     assert _read_last_fire_index(tmp_path / "no.jsonl") == {}
 
 
+def test_read_last_fire_index_applies_legacy_mode_rename(tmp_path):
+    """Legacy session-tokens.jsonl with old mode names → renamed to new slot keys."""
+    log_dir = tmp_path / ".scout-logs"
+    log_dir.mkdir()
+    session_tokens = log_dir / "session-tokens.jsonl"
+    session_tokens.write_text(
+        '{"ts":"2026-05-11T15:00:00Z","scout_mode":"consolidation-11am"}\n'
+        '{"ts":"2026-05-11T17:00:00Z","scout_mode":"consolidation-1pm"}\n'
+        '{"ts":"2026-05-11T21:00:00Z","scout_mode":"morning-briefing"}\n'
+    )
+    tracker = log_dir / "usage-tracker.jsonl"
+    tracker.write_text("")
+    index = _read_last_fire_index(tracker)
+    # Old names mapped to new keys.
+    assert "morning-consolidation" in index
+    assert "midday-consolidation" in index
+    assert "morning-briefing" in index
+    assert "consolidation-11am" not in index  # not present under old name
+
+
+def test_read_last_fire_index_falls_through_legacy_usage_tracker_rows(tmp_path):
+    """Legacy usage-tracker rows lacking scout_mode are silently skipped."""
+    log_dir = tmp_path / ".scout-logs"
+    log_dir.mkdir()
+    tracker = log_dir / "usage-tracker.jsonl"
+    tracker.write_text(
+        # Pre-Plan-5 rows from write-session-cost.sh / heartbeat.sh (no scout_mode):
+        '{"ts":"2026-05-01T12:00:00Z","type":"briefing","budget_cap":150}\n'
+        '{"ts":"2026-05-01T13:00:00Z","type":"heartbeat","source":"heartbeat"}\n'
+    )
+    index = _read_last_fire_index(tracker)
+    assert index == {}  # silently skipped; no error
+
+
 # 6. End-to-end: run() emits Event and writes JSONL row.
 
 
@@ -330,3 +364,138 @@ def test_run_lock_held_returns_quickly(tmp_path, monkeypatch):
         ev = tick_run()
     assert ev.kind == "schedule.tick.skipped"
     assert ev.payload.get("reason") == "lock_held"
+
+
+# 7. v0.5+ event-taxonomy compliance: payload fields per spec §9.
+
+
+def test_slot_fired_event_has_full_payload_per_v0_5_spec(tmp_path, monkeypatch):
+    """slot.fired payload must contain every v0.5+ spec field."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched_path = tmp_path / ".scout-state" / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  smoke-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: fire\n    cooldown_minutes: 5\n"
+    )
+    with (
+        patch("scout.scripts.schedule_tick._network_ready", return_value=True),
+        patch("scout.scripts.schedule_tick.subprocess.Popen") as mock_popen,
+    ):
+        mock_popen.return_value.pid = 42
+        tick_run()
+    log = next((tmp_path / ".scout-logs").glob("schedule-events-*.jsonl"))
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+    fired_events = [r for r in rows if r["kind"] == "slot.fired"]
+    assert len(fired_events) == 1
+    payload = fired_events[0]["payload"]
+    # All v0.5+ spec fields present.
+    for f in ("slot_key", "slot_type", "target_local", "target_utc", "runner", "pid_spawned"):
+        assert f in payload, f"{f} missing from slot.fired payload: {payload}"
+    assert fired_events[0]["source"] == "cli:schedule_tick"
+
+
+def test_slot_skipped_event_has_slot_type_and_target_local(tmp_path, monkeypatch):
+    """slot.skipped payload must contain slot_type and target_local per v0.5+ spec."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched_path = tmp_path / ".scout-state" / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  research-slot:\n"
+        "    type: research\n    runner: run-research.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: skip\n    cooldown_minutes: 5\n"
+    )
+    with patch("scout.scripts.schedule_tick._network_ready", return_value=True):
+        tick_run()
+    log = next((tmp_path / ".scout-logs").glob("schedule-events-*.jsonl"))
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+    skipped = [r for r in rows if r["kind"] == "slot.skipped"]
+    assert len(skipped) >= 1
+    payload = skipped[0]["payload"]
+    for f in ("slot_key", "slot_type", "target_local", "reason"):
+        assert f in payload
+
+
+# 8. fire_now() coverage.
+
+
+def test_fire_now_unknown_slot_emits_fire_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched = tmp_path / ".scout-state" / "schedule.yaml"
+    sched.write_text(
+        "schema_version: 1\nslots:\n  any-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n    missed_window_hours: 4\n    on_miss: fire\n    cooldown_minutes: 60\n"
+    )
+    from scout.scripts.schedule_tick import fire_now
+
+    ev = fire_now("no-such-slot")
+    assert ev.kind == "slot.fire_failed"
+    assert "unknown" in (ev.payload.get("error") or "").lower()
+
+
+def test_fire_now_lock_held_emits_fire_failed(tmp_path, monkeypatch):
+    import fcntl
+
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched = tmp_path / ".scout-state" / "schedule.yaml"
+    sched.write_text(
+        "schema_version: 1\nslots:\n  any-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n    missed_window_hours: 4\n    on_miss: fire\n    cooldown_minutes: 60\n"
+    )
+    lock_path = tmp_path / ".scout-state" / ".schedule-tick.lock"
+    lock_path.touch()
+    from scout.scripts.schedule_tick import fire_now
+
+    with open(lock_path, "w") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        ev = fire_now("any-slot")
+    assert ev.kind == "slot.fire_failed"
+    assert "lock" in (ev.payload.get("error") or "").lower()
+
+
+def test_fire_now_happy_path_emits_slot_fired(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched = tmp_path / ".scout-state" / "schedule.yaml"
+    sched.write_text(
+        "schema_version: 1\nslots:\n  any-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n    missed_window_hours: 4\n    on_miss: fire\n    cooldown_minutes: 60\n"
+    )
+    from scout.scripts.schedule_tick import fire_now
+
+    with patch("scout.scripts.schedule_tick.subprocess.Popen") as mock_popen:
+        mock_popen.return_value.pid = 7777
+        ev = fire_now("any-slot")
+    assert ev.kind == "slot.fired"
+    assert ev.payload.get("manual") is True
+    assert ev.payload.get("pid_spawned") == 7777
+
+
+def test_fire_now_runner_missing_emits_fire_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched = tmp_path / ".scout-state" / "schedule.yaml"
+    sched.write_text(
+        "schema_version: 1\nslots:\n  any-slot:\n"
+        "    type: briefing\n    runner: nonexistent-runner.sh\n    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n    missed_window_hours: 4\n    on_miss: fire\n    cooldown_minutes: 60\n"
+    )
+    from scout.scripts.schedule_tick import fire_now
+
+    with patch("scout.scripts.schedule_tick.subprocess.Popen", side_effect=FileNotFoundError("nope")):
+        ev = fire_now("any-slot")
+    assert ev.kind == "slot.fire_failed"

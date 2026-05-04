@@ -63,7 +63,25 @@ NETWORK_PROBE_SLEEP_SECONDS = 5
 
 LOCK_FILENAME = ".schedule-tick.lock"
 TRACKER_FILENAME = "usage-tracker.jsonl"
+SESSION_TOKENS_FILENAME = "session-tokens.jsonl"
 EVENT_LOG_PREFIX = "schedule-events-"
+
+# Mode-name rename map applied when reading legacy session-tokens.jsonl rows.
+# Ships in Plan 5 to bridge pre-rename JSONL data through to post-rename slot
+# keys. Once Task 7's tools/migrate-mode-names.py runs against the live vault,
+# the rename will be persisted and this map becomes idempotent (old names
+# already rewritten). Kept in code so the dispatcher works even if
+# migrate-mode-names hasn't been run yet.
+_LEGACY_MODE_RENAME: dict[str, str] = {
+    "consolidation-11am": "morning-consolidation",
+    "consolidation-1pm": "midday-consolidation",
+    "consolidation-5pm": "afternoon-consolidation",
+    "consolidation-7pm": "evening-consolidation",
+    "dreaming-nightly-10pm": "dreaming-nightly",
+    "dreaming-weekend-6am": "dreaming-weekend-morning",
+    "dreaming-weekend-7am": "dreaming-weekend-morning",
+    # morning-briefing, weekend-briefing, manual unchanged.
+}
 
 
 # ----- data structures ----------------------------------------------------
@@ -134,37 +152,53 @@ def _parse_iso_z(ts: str) -> _dt.datetime:
 
 
 def _read_last_fire_index(tracker_path: Path) -> dict[str, _dt.datetime]:
-    """Build a per-slot ``last_fire_ts`` index from the usage tracker JSONL.
+    """Build a ``{slot_key: latest_ts}`` index from the run-tracker JSONL files.
 
-    Returns a dict keyed by ``scout_mode`` (the slot key) → most recent
-    fire timestamp seen in the file. Robust to malformed rows: a JSON
-    decode error or missing field skips that row silently.
+    Reads BOTH ``usage-tracker.jsonl`` (Plan 4-supplement-era; rows from
+    write-session-cost.sh / heartbeat.sh / budget-check.sh that may lack
+    ``scout_mode``) AND ``session-tokens.jsonl`` (Plan 4 hook; has
+    ``scout_mode`` populated, but with the OLD mode names that we rename
+    inline via ``_LEGACY_MODE_RENAME``).
+
+    Robust to malformed rows: a JSON decode error or missing field skips
+    that row silently. Rows that lack a usable slot key (legacy
+    budget/heartbeat entries with no ``scout_mode``) are silently dropped
+    — they don't carry slot identity.
     """
-    if not tracker_path.exists():
-        return {}
     out: dict[str, _dt.datetime] = {}
-    with tracker_path.open("r", encoding="utf-8") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(row, dict):
-                continue
-            slot_key = row.get("scout_mode")
-            ts_str = row.get("ts")
-            if not slot_key or not ts_str or not isinstance(ts_str, str):
-                continue
-            try:
-                ts = _parse_iso_z(ts_str)
-            except ValueError:
-                continue
-            prev = out.get(slot_key)
-            if prev is None or ts > prev:
-                out[slot_key] = ts
+    log_dir = tracker_path.parent
+    candidates = [tracker_path, log_dir / SESSION_TOKENS_FILENAME]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(row, dict):
+                        continue
+                    raw_key = row.get("scout_mode") or row.get("slot_key")
+                    if not isinstance(raw_key, str) or not raw_key:
+                        continue
+                    slot_key = _LEGACY_MODE_RENAME.get(raw_key, raw_key)
+                    ts_str = row.get("ts")
+                    if not isinstance(ts_str, str) or not ts_str:
+                        continue
+                    try:
+                        ts = _parse_iso_z(ts_str)
+                    except ValueError:
+                        continue
+                    prev = out.get(slot_key)
+                    if prev is None or ts > prev:
+                        out[slot_key] = ts
+        except OSError:
+            continue
     return out
 
 
@@ -357,6 +391,7 @@ def _spawn_runner(vault: Path, slot_key: str, slot: Slot) -> int:
         cwd=str(vault),
         env=env,
         start_new_session=True,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -377,6 +412,10 @@ def _emit_event(
 
     The file name is ``schedule-events-<UTC-date>.jsonl`` — UTC-dated
     intentionally (event timestamps are UTC; the file name follows).
+
+    The UTC date is derived from ``_now()`` (not ``datetime.now``) so that
+    a single ``patch("scout.scripts.schedule_tick._now", ...)`` in tests
+    sets both the event clock and the file name consistently.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     ev = Event(
@@ -386,7 +425,7 @@ def _emit_event(
         source=source,
         payload=payload,
     )
-    utc_date = _dt.datetime.now(tz=_dt.UTC).date().isoformat()
+    utc_date = _now().astimezone(_dt.UTC).date().isoformat()
     log_path = log_dir / f"{EVENT_LOG_PREFIX}{utc_date}.jsonl"
     row = {
         "id": ev.id,
@@ -466,7 +505,7 @@ def run() -> Event:
             return _emit_event(
                 log_dir,
                 kind="schedule.tick.skipped",
-                source="schedule.tick",
+                source="cli:schedule_tick",
                 payload={"reason": "lock_held"},
             )
         return _do_tick(
@@ -489,6 +528,7 @@ def _do_tick(
     now = _now()
 
     candidates = _compute_due_slots(schedule, last_fire, now)
+    cand_index = candidates_by_key(candidates)
     decisions = _apply_miss_rules(candidates, now=now)
 
     result = _TickResult()
@@ -500,20 +540,17 @@ def _do_tick(
             _emit_event(
                 log_dir,
                 kind="slot.skipped",
-                source="schedule.tick",
-                payload={
-                    "slot_key": k,
-                    "reason": "network-offline",
-                },
+                source="cli:schedule_tick",
+                payload=_skipped_payload(cand_index, k, "network-offline"),
             )
             result.skipped.append({"slot_key": k, "reason": "network-offline"})
         # Per the spec: do NOT mark them fired in the tracker; the next tick
         # will re-evaluate. Emit other "skip" decisions then exit.
-        _emit_skip_decisions(log_dir, decisions, result, exclude=set(fire_keys_pre))
+        _emit_skip_decisions(log_dir, decisions, cand_index, result, exclude=set(fire_keys_pre))
         return _finalize_tick(log_dir, result, started_at=started_at)
 
     # Emit non-fire skip decisions (skip / collapsed / stale).
-    _emit_skip_decisions(log_dir, decisions, result)
+    _emit_skip_decisions(log_dir, decisions, cand_index, result)
 
     # Pick at most one winner by priority among the fire decisions.
     winner_key = _filter_winner_by_priority(schedule, decisions)
@@ -522,15 +559,18 @@ def _do_tick(
 
     if winner_key is not None:
         winner_slot = schedule[winner_key]
+        winner_target = cand_index[winner_key].target
         try:
             pid = _spawn_runner(vault, winner_key, winner_slot)
         except (FileNotFoundError, OSError) as exc:
             _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
-                source="schedule.tick",
+                source="cli:schedule_tick",
                 payload={
                     "slot_key": winner_key,
+                    "slot_type": winner_slot.type.value,
+                    "target_local": winner_target.isoformat(),
                     "error": f"{type(exc).__name__}: {exc}",
                 },
             )
@@ -540,12 +580,14 @@ def _do_tick(
             _emit_event(
                 log_dir,
                 kind="slot.fired",
-                source="schedule.tick",
+                source="cli:schedule_tick",
                 payload={
                     "slot_key": winner_key,
-                    "type": winner_slot.type.value,
-                    "pid": pid,
-                    "target": _candidate_target_iso(candidates, winner_key),
+                    "slot_type": winner_slot.type.value,
+                    "target_local": winner_target.isoformat(),
+                    "target_utc": _target_utc_iso(winner_target),
+                    "runner": winner_slot.runner,
+                    "pid_spawned": pid,
                 },
             )
             result.fired.append(winner_key)
@@ -560,9 +602,30 @@ def _candidate_target_iso(candidates: list[SlotCandidate], slot_key: str) -> str
     return None
 
 
+def _target_utc_iso(target: _dt.datetime) -> str:
+    """Render a tz-aware target datetime as a UTC ISO string with ``Z`` suffix."""
+    utc = target.astimezone(_dt.UTC)
+    return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _skipped_payload(
+    cand_index: dict[str, SlotCandidate],
+    slot_key: str,
+    reason: str,
+) -> dict[str, Any]:
+    """Build a v0.5+ spec-compliant ``slot.skipped`` payload."""
+    payload: dict[str, Any] = {"slot_key": slot_key, "reason": reason}
+    cand = cand_index.get(slot_key)
+    if cand is not None:
+        payload["slot_type"] = cand.slot.type.value
+        payload["target_local"] = cand.target.isoformat()
+    return payload
+
+
 def _emit_skip_decisions(
     log_dir: Path,
     decisions: dict[str, Decision],
+    cand_index: dict[str, SlotCandidate],
     result: _TickResult,
     *,
     exclude: set[str] | None = None,
@@ -575,11 +638,8 @@ def _emit_skip_decisions(
         _emit_event(
             log_dir,
             kind="slot.skipped",
-            source="schedule.tick",
-            payload={
-                "slot_key": k,
-                "reason": d.reason,
-            },
+            source="cli:schedule_tick",
+            payload=_skipped_payload(cand_index, k, d.reason),
         )
         result.skipped.append({"slot_key": k, "reason": d.reason})
 
@@ -589,7 +649,7 @@ def _finalize_tick(log_dir: Path, result: _TickResult, *, started_at: float) -> 
     return _emit_event(
         log_dir,
         kind="schedule.tick.completed",
-        source="schedule.tick",
+        source="cli:schedule_tick",
         payload={
             "fired": list(result.fired),
             "skipped": list(result.skipped),
@@ -617,7 +677,7 @@ def fire_now(slot_key: str) -> Event:
             return _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
-                source="schedule.fire-now",
+                source="cli:schedule_fire_now",
                 payload={
                     "slot_key": slot_key,
                     "error": "lock_held",
@@ -628,35 +688,45 @@ def fire_now(slot_key: str) -> Event:
             return _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
-                source="schedule.fire-now",
+                source="cli:schedule_fire_now",
                 payload={
                     "slot_key": slot_key,
                     "error": f"unknown slot: {slot_key}",
                 },
             )
         slot = schedule[slot_key]
+        now = _now()
+        # Manual fire-now uses "now" as the effective target for payload
+        # purposes — the spec's target_local/target_utc fields describe
+        # when the fire happened, and a manual fire has no scheduled target.
+        target_local = now.isoformat()
+        target_utc = _target_utc_iso(now)
         try:
             pid = _spawn_runner(vault, slot_key, slot)
         except (FileNotFoundError, OSError) as exc:
             return _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
-                source="schedule.fire-now",
+                source="cli:schedule_fire_now",
                 payload={
                     "slot_key": slot_key,
+                    "slot_type": slot.type.value,
+                    "target_local": target_local,
                     "error": f"{type(exc).__name__}: {exc}",
                 },
             )
-        now = _now()
         _record_fire(tracker_path, slot_key, slot, now)
         return _emit_event(
             log_dir,
             kind="slot.fired",
-            source="schedule.fire-now",
+            source="cli:schedule_fire_now",
             payload={
                 "slot_key": slot_key,
-                "type": slot.type.value,
-                "pid": pid,
+                "slot_type": slot.type.value,
+                "target_local": target_local,
+                "target_utc": target_utc,
+                "runner": slot.runner,
+                "pid_spawned": pid,
                 "manual": True,
             },
         )
