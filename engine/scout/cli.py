@@ -421,6 +421,83 @@ def _register_schedule() -> None:
         )
         typer.echo(_i(sched, dry_run=dry_run))
 
+    @schedule_app.command("snapshot")
+    def cli_schedule_snapshot(
+        target: Path | None = typer.Option(
+            None,
+            "--target",
+            "-t",
+            help=(
+                "Where to write the snapshot. Defaults to scout-plugin's "
+                "canonical engine/scout/schedule.snapshot.json (the file "
+                "CI verifies)."
+            ),
+        ),
+        check: bool = typer.Option(
+            False,
+            "--check",
+            help="Exit 1 if on-disk differs from would-write; print unified diff.",
+        ),
+        also_write_app_fixture: bool = typer.Option(
+            True,
+            "--also-write-app-fixture/--no-also-write-app-fixture",
+            help=(
+                "Also write the scout-app bundled fixture at "
+                "~/scout-app/ScoutTests/Fixtures/schedule.snapshot.json. "
+                "Best-effort: silently skipped (with a warning) if the path "
+                "doesn't exist on this machine. Default: enabled."
+            ),
+        ),
+    ) -> None:
+        """Write or verify schedule.snapshot.json (consumed by scout-app).
+
+        Default behavior writes BOTH the canonical snapshot in scout-plugin
+        AND the scout-app bundled fixture, so a single invocation keeps both
+        repos in sync after a schedule.yaml edit. Pass
+        --no-also-write-app-fixture on a build agent that doesn't have
+        scout-app checked out.
+        """
+        from scout.scripts.schedule_snapshot import (
+            app_fixture_snapshot_path,
+            canonical_snapshot_path,
+            check_snapshot,
+            write_snapshot,
+        )
+
+        resolved_target = target if target is not None else canonical_snapshot_path()
+
+        if check:
+            ok, diff = check_snapshot(resolved_target)
+            if ok:
+                typer.echo(f"schedule snapshot OK: {resolved_target}")
+                return
+            typer.echo(diff, err=True)
+            typer.echo(
+                f"Drift detected: regenerate with `scoutctl schedule snapshot --target {resolved_target}`.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        write_snapshot(resolved_target)
+        typer.echo(f"Wrote: {resolved_target}")
+
+        # Best-effort dual-write so a single invocation keeps both repos in sync.
+        if also_write_app_fixture:
+            app_fixture = app_fixture_snapshot_path()
+            if app_fixture == resolved_target:
+                # Operator pointed --target at the app fixture; primary write covered it.
+                pass
+            elif app_fixture.parent.is_dir():
+                write_snapshot(app_fixture)
+                typer.echo(f"Wrote: {app_fixture}")
+            else:
+                typer.echo(
+                    f"warning: skipped scout-app fixture write — {app_fixture.parent} "
+                    "is not a directory on this machine. Pass --no-also-write-app-fixture "
+                    "to silence.",
+                    err=True,
+                )
+
 
 _register_schedule()
 

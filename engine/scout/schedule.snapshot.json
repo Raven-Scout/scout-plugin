@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "generated_from": "scout-plugin@dc6ad86",
+  "slots": [
+    {
+      "key": "morning-briefing",
+      "type": "briefing",
+      "runner": "run-scout.sh",
+      "fires_at_local": "08:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "fire"
+    },
+    {
+      "key": "weekend-briefing",
+      "type": "briefing",
+      "runner": "run-scout.sh",
+      "fires_at_local": "08:30",
+      "weekdays": [
+        "Sat",
+        "Sun"
+      ],
+      "on_miss": "fire"
+    },
+    {
+      "key": "morning-consolidation",
+      "type": "consolidation",
+      "runner": "run-scout.sh",
+      "fires_at_local": "11:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "collapse"
+    },
+    {
+      "key": "midday-consolidation",
+      "type": "consolidation",
+      "runner": "run-scout.sh",
+      "fires_at_local": "13:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "collapse"
+    },
+    {
+      "key": "afternoon-consolidation",
+      "type": "consolidation",
+      "runner": "run-scout.sh",
+      "fires_at_local": "17:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "collapse"
+    },
+    {
+      "key": "evening-consolidation",
+      "type": "consolidation",
+      "runner": "run-scout.sh",
+      "fires_at_local": "19:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "collapse"
+    },
+    {
+      "key": "dreaming-evening",
+      "type": "dreaming",
+      "runner": "run-dreaming.sh",
+      "fires_at_local": "18:30",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
+        "Sun"
+      ],
+      "on_miss": "skip"
+    },
+    {
+      "key": "dreaming-nightly",
+      "type": "dreaming",
+      "runner": "run-dreaming.sh",
+      "fires_at_local": "22:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
+        "Sun"
+      ],
+      "on_miss": "skip"
+    },
+    {
+      "key": "dreaming-weekend-morning",
+      "type": "dreaming",
+      "runner": "run-dreaming.sh",
+      "fires_at_local": "07:00",
+      "weekdays": [
+        "Sat",
+        "Sun"
+      ],
+      "on_miss": "skip"
+    },
+    {
+      "key": "research",
+      "type": "research",
+      "runner": "run-research.sh",
+      "fires_at_local": "14:00",
+      "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "on_miss": "skip"
+    }
+  ]
+}
