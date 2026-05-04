@@ -244,6 +244,106 @@ def _register_connectors() -> None:
 _register_connectors()
 
 
+def _register_schedule() -> None:
+    """scoutctl schedule {list,show,validate,init,reload} — vault schedule operations.
+
+    Tasks 3 (tick, fire-now), 4 (install-plist), 5 (install-wake-schedule),
+    and 8 (snapshot, list-upcoming) extend this same sub-app with more
+    commands. Keep this function open for extension.
+    """
+
+    schedule_app = typer.Typer(help="Schedule operations (vault schedule.yaml).")
+    app.add_typer(schedule_app, name="schedule")
+
+    @schedule_app.command("list")
+    def cli_schedule_list() -> None:
+        """List the registered schedule slots."""
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+        for key in sorted(sched.keys()):
+            slot = sched[key]
+            typer.echo(
+                f"{key}\t{slot.type.value}\t{slot.fires_at_local}\t{','.join(slot.weekdays)}\t{slot.on_miss.value}"
+            )
+
+    @schedule_app.command("show")
+    def cli_schedule_show(key: str) -> None:
+        """Show one slot's full record as JSON."""
+        import json as _json
+
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+        if key not in sched:
+            typer.echo(f"unknown slot: {key}", err=True)
+            raise typer.Exit(code=1)
+        slot = sched[key]
+        record = {
+            "key": slot.key,
+            "type": slot.type.value,
+            "runner": slot.runner,
+            "fires_at_local": slot.fires_at_local,
+            "weekdays": list(slot.weekdays),
+            "missed_window_hours": slot.missed_window_hours,
+            "on_miss": slot.on_miss.value,
+            "cooldown_minutes": slot.cooldown_minutes,
+            "budget_usd": slot.budget_usd,
+            "tz": slot.tz,
+        }
+        typer.echo(_json.dumps(record, indent=2))
+
+    @schedule_app.command("validate")
+    def cli_schedule_validate() -> None:
+        """Re-load the schedule (canonical + overlay if present); exit 0 on success."""
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        if vault_path.exists():
+            load_schedule(vault_path)
+            typer.echo(f"schedule OK: {vault_path}")
+        else:
+            load_default_schedule()
+            typer.echo("schedule OK: (no vault file; using plugin defaults)")
+
+    @schedule_app.command("init")
+    def cli_schedule_init(
+        force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing vault file."),
+    ) -> None:
+        """Seed the vault schedule.yaml from plugin defaults."""
+        import shutil
+
+        from scout import paths as _paths
+
+        target = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        if target.exists() and not force:
+            typer.echo(
+                f"{target} exists; refusing to overwrite. Use --force to replace.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = Path(__file__).parent / "defaults" / "schedule.yaml"
+        shutil.copy2(source, target)
+        typer.echo(f"wrote: {target}")
+
+    @schedule_app.command("reload")
+    def cli_schedule_reload() -> None:
+        """Force-reload the schedule (forward-compat signal; loader has no cache in v0.5)."""
+        from scout.schedule import load_default_schedule
+
+        load_default_schedule()
+        typer.echo("reloaded")
+
+
+_register_schedule()
+
+
 def _register_notify() -> None:
     """scoutctl notify {telegram} — outbound notification commands.
 
