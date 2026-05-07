@@ -20,6 +20,47 @@ def test_schedule_list_shows_all_default_slots():
     assert "research" in result.stdout
 
 
+def test_schedule_list_json_emits_full_slot_records():
+    """Plan 6's ScheduleEditService consumes this exact JSON shape to populate
+    the in-app editor. Each record must have all 11 Slot fields, sorted by
+    slot_key alphabetically.
+    """
+    result = runner.invoke(app, ["schedule", "list", "--json"])
+    assert result.exit_code == 0, result.stdout + result.stderr
+
+    data = json.loads(result.stdout)
+    assert isinstance(data, list)
+    assert len(data) == 10  # default schedule.yaml ships 10 slots
+
+    # Sorted alphabetically by slot_key.
+    keys = [s["key"] for s in data]
+    assert keys == sorted(keys)
+
+    # morning-briefing field-shape spot-check (all 11 fields present).
+    morning = next(s for s in data if s["key"] == "morning-briefing")
+    assert morning["type"] == "briefing"
+    assert morning["runner"] == "run-scout.sh"
+    assert morning["fires_at_local"] == "08:00"
+    assert morning["weekdays"] == ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    assert morning["missed_window_hours"] == 4
+    assert morning["on_miss"] == "fire"
+    assert morning["cooldown_minutes"] == 60
+    assert morning["budget_usd"] is None
+    assert morning["tz"] is None
+    assert morning["runtime"] == "local"
+
+
+def test_schedule_list_default_emits_tab_separated():
+    """Backward compat: --no-json (default) preserves the original
+    tab-separated output for existing terminal users."""
+    result = runner.invoke(app, ["schedule", "list"])
+    assert result.exit_code == 0
+    # Tab-separated, not JSON — first non-empty line should NOT start with `[`.
+    first_line = next((line for line in result.stdout.splitlines() if line.strip()), "")
+    assert not first_line.startswith("[")
+    assert "\t" in first_line
+
+
 def test_schedule_show_single_slot_returns_full_record():
     result = runner.invoke(app, ["schedule", "show", "morning-briefing"])
     assert result.exit_code == 0, result.stdout + result.stderr
