@@ -29,6 +29,7 @@ def test_build_manifest_exposes_known_features() -> None:
         "action_items_cli_v1",
         "kb_ontology_v1",
         "tui_v1",
+        "schedule_v2",
     }
     assert expected.issubset(m.features.keys())
 
@@ -89,7 +90,7 @@ def test_build_manifest_subcommands_sorted_for_stability() -> None:
 
 
 def test_action_items_kb_tui_features_enabled() -> None:
-    """Plan 2 lights these three; Plan 4 lights session_tokens + connector_health."""
+    """Plan 2 lights these three; Plan 4 lights session_tokens + connector_health; Plan 5 lights schedule_v2."""
     m = build_manifest()
     assert m.features["action_items_cli_v1"] is True
     assert m.features["kb_ontology_v1"] is True
@@ -97,3 +98,5 @@ def test_action_items_kb_tui_features_enabled() -> None:
     # Plan 4 lights these — flipped True after the connector subsystem + hooks port land.
     assert m.features["session_tokens_v1"] is True
     assert m.features["connector_health_v1"] is True
+    # Plan 5 lights this after schedule.yaml + dispatcher + scout-app refactor land.
+    assert m.features["schedule_v2"] is True
