@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from": "scout-plugin@15bbe4c",
+  "generated_from": "scout-plugin@fa60703",
   "connectors": [
     {
       "key": "mcp:claude_ai_Slack",

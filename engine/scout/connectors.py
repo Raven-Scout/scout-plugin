@@ -19,6 +19,7 @@ import yaml
 
 from scout import paths
 from scout.errors import ConfigError
+from scout.schedule import SlotType
 
 
 class Tier(enum.Enum):
@@ -45,14 +46,36 @@ class Connector:
     display_name: str
     tier: Tier
     capabilities: tuple[Capability, ...]
-    required_in: tuple[str, ...] | str  # tuple of mode strings, or "all"
+    # DEPRECATED (kept for one transitional version): tuple of mode strings, or
+    # "all". Plan 5 Task 6 introduced ``required_in_types`` as the canonical
+    # vocabulary; ``required_in`` is now empty for new YAML rows and only
+    # populated when an overlay still uses the old shape. Prefer
+    # ``required_in_type(slot_type)`` over ``required_in_mode(mode)``.
+    required_in: tuple[str, ...] | str
+    # v0.5+ canonical: which slot TYPES this connector is required for.
+    # Replaces ``required_in`` (which keyed on slot KEY names — fragile when
+    # users rename slots). Outbound-only connectors keep this empty.
+    required_in_types: tuple[SlotType, ...]
     remediation: Remediation
     notes: str = ""
 
     def required_in_mode(self, mode: str) -> bool:
+        """DEPRECATED: keyed on slot key. Prefer ``required_in_type``.
+
+        Retained for one transitional version so any caller still passing
+        slot-key strings keeps working. Returns True iff ``mode`` matches
+        the legacy ``required_in`` field.
+        """
         if self.required_in == "all":
             return True
         return mode in self.required_in
+
+    def required_in_type(self, slot_type: SlotType) -> bool:
+        """v0.5+ canonical: is this connector required in any slot of the given type?
+
+        Returns False for outbound-only connectors (empty ``required_in_types``).
+        """
+        return slot_type in self.required_in_types
 
 
 class ConnectorRegistry:
@@ -80,8 +103,19 @@ class ConnectorRegistry:
         return self._connectors.values()
 
     def critical_in_mode(self, mode: str) -> list[str]:
-        """Connector keys that are required in `mode` (i.e., outage = alert)."""
+        """DEPRECATED: keyed on slot key. Prefer ``critical_for_slot_type``.
+
+        Returns connector keys that are required in `mode` per the legacy
+        ``required_in`` field. After Plan 5 Task 6 rewrote connectors.yaml
+        to use ``required_in_types`` exclusively, this returns an empty list
+        for the seed YAML — only overlays still using the old shape can
+        produce non-empty results here.
+        """
         return [key for key, c in self._connectors.items() if c.required_in_mode(mode)]
+
+    def critical_for_slot_type(self, slot_type: SlotType) -> list[str]:
+        """Connector keys that are required for any slot of the given type."""
+        return [key for key, c in self._connectors.items() if c.required_in_type(slot_type)]
 
 
 def load_registry(data_dir: Path | None = None) -> ConnectorRegistry:
@@ -143,6 +177,11 @@ def _build_connector(key: str, raw: dict[str, Any]) -> Connector:
             required_in = "all"
         else:
             required_in = tuple(required_in_raw)
+        rit_raw = raw.get("required_in_types")
+        if rit_raw is None:
+            required_in_types: tuple[SlotType, ...] = ()
+        else:
+            required_in_types = tuple(SlotType(t) for t in rit_raw)
         rem_raw = raw.get("remediation", {})
         remediation = Remediation(
             first_fix=rem_raw.get("first_fix", ""),
@@ -154,6 +193,7 @@ def _build_connector(key: str, raw: dict[str, Any]) -> Connector:
             tier=tier,
             capabilities=capabilities,
             required_in=required_in,
+            required_in_types=required_in_types,
             remediation=remediation,
             notes=raw.get("notes", "") or "",
         )

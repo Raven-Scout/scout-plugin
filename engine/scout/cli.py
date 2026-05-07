@@ -147,6 +147,7 @@ def _register_connectors() -> None:
             "tier": c.tier.value,
             "capabilities": [cap.value for cap in c.capabilities],
             "required_in": "all" if c.required_in == "all" else list(c.required_in),
+            "required_in_types": [t.value for t in c.required_in_types],
             "remediation": {
                 "first_fix": c.remediation.first_fix,
                 "detail": c.remediation.detail,
@@ -242,6 +243,320 @@ def _register_connectors() -> None:
 
 
 _register_connectors()
+
+
+def _register_schedule() -> None:
+    """scoutctl schedule {list,show,validate,init,reload} — vault schedule operations.
+
+    Tasks 3 (tick, fire-now), 4 (install-plist), 5 (install-wake-schedule),
+    and 8 (snapshot, list-upcoming) extend this same sub-app with more
+    commands. Keep this function open for extension.
+    """
+
+    schedule_app = typer.Typer(help="Schedule operations (vault schedule.yaml).")
+    app.add_typer(schedule_app, name="schedule")
+
+    @schedule_app.command("list")
+    def cli_schedule_list() -> None:
+        """List the registered schedule slots."""
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+        for key in sorted(sched.keys()):
+            slot = sched[key]
+            typer.echo(
+                f"{key}\t{slot.type.value}\t{slot.fires_at_local}\t{','.join(slot.weekdays)}\t{slot.on_miss.value}"
+            )
+
+    @schedule_app.command("show")
+    def cli_schedule_show(key: str) -> None:
+        """Show one slot's full record as JSON."""
+        import json as _json
+
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+        if key not in sched:
+            typer.echo(f"unknown slot: {key}", err=True)
+            raise typer.Exit(code=1)
+        slot = sched[key]
+        record = {
+            "key": slot.key,
+            "type": slot.type.value,
+            "runner": slot.runner,
+            "fires_at_local": slot.fires_at_local,
+            "weekdays": list(slot.weekdays),
+            "missed_window_hours": slot.missed_window_hours,
+            "on_miss": slot.on_miss.value,
+            "cooldown_minutes": slot.cooldown_minutes,
+            "budget_usd": slot.budget_usd,
+            "tz": slot.tz,
+        }
+        typer.echo(_json.dumps(record, indent=2))
+
+    @schedule_app.command("validate")
+    def cli_schedule_validate() -> None:
+        """Re-load the schedule (canonical + overlay if present); exit 0 on success."""
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        if vault_path.exists():
+            load_schedule(vault_path)
+            typer.echo(f"schedule OK: {vault_path}")
+        else:
+            load_default_schedule()
+            typer.echo("schedule OK: (no vault file; using plugin defaults)")
+
+    @schedule_app.command("init")
+    def cli_schedule_init(
+        force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing vault file."),
+    ) -> None:
+        """Seed the vault schedule.yaml from plugin defaults."""
+        import shutil
+
+        from scout import paths as _paths
+
+        target = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        if target.exists() and not force:
+            typer.echo(
+                f"{target} exists; refusing to overwrite. Use --force to replace.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = Path(__file__).parent / "defaults" / "schedule.yaml"
+        shutil.copy2(source, target)
+        typer.echo(f"wrote: {target}")
+
+    @schedule_app.command("reload")
+    def cli_schedule_reload() -> None:
+        """Force-reload the schedule (forward-compat signal; loader has no cache in v0.5)."""
+        from scout.schedule import load_default_schedule
+
+        load_default_schedule()
+        typer.echo("reloaded")
+
+    @schedule_app.command("tick")
+    def cli_schedule_tick() -> None:
+        """Run a single dispatch tick. Invoked by com.scout.schedule-tick.plist every 5 min."""
+        from scout.scripts.schedule_tick import main as _main
+
+        raise typer.Exit(code=_main())
+
+    @schedule_app.command("fire-now")
+    def cli_schedule_fire_now(slot_key: str) -> None:
+        """Manually fire a slot, bypassing the dispatcher's policy logic."""
+        from scout.scripts.schedule_tick import fire_now as _fire_now
+
+        ev = _fire_now(slot_key)
+        if ev.kind == "slot.fire_failed":
+            typer.echo(f"failed: {(ev.payload or {}).get('error', 'unknown')}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"fired: {slot_key}")
+
+    @schedule_app.command("install-plist")
+    def cli_schedule_install_plist(
+        force: bool = typer.Option(False, "--force", "-f"),
+        bootstrap: bool = typer.Option(
+            True,
+            "--bootstrap/--no-bootstrap",
+            help="Run launchctl bootstrap to load the job after writing the plist.",
+        ),
+        uninstall: bool = typer.Option(
+            False,
+            "--uninstall",
+            help="Remove the plist (and bootout the job) instead of installing.",
+        ),
+    ) -> None:
+        """Install or remove com.scout.schedule-tick.plist in ~/Library/LaunchAgents/."""
+        from pathlib import Path as _Path
+
+        from scout.scripts.install_schedule_plist import install_plist as _i
+        from scout.scripts.install_schedule_plist import uninstall_plist as _u
+
+        if uninstall:
+            _u(bootout=bootstrap)
+            typer.echo("uninstalled com.scout.schedule-tick.plist")
+            return
+        try:
+            target = _i(home=_Path.home(), force=force, bootstrap=bootstrap)
+            typer.echo(f"installed: {target}")
+        except FileExistsError as e:
+            typer.echo(f"plist already exists at {e}; use --force to overwrite", err=True)
+            raise typer.Exit(code=1) from e
+
+    @schedule_app.command("install-wake-schedule")
+    def cli_schedule_install_wake_schedule(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+        dry_run: bool = typer.Option(False, "--dry-run"),
+    ) -> None:
+        """Install (or remove) a pmset repeat rule that wakes the Mac for the earliest weekday slot.
+
+        AC-only: macOS standby suppresses wake timers when on battery + lid closed.
+        Keep the laptop plugged in if you need guaranteed live firing.
+        """
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule
+        from scout.scripts.install_wake_schedule import (
+            install_wake_schedule as _i,
+        )
+        from scout.scripts.install_wake_schedule import (
+            uninstall_wake_schedule as _u,
+        )
+
+        if uninstall:
+            typer.echo(_u(dry_run=dry_run))
+            return
+        vault = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault) if vault.exists() else load_default_schedule()
+        typer.echo(
+            "Note: pmset wake-schedule is AC-only. On battery + lid closed, "
+            "Apple Silicon laptops enter standby and ignore wake timers. "
+            "Keep the laptop plugged in if you need guaranteed live firing."
+        )
+        typer.echo(_i(sched, dry_run=dry_run))
+
+    @schedule_app.command("list-upcoming")
+    def cli_schedule_list_upcoming(
+        window: float = typer.Option(24.0, "--window", help="Look-ahead window in hours."),
+        use_json: bool = typer.Option(
+            True, "--json/--no-json", help="Emit JSON array (default) or tab-separated rows."
+        ),
+    ) -> None:
+        """List the next scheduled fire time for each slot within the given window.
+
+        JSON output (default) is an array sorted by scheduled_at_utc:
+            [{slot_key, slot_type, scheduled_at_local, scheduled_at_utc}, ...]
+        Slots whose next fire falls outside the window are omitted.
+        """
+        import json as _json
+        from datetime import UTC
+        from datetime import datetime as _datetime
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        from scout import paths as _paths
+        from scout.schedule import load_default_schedule, load_schedule, next_fires
+        from scout.scripts.schedule_tick import _local_tz_name
+
+        vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
+        sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+
+        # Reuse the canonical local-tz resolver from schedule_tick — keeps
+        # CLI and dispatcher in lockstep if the helper grows fallbacks.
+        try:
+            local_tz: ZoneInfo = ZoneInfo(_local_tz_name())
+        except ZoneInfoNotFoundError:
+            local_tz = ZoneInfo("UTC")
+
+        now = _datetime.now(tz=local_tz)
+
+        fires = next_fires(sched, now=now, window_hours=window)
+
+        if use_json:
+            records = []
+            for key, fire_dt in sorted(fires, key=lambda x: (x[0],)):
+                slot = sched[key]
+                utc_dt = fire_dt.astimezone(UTC)
+                records.append(
+                    {
+                        "slot_key": key,
+                        "slot_type": slot.type.value,
+                        "scheduled_at_local": fire_dt.isoformat(),
+                        "scheduled_at_utc": utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }
+                )
+            # Sort by slot_key alphabetically per spec
+            records.sort(key=lambda r: r["slot_key"])
+            typer.echo(_json.dumps(records))
+        else:
+            for key, fire_dt in sorted(fires, key=lambda x: x[0]):
+                slot = sched[key]
+                typer.echo(f"{key}\t{slot.type.value}\t{fire_dt.isoformat()}")
+
+    @schedule_app.command("snapshot")
+    def cli_schedule_snapshot(
+        target: Path | None = typer.Option(
+            None,
+            "--target",
+            "-t",
+            help=(
+                "Where to write the snapshot. Defaults to scout-plugin's "
+                "canonical engine/scout/schedule.snapshot.json (the file "
+                "CI verifies)."
+            ),
+        ),
+        check: bool = typer.Option(
+            False,
+            "--check",
+            help="Exit 1 if on-disk differs from would-write; print unified diff.",
+        ),
+        also_write_app_fixture: bool = typer.Option(
+            True,
+            "--also-write-app-fixture/--no-also-write-app-fixture",
+            help=(
+                "Also write the scout-app bundled fixture at "
+                "~/scout-app/ScoutTests/Fixtures/schedule.snapshot.json. "
+                "Best-effort: silently skipped (with a warning) if the path "
+                "doesn't exist on this machine. Default: enabled."
+            ),
+        ),
+    ) -> None:
+        """Write or verify schedule.snapshot.json (consumed by scout-app).
+
+        Default behavior writes BOTH the canonical snapshot in scout-plugin
+        AND the scout-app bundled fixture, so a single invocation keeps both
+        repos in sync after a schedule.yaml edit. Pass
+        --no-also-write-app-fixture on a build agent that doesn't have
+        scout-app checked out.
+        """
+        from scout.scripts.schedule_snapshot import (
+            app_fixture_snapshot_path,
+            canonical_snapshot_path,
+            check_snapshot,
+            write_snapshot,
+        )
+
+        resolved_target = target if target is not None else canonical_snapshot_path()
+
+        if check:
+            ok, diff = check_snapshot(resolved_target)
+            if ok:
+                typer.echo(f"schedule snapshot OK: {resolved_target}")
+                return
+            typer.echo(diff, err=True)
+            typer.echo(
+                f"Drift detected: regenerate with `scoutctl schedule snapshot --target {resolved_target}`.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        write_snapshot(resolved_target)
+        typer.echo(f"Wrote: {resolved_target}")
+
+        # Best-effort dual-write so a single invocation keeps both repos in sync.
+        if also_write_app_fixture:
+            app_fixture = app_fixture_snapshot_path()
+            if app_fixture == resolved_target:
+                # Operator pointed --target at the app fixture; primary write covered it.
+                pass
+            elif app_fixture.parent.is_dir():
+                write_snapshot(app_fixture)
+                typer.echo(f"Wrote: {app_fixture}")
+            else:
+                typer.echo(
+                    f"warning: skipped scout-app fixture write — {app_fixture.parent} "
+                    "is not a directory on this machine. Pass --no-also-write-app-fixture "
+                    "to silence.",
+                    err=True,
+                )
+
+
+_register_schedule()
 
 
 def _register_notify() -> None:

@@ -257,15 +257,20 @@ def test_slack_dark_two_prior_healthy_fires_critical(fake_data_dir, monkeypatch)
 # ----- Test 5: Weekend-only `gh CLI dark` → no alert if non-required -------
 
 
-def test_chronic_skip_only_in_required_mode(fake_data_dir, monkeypatch):
-    """github is required_in: all → it IS required in weekend-briefing too,
-    so the chronic-skip override should fire. To exercise the "non-required mode"
-    path, use Granola which is NOT required on weekends (weekday-only).
+def test_chronic_skip_only_in_required_slot_type(fake_data_dir, monkeypatch):
+    """Plan 5 Task 6: chronic-skip rule keys on slot TYPE, not slot key.
 
-    Set up: 3 weekend-briefing runs all dark on Granola, but the connector
-    DOES have prior OK calls (so Pattern #48 does not suppress). The
-    mode-baseline rule sees 0 of 2 prior same-mode runs healthy → no alert.
-    The chronic-skip rule sees mode_required=False → no alert.
+    Granola declares ``required_in_types: [briefing, consolidation]`` — so
+    it is required across any briefing-type slot (including weekend
+    briefings, which intentionally over-applies safety) but NOT in
+    research-type runs. Use research to exercise the "non-required slot
+    type" path.
+
+    Set up: prior morning-briefings establish total_ok_ever > 0 (Pattern
+    #48 doesn't suppress). Then 3 research runs all dark on Granola. The
+    mode-baseline rule sees 0 of 2 prior same-mode runs healthy → no
+    alert. The chronic-skip rule sees the current slot type is research,
+    Granola is NOT required for research → no alert.
     """
     monkeypatch.setattr(chr_mod, "_default_now", _frozen_now)
     log_dir = fake_data_dir / ".scout-logs"
@@ -286,13 +291,13 @@ def test_chronic_skip_only_in_required_mode(fake_data_dir, monkeypatch):
             },
         )
 
-    # Then 3 weekend-briefing runs where Granola is dark (legitimately —
-    # weekend mode doesn't call it).
+    # Then 3 research runs where Granola is dark — research-type slots don't
+    # require Granola, so the chronic-skip override must stay silent.
     for i in range(3):
         _seed_session(
             log_dir,
-            sid=f"weekend_{i}",
-            mode="weekend-briefing",
+            sid=f"research_{i}",
+            mode="research",
             ts=base + timedelta(days=5 + i),
             calls={
                 "mcp:claude_ai_Slack": (5, 0),
@@ -305,7 +310,7 @@ def test_chronic_skip_only_in_required_mode(fake_data_dir, monkeypatch):
 
     alerts = event.payload["alerts"]
     granola_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Granola"]
-    assert granola_alerts == [], "Granola is not required in weekend-briefing — should not fire chronic-skip."
+    assert granola_alerts == [], "Granola is not required in research slot type — should not fire chronic-skip."
 
 
 # ----- Test 6: WARNING rule (4 calls, 3 errors > 50% → WARNING) -----------

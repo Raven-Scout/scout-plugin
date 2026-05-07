@@ -1,0 +1,5 @@
+{"ts":"2026-04-30T15:03:01Z","session_id":"a1","mode":"consolidation-11am","tool":"Bash","connector":"github","error":false}
+{"ts":"2026-04-30T17:03:02Z","session_id":"a2","mode":"consolidation-1pm","tool":"Bash","connector":"github","error":false}
+{"ts":"2026-04-30T21:03:03Z","session_id":"a3","mode":"consolidation-5pm","tool":"Bash","connector":"github","error":false}
+{"ts":"2026-04-30T23:00:04Z","session_id":"a4","mode":"consolidation-7pm","tool":"Bash","connector":"github","error":false}
+{"ts":"2026-04-30T12:00:05Z","session_id":"a5","mode":"morning-briefing","tool":"Bash","connector":"github","error":false}

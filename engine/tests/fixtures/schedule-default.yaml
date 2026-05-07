@@ -1,0 +1,11 @@
+schema_version: 1
+
+slots:
+  morning-briefing:
+    type: briefing
+    runner: run-scout.sh
+    fires_at_local: "08:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 4
+    on_miss: fire
+    cooldown_minutes: 60

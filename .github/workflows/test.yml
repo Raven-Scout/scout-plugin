@@ -33,3 +33,9 @@ jobs:
         # here checks the canonical file is in sync with the YAML — drift =
         # someone edited connectors.yaml and forgot to regenerate.
         run: .venv/bin/python -m scout.scripts.connectors_snapshot --check --target scout/connectors.snapshot.json
+      - name: Verify schedule.snapshot.json drift
+        # The canonical snapshot lives at engine/scout/schedule.snapshot.json
+        # (Plan 5 Task 8). scout-app's bundled fixture is a synced copy. CI
+        # here checks the canonical file is in sync with the YAML — drift =
+        # someone edited schedule.yaml and forgot to regenerate.
+        run: .venv/bin/python -m scout.scripts.schedule_snapshot --check --target scout/schedule.snapshot.json

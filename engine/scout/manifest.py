@@ -66,6 +66,7 @@ def build_manifest() -> EngineManifest:
             "action_items_cli_v1": True,  # Plan 2
             "kb_ontology_v1": True,  # Plan 2
             "tui_v1": True,  # Plan 2
+            "schedule_v2": True,  # Plan 5
         },
         subcommands=_list_subcommands(),
     )

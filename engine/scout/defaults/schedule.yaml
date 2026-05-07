@@ -1,0 +1,104 @@
+# engine/scout/defaults/schedule.yaml — Scout default schedule.
+#
+# This file is the plugin's seed schedule. `scoutctl schedule init`
+# copies it to `~/Scout/.scout-state/schedule.yaml` on first run.
+# Users edit the vault copy after that; this file is not modified.
+#
+# Slot keys are user-renameable. Slot types are a fixed plugin
+# vocabulary (briefing | consolidation | dreaming | research | manual)
+# that aggregation surfaces (connectors.yaml `required_in_types`,
+# alert routing) reference. See:
+#   ~/scout-app/docs/superpowers/specs/2026-05-04-schedule-v2-design.md
+
+schema_version: 1
+
+slots:
+  morning-briefing:
+    type: briefing
+    runner: run-scout.sh
+    fires_at_local: "08:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 4
+    on_miss: fire
+    cooldown_minutes: 60
+
+  weekend-briefing:
+    type: briefing
+    runner: run-scout.sh
+    fires_at_local: "08:30"
+    weekdays: [Sat, Sun]
+    missed_window_hours: 6
+    on_miss: fire
+    cooldown_minutes: 60
+
+  morning-consolidation:
+    type: consolidation
+    runner: run-scout.sh
+    fires_at_local: "11:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 2
+    on_miss: collapse
+    cooldown_minutes: 90
+
+  midday-consolidation:
+    type: consolidation
+    runner: run-scout.sh
+    fires_at_local: "13:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 2
+    on_miss: collapse
+    cooldown_minutes: 90
+
+  afternoon-consolidation:
+    type: consolidation
+    runner: run-scout.sh
+    fires_at_local: "17:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 3
+    on_miss: collapse
+    cooldown_minutes: 90
+
+  evening-consolidation:
+    type: consolidation
+    runner: run-scout.sh
+    fires_at_local: "19:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 4
+    on_miss: collapse
+    cooldown_minutes: 90
+
+  dreaming-evening:
+    type: dreaming
+    runner: run-dreaming.sh
+    fires_at_local: "18:30"
+    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+    missed_window_hours: 4
+    on_miss: skip
+    cooldown_minutes: 120
+
+  dreaming-nightly:
+    type: dreaming
+    runner: run-dreaming.sh
+    fires_at_local: "22:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+    missed_window_hours: 6
+    on_miss: skip
+    cooldown_minutes: 120
+
+  dreaming-weekend-morning:
+    type: dreaming
+    runner: run-dreaming.sh
+    fires_at_local: "07:00"
+    weekdays: [Sat, Sun]
+    missed_window_hours: 4
+    on_miss: skip
+    cooldown_minutes: 120
+
+  research:
+    type: research
+    runner: run-research.sh
+    fires_at_local: "14:00"
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    missed_window_hours: 4
+    on_miss: skip
+    cooldown_minutes: 240
