@@ -257,13 +257,48 @@ def _register_schedule() -> None:
     app.add_typer(schedule_app, name="schedule")
 
     @schedule_app.command("list")
-    def cli_schedule_list() -> None:
+    def cli_schedule_list(
+        as_json: bool = typer.Option(
+            False,
+            "--json/--no-json",
+            help=(
+                "Emit a JSON array of full slot records (key/type/runner/"
+                "fires_at_local/weekdays/missed_window_hours/on_miss/"
+                "cooldown_minutes/budget_usd/tz/runtime) instead of "
+                "tab-separated lines. Plan 6's ScheduleEditService consumes "
+                "this for the in-app editor."
+            ),
+        ),
+    ) -> None:
         """List the registered schedule slots."""
+        import json as _json
+
         from scout import paths as _paths
         from scout.schedule import load_default_schedule, load_schedule
 
         vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
         sched = load_schedule(vault_path) if vault_path.exists() else load_default_schedule()
+
+        if as_json:
+            records = [
+                {
+                    "key": sched[key].key,
+                    "type": sched[key].type.value,
+                    "runner": sched[key].runner,
+                    "fires_at_local": sched[key].fires_at_local,
+                    "weekdays": list(sched[key].weekdays),
+                    "missed_window_hours": sched[key].missed_window_hours,
+                    "on_miss": sched[key].on_miss.value,
+                    "cooldown_minutes": sched[key].cooldown_minutes,
+                    "budget_usd": sched[key].budget_usd,
+                    "tz": sched[key].tz,
+                    "runtime": sched[key].runtime.value,
+                }
+                for key in sorted(sched.keys())
+            ]
+            typer.echo(_json.dumps(records))
+            return
+
         for key in sorted(sched.keys()):
             slot = sched[key]
             typer.echo(
