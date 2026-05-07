@@ -7,10 +7,14 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import pytest
+
+from scout.errors import ConfigError
 from scout.events import Event
 from scout.schedule import (
     OnMissPolicy,
     Slot,
+    SlotRuntime,
     SlotType,
     load_default_schedule,
 )
@@ -22,6 +26,7 @@ from scout.scripts.schedule_tick import (
     _filter_winner_by_priority,
     _network_ready,
     _read_last_fire_index,
+    _spawn_runner,
     candidates_by_key,
 )
 from scout.scripts.schedule_tick import (
@@ -499,3 +504,26 @@ def test_fire_now_runner_missing_emits_fire_failed(tmp_path, monkeypatch):
     with patch("scout.scripts.schedule_tick.subprocess.Popen", side_effect=FileNotFoundError("nope")):
         ev = fire_now("any-slot")
     assert ev.kind == "slot.fire_failed"
+
+
+# 9. runtime guard: dispatcher rejects remote slots until Plan 7.
+
+
+def test_spawn_runner_rejects_remote_runtime(tmp_path):
+    """Plan 7 forward-compat: dispatcher refuses to spawn `runtime: remote` slots
+    until the routines API integration ships. Until then, save attempts in the
+    Schedules tab UI render Remote as disabled, so this guard catches manual
+    YAML edits that set runtime: remote."""
+    slot = Slot(
+        key="research",
+        type=SlotType.RESEARCH,
+        runner="run-research.sh",
+        fires_at_local="14:00",
+        weekdays=("Mon",),
+        missed_window_hours=4,
+        on_miss=OnMissPolicy.SKIP,
+        cooldown_minutes=240,
+        runtime=SlotRuntime.REMOTE,
+    )
+    with pytest.raises(ConfigError, match="runtime: remote.*Plan 7"):
+        _spawn_runner(vault=tmp_path, slot_key="research", slot=slot)

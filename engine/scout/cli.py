@@ -14,7 +14,7 @@ from pathlib import Path
 import typer
 
 from scout import __version__
-from scout.errors import ScoutError
+from scout.errors import ConfigError, ScoutError
 
 # Reserved for non-ScoutError exceptions escaping app(). Kept distinct
 # from ScoutError.exit_code == 1 so scout-app can decode "the CLI
@@ -299,10 +299,32 @@ def _register_schedule() -> None:
         typer.echo(_json.dumps(record, indent=2))
 
     @schedule_app.command("validate")
-    def cli_schedule_validate() -> None:
+    def cli_schedule_validate(
+        target: Path | None = typer.Option(
+            None,
+            "--target",
+            "-t",
+            help=(
+                "Validate the schedule.yaml at this path instead of the vault canonical. "
+                "Used by scout-app's editor to validate candidate writes before atomic-rename."
+            ),
+        ),
+    ) -> None:
         """Re-load the schedule (canonical + overlay if present); exit 0 on success."""
         from scout import paths as _paths
         from scout.schedule import load_default_schedule, load_schedule
+
+        if target is not None:
+            if not target.exists():
+                typer.echo(f"target does not exist: {target}", err=True)
+                raise typer.Exit(code=1)
+            try:
+                load_schedule(target)
+            except ConfigError as e:
+                typer.echo(str(e), err=True)
+                raise typer.Exit(code=1) from e
+            typer.echo(f"schedule OK: {target}")
+            return
 
         vault_path = _paths.data_dir() / ".scout-state" / "schedule.yaml"
         if vault_path.exists():

@@ -170,3 +170,59 @@ def test_list_upcoming_no_json_emits_tab_separated_lines():
         assert slot_type in {"briefing", "consolidation", "dreaming", "research", "manual"}
         # scheduled_at_local should look like an ISO datetime
         assert "T" in scheduled_at_local or ":" in scheduled_at_local
+
+
+# ---------------------------------------------------------------------------
+# validate --target tests (Plan 6 Task 3)
+# ---------------------------------------------------------------------------
+
+
+def test_schedule_validate_target_flag_passes_for_valid_yaml(tmp_path):
+    """The --target flag points validate at an arbitrary path so the Schedules
+    tab editor can validate a candidate before committing via atomic-rename."""
+    target = tmp_path / "candidate.yaml"
+    target.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["schedule", "validate", "--target", str(target)])
+    assert result.exit_code == 0
+    assert "schedule OK" in result.output
+
+
+def test_schedule_validate_target_flag_fails_for_invalid_yaml(tmp_path):
+    target = tmp_path / "broken.yaml"
+    target.write_text("schema_version: 99\nslots: {}\n")
+    runner = CliRunner()
+    result = runner.invoke(app, ["schedule", "validate", "--target", str(target)])
+    assert result.exit_code == 1
+    # ConfigError message is surfaced — both stdout and stderr captures may have it.
+    combined = (result.stderr or "") + (result.output or "")
+    assert "schema_version" in combined
+
+
+def test_schedule_validate_target_flag_fails_for_missing_file(tmp_path):
+    missing = tmp_path / "does-not-exist.yaml"
+    runner = CliRunner()
+    result = runner.invoke(app, ["schedule", "validate", "--target", str(missing)])
+    assert result.exit_code == 1
+
+
+def test_schedule_validate_no_flag_keeps_default_behavior(tmp_path, monkeypatch):
+    """Without --target, validate reads from the vault path (or engine defaults).
+    Backward-compat with pre-Plan-6 callers."""
+    # Point the vault at an empty tmp_path so the defaults fallback kicks in.
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["schedule", "validate"])
+    assert result.exit_code == 0
+    assert "schedule OK" in result.output
