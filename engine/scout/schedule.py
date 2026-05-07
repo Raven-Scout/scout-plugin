@@ -42,6 +42,11 @@ class OnMissPolicy(enum.Enum):
     COLLAPSE = "collapse"
 
 
+class SlotRuntime(enum.Enum):
+    LOCAL = "local"
+    REMOTE = "remote"  # Reserved for Plan 7. Loader accepts; dispatcher rejects.
+
+
 class SlotPriority(enum.IntEnum):
     """Priority order for single-fire-per-tick selection.
 
@@ -73,6 +78,7 @@ class Slot:
     cooldown_minutes: int
     budget_usd: float | None = None  # optional; not load-bearing in v0.5
     tz: str | None = None  # optional IANA zone; absent → system local
+    runtime: SlotRuntime = SlotRuntime.LOCAL
 
     @property
     def priority(self) -> SlotPriority:
@@ -216,6 +222,13 @@ def _build_slot(key: str, raw: dict[str, Any]) -> Slot:
         cd = int(raw["cooldown_minutes"])
         if cd < 0:
             raise ConfigError(f"slot {key}: cooldown_minutes must be >= 0, got {cd}")
+        runtime_raw = raw.get("runtime", "local")
+        try:
+            runtime = SlotRuntime(runtime_raw)
+        except ValueError as e:
+            raise ConfigError(
+                f"slot {key!r}: runtime {runtime_raw!r} is not one of {[r.value for r in SlotRuntime]}"
+            ) from e
         return Slot(
             key=key,
             type=slot_type,
@@ -227,6 +240,7 @@ def _build_slot(key: str, raw: dict[str, Any]) -> Slot:
             cooldown_minutes=cd,
             budget_usd=raw.get("budget_usd"),
             tz=tz,
+            runtime=runtime,
         )
     except (KeyError, ValueError) as e:
         raise ConfigError(f"slot {key}: malformed entry: {e}") from e

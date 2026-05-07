@@ -14,6 +14,7 @@ from scout.schedule import (
     Schedule,
     Slot,
     SlotPriority,
+    SlotRuntime,
     SlotType,
     load_default_schedule,
     load_schedule,
@@ -478,3 +479,92 @@ def test_next_fires_default_schedule_returns_slots_within_24h():
     # Results should be in chronological order
     fire_times = [fire_dt for _, fire_dt in results]
     assert fire_times == sorted(fire_times)
+
+
+# ---------------------------------------------------------------------------
+# SlotRuntime — Plan 6 Task 1: runtime enum field on Slot
+# ---------------------------------------------------------------------------
+
+
+def test_slot_runtime_defaults_to_local_when_absent(tmp_path):
+    """YAML without a runtime key should produce Slot.runtime == LOCAL."""
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+        # runtime key intentionally absent
+    )
+    sched = load_schedule(yaml_file)
+    assert sched["morning-briefing"].runtime == SlotRuntime.LOCAL
+
+
+def test_slot_runtime_parses_local_explicitly(tmp_path):
+    """YAML with runtime: local should parse to SlotRuntime.LOCAL."""
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+        "    runtime: local\n"
+    )
+    sched = load_schedule(yaml_file)
+    assert sched["morning-briefing"].runtime == SlotRuntime.LOCAL
+
+
+def test_slot_runtime_parses_remote(tmp_path):
+    """YAML with runtime: remote should parse to SlotRuntime.REMOTE.
+
+    Note: the dispatcher guard (Task 2) is what rejects REMOTE at fire-time.
+    The loader accepts it without error.
+    """
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+        "    runtime: remote\n"
+    )
+    sched = load_schedule(yaml_file)
+    assert sched["morning-briefing"].runtime == SlotRuntime.REMOTE
+
+
+def test_slot_runtime_invalid_value_raises_config_error(tmp_path):
+    """YAML with an unrecognized runtime value should raise ConfigError mentioning 'runtime'."""
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+        "    runtime: cloud\n"  # not a valid SlotRuntime value
+    )
+    with pytest.raises(ConfigError, match="runtime"):
+        load_schedule(yaml_file)
