@@ -41,6 +41,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from scout import paths
+from scout.errors import ConfigError
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 from scout.schedule import (
@@ -48,6 +49,7 @@ from scout.schedule import (
     Schedule,
     Slot,
     SlotPriority,
+    SlotRuntime,
     SlotType,
     load_default_schedule,
     load_schedule,
@@ -381,7 +383,18 @@ def _spawn_runner(vault: Path, slot_key: str, slot: Slot) -> int:
     propagates from ``subprocess.Popen`` when the file does not exist on
     disk. We deliberately do NOT pre-check existence so that mocked
     Popen calls in tests still see the call.
+
+    Raises ``ConfigError`` if ``slot.runtime == SlotRuntime.REMOTE`` — remote
+    slots are reserved for Plan 7 (remote routine integration) and cannot be
+    dispatched until that work lands.
     """
+    if slot.runtime == SlotRuntime.REMOTE:
+        raise ConfigError(
+            f"slot {slot_key!r} has runtime: remote, which is reserved for Plan 7 "
+            f"(remote routine integration). The dispatcher cannot fire remote slots "
+            f"until that work lands. Edit ~/Scout/.scout-state/schedule.yaml and set "
+            f"runtime: local, or delete the slot."
+        )
     runner_path = vault / slot.runner
     env = os.environ.copy()
     env["SCOUT_FORCE_MODE"] = slot_key
