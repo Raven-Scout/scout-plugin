@@ -6,9 +6,21 @@ You shouldn't have to manually track what happened across seven different tools 
 
 ## Quick Start
 
+Scout is distributed as a Claude Code plugin via a built-in marketplace catalog (`.claude-plugin/marketplace.json`). Install it with:
+
 ```
-claude plugin add <repo-url>
+/plugin marketplace add jordanrburger/scout-plugin
+/plugin install scout@scout-plugin
 ```
+
+The first command registers this repo as a plugin marketplace; the second installs the `scout` plugin from it. After installing, the `/scout-*` commands and skills are available in every Claude Code session.
+
+> **Other ways to install**
+>
+> - **One-off (no install):** `claude --plugin-dir /path/to/scout-plugin` loads the plugin for a single session without persisting it.
+> - **From a local clone via marketplace:** `/plugin marketplace add /path/to/scout-plugin` (give it the directory containing `.claude-plugin/marketplace.json`).
+>
+> See [Discover and install plugins](https://code.claude.com/docs/en/discover-plugins) for the full Claude Code plugin documentation.
 
 Then run `/scout-setup` in any Claude Code session. The setup wizard detects your connected tools (MCP connectors, `gh` CLI, local directories), collects your details (name, Slack ID, email), scaffolds the Scout directory with a knowledge graph ontology, assembles personalized skill files from phase modules matching your connectors, sets up budget tracking scripts, and configures scheduling. Done in under 5 minutes.
 
@@ -188,7 +200,9 @@ Scout is built from **phase modules** — small, focused markdown files that eac
 
 ```
 scout-plugin/
-  plugin.json               -- Plugin manifest
+  .claude-plugin/
+    plugin.json             -- Plugin manifest
+    marketplace.json        -- Marketplace catalog (lets the repo install via /plugin marketplace add)
   commands/
     scout-setup.md          -- Interactive setup wizard
     scout-status.md         -- Dashboard command
