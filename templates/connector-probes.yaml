@@ -1,0 +1,33 @@
+# Declarative probe registry for /scout-setup connector detection.
+# When MCP namespaces shift, update this file (no wizard prose changes needed).
+
+slack:
+  primary: mcp__plugin_slack_slack__slack_read_user_profile
+  fallbacks:
+    - mcp__claude_ai_Slack__slack_read_user_profile
+  needs_user_input:
+    - user_slack_id
+calendar:
+  primary: mcp__claude_ai_Google_Calendar__list_calendars
+  fallbacks: []
+gmail:
+  primary: mcp__claude_ai_Gmail__list_labels
+  fallbacks: []
+linear:
+  primary: mcp__plugin_linear_linear__list_teams
+  fallbacks: []
+github:
+  primary: bash
+  command: "gh auth status"
+  needs_user_input:
+    - github_username
+    - github_repos
+granola:
+  primary: mcp__claude_ai_Granola__list_meetings
+  fallbacks: []
+drive:
+  primary: mcp__claude_ai_Google_Drive__list_recent_files
+  fallbacks: []
+claude_sessions:
+  primary: bash
+  command: "test -d ~/.claude/projects"
