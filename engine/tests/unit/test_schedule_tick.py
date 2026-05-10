@@ -506,11 +506,11 @@ def test_fire_now_runner_missing_emits_fire_failed(tmp_path, monkeypatch):
     assert ev.kind == "slot.fire_failed"
 
 
-# 9. runtime guard: dispatcher rejects remote slots until Plan 7.
+# 9. runtime guard: dispatcher rejects remote slots until the routines API ships.
 
 
 def test_spawn_runner_rejects_remote_runtime(tmp_path):
-    """Plan 7 forward-compat: dispatcher refuses to spawn `runtime: remote` slots
+    """Forward-compat: dispatcher refuses to spawn `runtime: remote` slots
     until the routines API integration ships. Until then, save attempts in the
     Schedules tab UI render Remote as disabled, so this guard catches manual
     YAML edits that set runtime: remote."""
@@ -525,5 +525,5 @@ def test_spawn_runner_rejects_remote_runtime(tmp_path):
         cooldown_minutes=240,
         runtime=SlotRuntime.REMOTE,
     )
-    with pytest.raises(ConfigError, match="runtime: remote.*Plan 7"):
+    with pytest.raises(ConfigError, match="runtime: remote.*not yet implemented"):
         _spawn_runner(vault=tmp_path, slot_key="research", slot=slot)
