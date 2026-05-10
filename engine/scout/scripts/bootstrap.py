@@ -172,6 +172,8 @@ def _stage_cat1b_runners(cfg: BootstrapConfig, *, is_upgrade: bool) -> list[str]
             if current != rendered:
                 today = _dt.date.today().isoformat()
                 bak = cfg.vault / f"{vault_rel}.bak.{today}"
+                # Overwrites same-day backup if present — only the most recent
+                # hand-edit-vs-template divergence is preserved per day.
                 shutil.copy2(target, bak)
                 backups.append(bak.name)
         _atomic_write(target, rendered)
@@ -196,9 +198,11 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
         for phase_file in sorted(src_dir.glob("*.md")):
             try:
                 sections = parse_phase_file(phase_file)
-            except (ValueError, Exception):
-                # Skip phase files that fail to parse (e.g., body contains
-                # bare '---' horizontal rules that confuse the section splitter).
+            except (ValueError, yaml.YAMLError):
+                # Phase file failed to parse — skip rather than abort the assembly.
+                # Known limitation: phase_assembly.parse_phase_file is fooled by bare
+                # '---' horizontal rules in markdown bodies (e.g., kb-management.md).
+                # Tracked as a Plan 8 followup to harden A5's parser.
                 continue
             kept = select_sections(sections, enabled_connectors=cfg.enabled_connectors)
             for s in kept:
@@ -286,7 +290,7 @@ def _stage_version_stamp(cfg: BootstrapConfig, *, is_upgrade: bool) -> None:
         plugin["version_at_last_setup"] = cfg.plugin_version
     plugin["version_at_last_update"] = cfg.plugin_version
     plugin.setdefault("applied_migrations", [])
-    config_path.write_text(yaml.safe_dump(existing, sort_keys=False), encoding="utf-8")
+    _atomic_write(config_path, yaml.safe_dump(existing, sort_keys=False))
 
 
 # ---------- entry points ----------
