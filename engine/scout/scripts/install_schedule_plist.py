@@ -27,8 +27,8 @@ def install_plist(
     target = agents_dir / PLIST_NAME
     if target.exists() and not force:
         raise FileExistsError(target)
-    rendered = TEMPLATE.read_text().replace("__USER_HOME__", str(home))
-    target.write_text(rendered)
+    rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", str(home))
+    target.write_text(rendered, encoding="utf-8")
     if bootstrap:
         # `launchctl bootstrap gui/$UID <plist>` loads the job. Best-effort.
         uid = os.getuid()
