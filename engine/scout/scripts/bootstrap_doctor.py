@@ -45,8 +45,11 @@ def run_doctor(*, vault: Path, check_jobs: bool = True) -> DoctorReport:
     errors: list[str] = []
     warnings: list[str] = []
 
-    if not vault.exists():
-        errors.append(f"vault directory missing: {vault}")
+    if not vault.is_dir():
+        if vault.exists():
+            errors.append(f"vault path is not a directory: {vault}")
+        else:
+            errors.append(f"vault directory missing: {vault}")
         return DoctorReport(severity=Severity.RED, errors=errors)
 
     # schedule.yaml must exist and parse.
