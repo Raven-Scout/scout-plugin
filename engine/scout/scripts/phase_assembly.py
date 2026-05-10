@@ -55,8 +55,13 @@ def parse_phase_file(path: Path) -> list[PhaseSection]:
         # Body is the next part; may be absent for a corrupt/trailing fence.
         body = parts[i + 1] if i + 1 < len(parts) else ""
         i += 2
+        # Skip empty junk sections (trailing '---' fence is a common editor artifact).
+        if not fm_text.strip() and not body.strip():
+            continue
 
         fm = yaml.safe_load(fm_text) or {}
+
+        section_id = fm.get("name") or f"section at index {(i // 2)}"
 
         # Validate and normalise ``mode``: must be a list of strings (or absent).
         raw_mode = fm.get("mode")
@@ -66,12 +71,12 @@ def parse_phase_file(path: Path) -> list[PhaseSection]:
             mode = [str(m) for m in raw_mode]
         elif isinstance(raw_mode, str):
             raise ValueError(
-                f"{path}: 'mode' must be a YAML list, got a plain string {raw_mode!r}. "
+                f"{path} [{section_id}]: 'mode' must be a YAML list, got {type(raw_mode).__name__}. "
                 "Wrap in brackets: [briefing]"
             )
         else:
             raise ValueError(
-                f"{path}: 'mode' must be a list, got {type(raw_mode).__name__}"
+                f"{path} [{section_id}]: 'mode' must be a YAML list, got {type(raw_mode).__name__}"
             )
 
         # Validate ``requires``: must be a string or null, not a list.
@@ -82,13 +87,20 @@ def parse_phase_file(path: Path) -> list[PhaseSection]:
             requires = raw_requires
         else:
             raise ValueError(
-                f"{path}: 'requires' must be a string or null, "
+                f"{path} [{section_id}]: 'requires' must be a string or null, "
                 f"got {type(raw_requires).__name__}"
+            )
+
+        # Validate ``phase``: must be present and non-empty.
+        phase_val = str(fm.get("phase", "")).strip()
+        if not phase_val:
+            raise ValueError(
+                f"{path} [{section_id}]: 'phase' field is required and must be non-empty"
             )
 
         sections.append(
             PhaseSection(
-                phase=str(fm.get("phase", "")),
+                phase=phase_val,
                 name=str(fm.get("name", "")),
                 slot=str(fm.get("slot", "")),
                 mode=mode,
