@@ -612,6 +612,84 @@ def _register_schedule() -> None:
                     err=True,
                 )
 
+    @schedule_app.command("install-heartbeat-plist")
+    def cli_schedule_install_heartbeat_plist(
+        force: bool = typer.Option(False, "--force", "-f"),
+        bootstrap: bool = typer.Option(True, "--bootstrap/--no-bootstrap"),
+        uninstall: bool = typer.Option(False, "--uninstall"),
+    ) -> None:
+        """Install or remove com.scout.heartbeat.plist."""
+        from scout.scripts.install_heartbeat_plist import (
+            install_plist as _i,
+            uninstall_plist as _u,
+        )
+        if uninstall:
+            _u(bootout=bootstrap)
+            typer.echo("uninstalled com.scout.heartbeat.plist")
+            return
+        try:
+            target = _i(home=Path.home(), force=force, bootstrap=bootstrap)
+            typer.echo(f"installed: {target}")
+        except FileExistsError as e:
+            typer.echo(f"plist exists at {e}; use --force to overwrite", err=True)
+            raise typer.Exit(code=1) from e
+
+    @schedule_app.command("install-cron")
+    def cli_schedule_install_cron(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+    ) -> None:
+        """Install or remove the Linux scout-managed crontab block."""
+        from scout.scripts.install_cron import (
+            CrontabApplyError,
+            install_cron as _i,
+            uninstall_cron as _u,
+        )
+        try:
+            if uninstall:
+                _u(home=Path.home())
+                typer.echo("removed scout-managed crontab block")
+            else:
+                _i(home=Path.home())
+                typer.echo("installed scout-managed crontab block")
+        except CrontabApplyError as e:
+            typer.echo(f"crontab apply failed: {e}", err=True)
+            raise typer.Exit(code=1) from e
+
+    @schedule_app.command("install-all")
+    def cli_schedule_install_all(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+        force: bool = typer.Option(False, "--force"),
+    ) -> None:
+        """Platform-aware installer (launchd on macOS, cron on Linux)."""
+        import platform as _platform
+        system = _platform.system()
+        if system == "Darwin":
+            from scout.scripts.install_schedule_plist import (
+                install_plist as install_st, uninstall_plist as uninstall_st,
+            )
+            from scout.scripts.install_heartbeat_plist import (
+                install_plist as install_hb, uninstall_plist as uninstall_hb,
+            )
+            if uninstall:
+                uninstall_st(bootout=True)
+                uninstall_hb(bootout=True)
+                typer.echo("uninstalled launchd plists")
+                return
+            install_st(home=Path.home(), force=force, bootstrap=True)
+            install_hb(home=Path.home(), force=force, bootstrap=True)
+            typer.echo("installed launchd plists")
+        elif system == "Linux":
+            from scout.scripts.install_cron import install_cron, uninstall_cron
+            if uninstall:
+                uninstall_cron(home=Path.home())
+                typer.echo("uninstalled scout-managed crontab block")
+                return
+            install_cron(home=Path.home())
+            typer.echo("installed scout-managed crontab block")
+        else:
+            typer.echo(f"unsupported platform: {system}", err=True)
+            raise typer.Exit(code=2)
+
 
 _register_schedule()
 
