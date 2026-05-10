@@ -1,6 +1,8 @@
 """Helper for `scoutctl schedule install-heartbeat-plist [--uninstall] [--force]`.
 
-Mirrors install_schedule_plist.py for com.scout.heartbeat.plist.
+Filling __USER_HOME__ in the template at install time; not at runtime, because
+launchd's plist parser doesn't expand env vars in <string> values. Mirrors
+install_schedule_plist.py for com.scout.heartbeat.plist.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ def install_plist(
     rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", str(home))
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
+        # `launchctl bootstrap gui/$UID <plist>` loads the job. Best-effort.
         uid = os.getuid()
         subprocess.run(
             ["launchctl", "bootstrap", f"gui/{uid}", str(target)],
