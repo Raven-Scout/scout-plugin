@@ -31,6 +31,11 @@ class Probe:
 def load_registry(path: Path) -> dict[str, Probe]:
     """Parse connector-probes.yaml into typed Probe objects."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"connector-probes.yaml must be a YAML mapping at the top level, "
+            f"got {type(raw).__name__}"
+        )
     out: dict[str, Probe] = {}
     for name, body in raw.items():
         if not isinstance(body, dict):
@@ -38,11 +43,16 @@ def load_registry(path: Path) -> dict[str, Probe]:
         if "primary" not in body:
             raise ValueError(f"connector {name!r}: missing 'primary'")
         primary = body["primary"]
-        needs = list(body.get("needs_user_input") or [])
+        raw_needs = body.get("needs_user_input") or []
+        if isinstance(raw_needs, str):
+            raise ValueError(f"connector {name!r}: 'needs_user_input' must be a list, got string")
+        needs = list(raw_needs)
 
         if primary == "bash":
             if "command" not in body:
                 raise ValueError(f"connector {name!r}: bash probe requires 'command'")
+            if not body["command"]:
+                raise ValueError(f"connector {name!r}: bash probe 'command' must not be empty")
             out[name] = Probe(
                 name=name,
                 kind=ProbeKind.BASH,
@@ -50,7 +60,10 @@ def load_registry(path: Path) -> dict[str, Probe]:
                 needs_user_input=needs,
             )
         else:
-            chain = [primary] + list(body.get("fallbacks") or [])
+            raw_fallbacks = body.get("fallbacks") or []
+            if isinstance(raw_fallbacks, str):
+                raise ValueError(f"connector {name!r}: 'fallbacks' must be a list, got string")
+            chain = [primary] + list(raw_fallbacks)
             out[name] = Probe(
                 name=name,
                 kind=ProbeKind.MCP_TOOL,

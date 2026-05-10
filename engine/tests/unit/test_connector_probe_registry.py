@@ -8,7 +8,6 @@ from textwrap import dedent
 import pytest
 
 from scout.scripts.connector_probes import (
-    Probe,
     ProbeKind,
     load_registry,
 )
@@ -105,3 +104,49 @@ def test_probe_emits_user_input_default_empty(tmp_path):
     )
     reg = load_registry(path)
     assert reg["calendar"].needs_user_input == []
+
+
+def test_fallbacks_as_string_raises(tmp_path):
+    path = _registry(
+        tmp_path,
+        """
+        slack:
+          primary: mcp__plugin_slack_slack__slack_read_user_profile
+          fallbacks: mcp__claude_ai_Slack__slack_read_user_profile
+        """,
+    )
+    with pytest.raises(ValueError, match="'fallbacks' must be a list"):
+        load_registry(path)
+
+
+def test_top_level_list_raises(tmp_path):
+    path = tmp_path / "connector-probes.yaml"
+    path.write_text("- foo\n- bar\n")
+    with pytest.raises(ValueError, match="must be a YAML mapping at the top level"):
+        load_registry(path)
+
+
+def test_bash_probe_with_empty_command_raises(tmp_path):
+    path = _registry(
+        tmp_path,
+        """
+        github:
+          primary: bash
+          command: ""
+        """,
+    )
+    with pytest.raises(ValueError, match="must not be empty"):
+        load_registry(path)
+
+
+def test_needs_user_input_as_string_raises(tmp_path):
+    path = _registry(
+        tmp_path,
+        """
+        slack:
+          primary: mcp__plugin_slack_slack__slack_read_user_profile
+          needs_user_input: user_slack_id
+        """,
+    )
+    with pytest.raises(ValueError, match="'needs_user_input' must be a list"):
+        load_registry(path)
