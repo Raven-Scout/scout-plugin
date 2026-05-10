@@ -37,9 +37,9 @@ def three_way_merge(*, base: str, ours: str, theirs: str) -> MergeResult:
         ours_path = tmp_path / "ours"
         base_path = tmp_path / "base"
         theirs_path = tmp_path / "theirs"
-        ours_path.write_text(ours)
-        base_path.write_text(base)
-        theirs_path.write_text(theirs)
+        ours_path.write_text(ours, encoding="utf-8")
+        base_path.write_text(base, encoding="utf-8")
+        theirs_path.write_text(theirs, encoding="utf-8")
 
         proc = subprocess.run(
             [
@@ -53,9 +53,12 @@ def three_way_merge(*, base: str, ours: str, theirs: str) -> MergeResult:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
-        # git merge-file: returncode 0 = clean, >0 = number of conflicts,
-        # <0 = fatal. Treat fatal as "raise".
-        if proc.returncode < 0:
-            raise RuntimeError(f"git merge-file failed: {proc.stderr}")
+        # git merge-file: returncode 0 = clean, 1..127 = conflict count,
+        # 128/255 = fatal git error. Treat fatal as "raise".
+        if proc.returncode < 0 or proc.returncode > 127:
+            raise RuntimeError(
+                f"git merge-file exited {proc.returncode}: {proc.stderr.strip()}"
+            )
         return MergeResult(content=proc.stdout, conflicts=proc.returncode > 0)
