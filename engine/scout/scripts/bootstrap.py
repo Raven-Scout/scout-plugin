@@ -97,6 +97,14 @@ _CAT1_TEMPLATES = (
     ("scripts/write-session-cost.sh", "templates/scripts/write-session-cost.sh.tmpl"),
     ("scripts/rate-limit-detect.sh", "templates/scripts/rate-limit-detect.sh.tmpl"),
     ("hooks/kb-pre-filter.sh", "templates/hooks/kb-pre-filter.sh.tmpl"),
+    (".gitignore", "templates/.gitignore.tmpl"),
+)
+
+_INSTALL_ONLY_TEMPLATES = (
+    # Vault-owned files seeded once on install (cat 2). Never overwritten on upgrade.
+    ("dreaming-proposals.md", "templates/dreaming-proposals.md.tmpl"),
+    ("knowledge-base/scout-mistake-audit.md", "templates/scout-mistake-audit.md.tmpl"),
+    ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
 )
 
 _CAT1B_RUNNERS = (
@@ -155,6 +163,20 @@ def _stage_cat1_writes(cfg: BootstrapConfig) -> None:
         rendered = render_template(src.read_text(encoding="utf-8"), vars_)
         _atomic_write(cfg.vault / vault_rel, rendered)
         (cfg.vault / vault_rel).chmod(0o755)
+
+
+def _stage_install_only_seeds(cfg: BootstrapConfig) -> None:
+    """Seed cat-2 vault-owned files on install only (never overwritten)."""
+    vars_ = _template_vars(cfg)
+    for vault_rel, tmpl_rel in _INSTALL_ONLY_TEMPLATES:
+        target = cfg.vault / vault_rel
+        if target.exists():
+            continue  # never overwrite
+        src = cfg.plugin_root / tmpl_rel
+        if not src.exists():
+            continue
+        rendered = render_template(src.read_text(encoding="utf-8"), vars_)
+        _atomic_write(target, rendered)
 
 
 def _stage_cat1b_runners(cfg: BootstrapConfig, *, is_upgrade: bool) -> list[str]:
@@ -332,6 +354,7 @@ def install(cfg: BootstrapConfig) -> InstallResult:
     try:
         _stage_create_dirs(cfg)
         _stage_cat1_writes(cfg)
+        _stage_install_only_seeds(cfg)   # <-- NEW
         _stage_seed_schedule(cfg)
         _stage_cat1b_runners(cfg, is_upgrade=False)
         _stage_cat4_install(cfg)
