@@ -73,7 +73,7 @@ def test_select_filters_by_slot():
     assert selected[0].slot == "outbound-scan"
 
 
-def test_select_filters_mixed_connectors_within_file(tmp_path):
+def test_select_filters_mixed_connectors_within_file():
     """Two sections in the same file with different `requires` are filtered independently."""
     sections = parse_phase_file(FIXTURES / "connectors" / "dummy-mixed.md")
     assert len(sections) == 2
