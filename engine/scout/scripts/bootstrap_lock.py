@@ -23,12 +23,22 @@ class LockBusyError(Exception):
 
 
 def is_lock_held_by_live_pid(lock_path: Path) -> bool:
-    """Return True iff the lock file exists and its PID is alive."""
+    """Return True iff the lock file exists and its PID is alive.
+
+    TOCTOU note: a process could exit between this check and a subsequent
+    operation. That's acceptable for single-user single-machine use; the
+    lock is a coordination signal between scout-app sessions, not a
+    cross-host mutex.
+    """
     if not lock_path.exists():
         return False
     try:
         pid = int(lock_path.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
+        return False
+    if pid <= 0:
+        # Corrupt lock — refuse to call os.kill(0, 0) (process group) or
+        # os.kill(-1, 0) (every process owned by user).
         return False
     try:
         os.kill(pid, 0)  # signal 0 — existence probe, no actual signal sent
@@ -44,7 +54,8 @@ def acquire_lock(lock_path: Path) -> None:
     """Take the lock by writing our PID. Raise if already held by a live PID."""
     if is_lock_held_by_live_pid(lock_path):
         try:
-            pid = int(lock_path.read_text(encoding="utf-8").strip())
+            pid_str = lock_path.read_text(encoding="utf-8").strip()
+            pid = int(pid_str)
         except (ValueError, OSError):
             pid = -1
         raise LockBusyError(lock_path, pid)
@@ -56,7 +67,12 @@ def acquire_lock(lock_path: Path) -> None:
 
 
 def release_lock(lock_path: Path) -> None:
-    """Release the lock if we still hold it."""
+    """Release the lock if we still hold it.
+
+    TOCTOU note: between reading the PID and unlinking, a different process
+    could replace the file. Acceptable for single-user single-machine use;
+    a malicious replacement isn't part of the threat model.
+    """
     if not lock_path.exists():
         return
     try:
