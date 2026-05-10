@@ -39,7 +39,7 @@ class FakeCrontab:
 def fake(monkeypatch):
     fc = FakeCrontab()
 
-    def fake_run(args, capture_output=True, text=True, check=False):
+    def fake_run(args, **_kwargs):
         from subprocess import CompletedProcess
 
         if args[:2] == ["crontab", "-l"]:
@@ -116,3 +116,50 @@ def test_uninstall_silent_when_no_block(fake, tmp_path):
     fake.content = "# user line\n"
     cron_mod.uninstall_cron(home=tmp_path, backup_dir=tmp_path)
     assert fake.content == "# user line\n"
+
+
+def test_install_when_crontab_is_only_managed_block(fake, tmp_path):
+    """If the user's crontab is only the managed block, install replaces cleanly with no leading blank."""
+    fake.content = (
+        "# >>> scout-managed >>>\n"
+        "*/99 * * * * old-content\n"
+        "# <<< scout-managed <<<\n"
+    )
+    cron_mod.install_cron(home=tmp_path, backup_dir=tmp_path)
+    # No leading blank line
+    assert not fake.content.startswith("\n")
+    assert fake.content.startswith("# >>> scout-managed >>>")
+    assert "old-content" not in fake.content
+    assert "scoutctl schedule tick" in fake.content
+
+
+def test_install_with_corrupt_unclosed_block(fake, tmp_path):
+    """Open marker without close — strip leaves it alone (no truncation)."""
+    fake.content = (
+        "# user line A\n"
+        "# >>> scout-managed >>>\n"
+        "*/5 * * * * orphaned-line\n"
+        "# user line B\n"
+    )
+    # Should still apply: install adds a fresh block at the end while leaving
+    # the corrupt block in place. User has to clean up manually.
+    cron_mod.install_cron(home=tmp_path, backup_dir=tmp_path)
+    assert "# user line A" in fake.content
+    assert "# user line B" in fake.content
+    # Both the corrupt orphaned line AND the fresh block should be present
+    assert "orphaned-line" in fake.content
+    assert "scoutctl schedule tick" in fake.content
+
+
+def test_uninstall_writes_backup(fake, tmp_path):
+    """uninstall_cron also writes a backup of the prior crontab."""
+    fake.content = (
+        "# user line\n"
+        "# >>> scout-managed >>>\n"
+        "*/5 * * * * scoutctl schedule tick\n"
+        "# <<< scout-managed <<<\n"
+    )
+    cron_mod.uninstall_cron(home=tmp_path, backup_dir=tmp_path)
+    backups = list(tmp_path.glob(".crontab.scout-bak.*"))
+    assert len(backups) == 1
+    assert "scoutctl schedule tick" in backups[0].read_text()

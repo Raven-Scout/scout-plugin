@@ -33,22 +33,34 @@ def _list_crontab() -> str:
 
 def _apply_crontab(content: str) -> None:
     """Apply the new crontab via temp-file. Atomic from user's perspective."""
-    fd, path = tempfile.mkstemp(suffix=".cron")
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".cron", delete=False, encoding="utf-8"
+    ) as tf:
+        tf.write(content)
+        path = tf.name
     try:
-        os.write(fd, content.encode("utf-8"))
-        os.close(fd)
         proc = subprocess.run(
             ["crontab", path], capture_output=True, text=True, check=False
         )
         if proc.returncode != 0:
-            raise CrontabApplyError(f"crontab apply failed: {proc.stderr}")
+            raise CrontabApplyError(
+                f"crontab apply failed (rc={proc.returncode}): "
+                f"{proc.stderr or proc.stdout or '(no output)'}"
+            )
     finally:
         if os.path.exists(path):
             os.unlink(path)
 
 
 def _strip_managed_block(text: str) -> str:
-    """Remove existing ``# >>> scout-managed >>>`` ... ``# <<< scout-managed <<<`` block."""
+    """Remove existing ``# >>> scout-managed >>>`` ... ``# <<< scout-managed <<<`` block.
+
+    If the close marker is missing (corrupt state), returns the original text
+    unchanged rather than silently eating the rest of the file.
+    """
+    if BLOCK_OPEN in text and BLOCK_CLOSE not in text:
+        # Corrupt managed block — leave crontab untouched rather than truncate.
+        return text
     lines = text.splitlines()
     out: list[str] = []
     in_block = False
@@ -70,10 +82,20 @@ def _render_block(home: Path) -> str:
 
 
 def _backup(previous: str, backup_dir: Path) -> None:
-    """Write the prior crontab to ~/.crontab.scout-bak.YYYY-MM-DD."""
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    today = _dt.date.today().isoformat()
-    (backup_dir / f".crontab.scout-bak.{today}").write_text(previous, encoding="utf-8")
+    """Write the prior crontab to ~/.crontab.scout-bak.YYYY-MM-DD.
+
+    Best-effort: failures here are logged but do not propagate, since the
+    crontab has already been successfully applied by the time we get here.
+    Same-day reruns overwrite the backup — only the most recent state is kept.
+    """
+    try:
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        today = _dt.date.today().isoformat()
+        (backup_dir / f".crontab.scout-bak.{today}").write_text(previous, encoding="utf-8")
+    except OSError as e:
+        # Best-effort — don't mask the successful crontab apply.
+        import sys
+        print(f"warning: failed to write crontab backup: {e}", file=sys.stderr)
 
 
 def install_cron(*, home: Path, backup_dir: Path | None = None) -> None:
@@ -82,9 +104,14 @@ def install_cron(*, home: Path, backup_dir: Path | None = None) -> None:
     previous = _list_crontab()
     stripped = _strip_managed_block(previous)
     block = _render_block(home)
-    if stripped and not stripped.endswith("\n"):
-        stripped += "\n"
-    new_content = stripped + block
+    if stripped.strip():
+        # Has user content — ensure trailing newline before the block.
+        if not stripped.endswith("\n"):
+            stripped += "\n"
+        new_content = stripped + block
+    else:
+        # No user content — just write the block clean.
+        new_content = block
     if not new_content.endswith("\n"):
         new_content += "\n"
     _apply_crontab(new_content)
