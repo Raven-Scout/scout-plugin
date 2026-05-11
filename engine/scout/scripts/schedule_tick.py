@@ -385,15 +385,15 @@ def _spawn_runner(vault: Path, slot_key: str, slot: Slot) -> int:
     Popen calls in tests still see the call.
 
     Raises ``ConfigError`` if ``slot.runtime == SlotRuntime.REMOTE`` — remote
-    slots are reserved for Plan 7 (remote routine integration) and cannot be
+    routine integration is reserved for a future plan and cannot be
     dispatched until that work lands.
     """
     if slot.runtime == SlotRuntime.REMOTE:
         raise ConfigError(
-            f"slot {slot_key!r} has runtime: remote, which is reserved for Plan 7 "
-            f"(remote routine integration). The dispatcher cannot fire remote slots "
-            f"until that work lands. Edit ~/Scout/.scout-state/schedule.yaml and set "
-            f"runtime: local, or delete the slot."
+            f"slot {slot_key!r} has runtime: remote, which is not yet implemented. "
+            f"Remote routine integration is reserved for a future plan. "
+            f"Edit ~/Scout/.scout-state/schedule.yaml and set runtime: local, "
+            f"or delete the slot."
         )
     runner_path = vault / slot.runner
     env = os.environ.copy()

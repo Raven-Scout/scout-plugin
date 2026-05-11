@@ -5,6 +5,9 @@
 set -euo pipefail
 
 SCOUT_DIR="{{SCOUT_DIR}}"
+# Exported so any consumer of scout-plugin's engine package (scout.kb, etc.)
+# resolves the user's vault. Required by Plan 5+.
+export SCOUT_DATA_DIR="$SCOUT_DIR"
 LOG_DIR="$SCOUT_DIR/.scout-logs"
 CLAUDE_BIN="{{CLAUDE_BIN}}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
@@ -51,24 +54,11 @@ Important:
 
 echo "=== {{INSTANCE_NAME}} run starting at $(date) ===" >> "$LOG_FILE"
 
-# Determine mode label for session name (must happen before pre-session hooks that use $MODE)
-HOUR=$(date +%H)
-DAY_OF_WEEK=$(date +%u)  # 1=Mon ... 6=Sat, 7=Sun
-
-if [ "$DAY_OF_WEEK" -ge 6 ]; then
-    # Weekend
-    case $HOUR in
-        {{BRIEFING_HOUR}}) MODE="weekend-briefing" ;;
-        *)  MODE="weekend-manual" ;;
-    esac
-else
-    # Weekday
-    case $HOUR in
-        {{BRIEFING_HOUR}}) MODE="morning-briefing" ;;
-        {{CONSOLIDATION_HOURS_CASE}}
-        *)  MODE="manual" ;;
-    esac
-fi
+# Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
+# without SCOUT_FORCE_MODE set, default to "manual" — operators can still
+# fire the runner directly for debugging, and the prompt downstream will
+# pick a reasonable mode based on day-of-week + hour.
+MODE="${SCOUT_FORCE_MODE:-manual}"
 
 # Pre-session hooks — gather data before Claude starts (saves tool calls inside the session).
 # These write to .scout-cache/ for the skill files to consume.

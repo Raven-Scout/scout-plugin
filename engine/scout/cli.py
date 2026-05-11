@@ -612,6 +612,84 @@ def _register_schedule() -> None:
                     err=True,
                 )
 
+    @schedule_app.command("install-heartbeat-plist")
+    def cli_schedule_install_heartbeat_plist(
+        force: bool = typer.Option(False, "--force", "-f"),
+        bootstrap: bool = typer.Option(True, "--bootstrap/--no-bootstrap"),
+        uninstall: bool = typer.Option(False, "--uninstall"),
+    ) -> None:
+        """Install or remove com.scout.heartbeat.plist."""
+        from scout.scripts.install_heartbeat_plist import (
+            install_plist as _i,
+            uninstall_plist as _u,
+        )
+        if uninstall:
+            _u(bootout=bootstrap)
+            typer.echo("uninstalled com.scout.heartbeat.plist")
+            return
+        try:
+            target = _i(home=Path.home(), force=force, bootstrap=bootstrap)
+            typer.echo(f"installed: {target}")
+        except FileExistsError as e:
+            typer.echo(f"plist exists at {e}; use --force to overwrite", err=True)
+            raise typer.Exit(code=1) from e
+
+    @schedule_app.command("install-cron")
+    def cli_schedule_install_cron(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+    ) -> None:
+        """Install or remove the Linux scout-managed crontab block."""
+        from scout.scripts.install_cron import (
+            CrontabApplyError,
+            install_cron as _i,
+            uninstall_cron as _u,
+        )
+        try:
+            if uninstall:
+                _u(home=Path.home())
+                typer.echo("removed scout-managed crontab block")
+            else:
+                _i(home=Path.home())
+                typer.echo("installed scout-managed crontab block")
+        except CrontabApplyError as e:
+            typer.echo(f"crontab apply failed: {e}", err=True)
+            raise typer.Exit(code=1) from e
+
+    @schedule_app.command("install-all")
+    def cli_schedule_install_all(
+        uninstall: bool = typer.Option(False, "--uninstall"),
+        force: bool = typer.Option(False, "--force"),
+    ) -> None:
+        """Platform-aware installer (launchd on macOS, cron on Linux)."""
+        import platform as _platform
+        system = _platform.system()
+        if system == "Darwin":
+            from scout.scripts.install_schedule_plist import (
+                install_plist as install_st, uninstall_plist as uninstall_st,
+            )
+            from scout.scripts.install_heartbeat_plist import (
+                install_plist as install_hb, uninstall_plist as uninstall_hb,
+            )
+            if uninstall:
+                uninstall_st(bootout=True)
+                uninstall_hb(bootout=True)
+                typer.echo("uninstalled launchd plists")
+                return
+            install_st(home=Path.home(), force=force, bootstrap=True)
+            install_hb(home=Path.home(), force=force, bootstrap=True)
+            typer.echo("installed launchd plists")
+        elif system == "Linux":
+            from scout.scripts.install_cron import install_cron, uninstall_cron
+            if uninstall:
+                uninstall_cron(home=Path.home())
+                typer.echo("uninstalled scout-managed crontab block")
+                return
+            install_cron(home=Path.home())
+            typer.echo("installed scout-managed crontab block")
+        else:
+            typer.echo(f"unsupported platform: {system}", err=True)
+            raise typer.Exit(code=2)
+
 
 _register_schedule()
 
@@ -699,6 +777,184 @@ def _register_notify() -> None:
 
 
 _register_notify()
+
+
+def _register_bootstrap() -> None:
+    bootstrap_app = typer.Typer(help="Bootstrap pipeline (install/upgrade/doctor).")
+    app.add_typer(bootstrap_app, name="bootstrap")
+
+    @bootstrap_app.command("install")
+    def cli_bootstrap_install(
+        instance_name: str = typer.Option("Scout", "--instance-name"),
+        user_name: str = typer.Option(..., "--user-name"),
+        user_email: str = typer.Option(..., "--user-email"),
+        timezone: str = typer.Option("America/New_York", "--timezone"),
+        platform: str = typer.Option("macos", "--platform"),
+        skip_jobs: bool = typer.Option(False, "--no-jobs"),
+        skip_claude: bool = typer.Option(False, "--skip-claude"),
+        connectors: str = typer.Option("", "--connectors", help="Comma-separated enabled connector names"),
+    ) -> None:
+        """Install Scout into the user's vault directory."""
+        from scout import paths as _paths
+        from scout import __version__
+        from scout.scripts.bootstrap import BootstrapConfig, install
+
+        vault = _paths.data_dir()
+        cfg = BootstrapConfig(
+            vault=vault,
+            plugin_root=Path(__file__).parent.parent.parent,
+            instance_name=instance_name,
+            instance_name_lower=instance_name.lower().replace(" ", "-"),
+            user_name=user_name,
+            user_email=user_email,
+            timezone=timezone,
+            platform=platform,
+            plugin_version=__version__,
+            enabled_connectors=set(c.strip() for c in connectors.split(",") if c.strip()),
+            connector_inputs={},
+            skip_jobs=skip_jobs,
+            skip_claude=skip_claude,
+        )
+        result = install(cfg)
+        typer.echo(f"installed: {result.vault}")
+        typer.echo(f"doctor: {result.doctor.severity.value}")
+        for w in result.doctor.warnings:
+            typer.echo(f"  warning: {w}", err=True)
+        for e in result.doctor.errors:
+            typer.echo(f"  error: {e}", err=True)
+        raise typer.Exit(code=result.doctor.exit_code)
+
+    @bootstrap_app.command("upgrade")
+    def cli_bootstrap_upgrade(
+        skip_jobs: bool = typer.Option(False, "--no-jobs"),
+        skip_claude: bool = typer.Option(False, "--skip-claude"),
+    ) -> None:
+        """Upgrade an existing vault against the current plugin templates."""
+        from scout import paths as _paths
+        from scout import __version__
+        from scout.scripts.bootstrap import BootstrapConfig, upgrade
+
+        vault = _paths.data_dir()
+        cfg_path = vault / "scout-config.yaml"
+        if not cfg_path.exists():
+            typer.echo(f"no vault at {vault} — run /scout-setup", err=True)
+            raise typer.Exit(code=2)
+        import yaml as _yaml
+        existing = _yaml.safe_load(cfg_path.read_text()) or {}
+        connectors = set(existing.get("connectors", {}).get("enabled") or [])
+        instance = existing.get("instance", {})
+        user = existing.get("user", {})
+        cfg = BootstrapConfig(
+            vault=vault,
+            plugin_root=Path(__file__).parent.parent.parent,
+            instance_name=instance.get("name", "Scout"),
+            instance_name_lower=instance.get("name_lower", "scout"),
+            user_name=user.get("name", ""),
+            user_email=user.get("email", ""),
+            timezone=existing.get("timezone", "America/New_York"),
+            platform=existing.get("platform", "macos"),
+            plugin_version=__version__,
+            enabled_connectors=connectors,
+            connector_inputs=existing.get("connectors", {}).get("inputs", {}),
+            skip_jobs=skip_jobs,
+            skip_claude=skip_claude,
+        )
+        result = upgrade(cfg)
+        typer.echo(f"upgraded: {result.vault}")
+        for c in result.conflicts:
+            typer.echo(f"  conflict (sidecar): {c}", err=True)
+        for b in result.backups:
+            typer.echo(f"  backup: {b}", err=True)
+        typer.echo(f"doctor: {result.doctor.severity.value}")
+        raise typer.Exit(code=result.doctor.exit_code)
+
+    @bootstrap_app.command("doctor")
+    def cli_bootstrap_doctor(
+        no_jobs: bool = typer.Option(False, "--no-jobs", help="Skip launchd registration check"),
+    ) -> None:
+        """Run the read-only health check on the current vault."""
+        from scout import paths as _paths
+        from scout.scripts.bootstrap_doctor import run_doctor
+
+        report = run_doctor(vault=_paths.data_dir(), check_jobs=not no_jobs)
+        typer.echo(f"severity: {report.severity.value}")
+        for w in report.warnings:
+            typer.echo(f"warning: {w}")
+        for e in report.errors:
+            typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(code=report.exit_code)
+
+    @bootstrap_app.command("migrate-legacy")
+    def cli_bootstrap_migrate_legacy(
+        user_name: str = typer.Option(..., "--user-name"),
+        user_email: str = typer.Option(..., "--user-email"),
+        instance_name: str = typer.Option("Scout", "--instance-name"),
+        user_slack_id: str = typer.Option("", "--user-slack-id"),
+        github_username: str = typer.Option("", "--github-username"),
+        github_repos: str = typer.Option("", "--github-repos"),
+        claude_bin: str = typer.Option("/usr/local/bin/claude", "--claude-bin"),
+        timezone: str = typer.Option("America/New_York", "--timezone"),
+        max_budget: str = typer.Option("5.00", "--max-budget"),
+        platform: str = typer.Option("macos", "--platform"),
+        connectors: str = typer.Option(
+            "", "--connectors", help="Comma-separated enabled connector names"
+        ),
+        skip_jobs: bool = typer.Option(
+            True,
+            "--no-jobs/--rebootstrap-jobs",
+            help="Default --no-jobs: leave launchd/cron untouched; use --rebootstrap-jobs to reinstall them.",
+        ),
+    ) -> None:
+        """One-time migration of a Plan-5-era vault to Plan 8 format.
+
+        Required: vault must exist with .scout-state/ but no scout-config.yaml.
+        Establishes the Plan 8 baseline (snapshots + scout-config.yaml + cat-1
+        regen) without touching live SKILL/DREAMING/RESEARCH content. Legacy
+        runners with hand-edits are backed up to .bak.YYYY-MM-DD before
+        regeneration from the current plugin templates.
+        """
+        from scout import __version__
+        from scout import paths as _paths
+        from scout.scripts.bootstrap import BootstrapConfig, migrate_legacy
+
+        vault = _paths.data_dir()
+        cfg = BootstrapConfig(
+            vault=vault,
+            plugin_root=Path(__file__).parent.parent.parent,
+            instance_name=instance_name,
+            instance_name_lower=instance_name.lower().replace(" ", "-"),
+            user_name=user_name,
+            user_email=user_email,
+            timezone=timezone,
+            platform=platform,
+            plugin_version=__version__,
+            enabled_connectors=set(
+                c.strip() for c in connectors.split(",") if c.strip()
+            ),
+            connector_inputs={
+                "user_slack_id": user_slack_id,
+                "github_username": github_username,
+                "github_repos": github_repos,
+                "claude_bin": claude_bin,
+                "max_budget": max_budget,
+            },
+            skip_jobs=skip_jobs,
+            skip_claude=True,
+        )
+        result = migrate_legacy(cfg)
+        typer.echo(f"migrated: {result.vault}")
+        typer.echo(f"snapshots recorded: {', '.join(result.snapshots_recorded) or 'none'}")
+        for b in result.backups:
+            typer.echo(f"  backup: {b}")
+        typer.echo(f"doctor: {result.doctor.severity.value}")
+        for w in result.doctor.warnings:
+            typer.echo(f"  warning: {w}", err=True)
+        for e in result.doctor.errors:
+            typer.echo(f"  error: {e}", err=True)
+        raise typer.Exit(code=result.doctor.exit_code)
+
+
+_register_bootstrap()
 
 
 @app.command()

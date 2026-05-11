@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCOUT_DIR="{{SCOUT_DIR}}"
+# Exported so any consumer of scout-plugin's engine package resolves the vault.
+export SCOUT_DATA_DIR="$SCOUT_DIR"
 LOG_DIR="$SCOUT_DIR/.scout-logs"
 CLAUDE_BIN="{{CLAUDE_BIN}}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
@@ -55,8 +57,9 @@ if [ -x "$BUDGET_CHECK" ]; then
     fi
 fi
 
-# Session label
-MODE="research-$(date +%H%M)"
+# Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
+# without SCOUT_FORCE_MODE set, default to "research-manual".
+MODE="${SCOUT_FORCE_MODE:-research-manual}"
 
 START_TIME=$(date +%s)
 

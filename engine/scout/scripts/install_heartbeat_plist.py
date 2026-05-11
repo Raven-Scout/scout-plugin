@@ -1,7 +1,8 @@
-"""Helper for `scoutctl schedule install-plist [--uninstall] [--force]`.
+"""Helper for `scoutctl schedule install-heartbeat-plist [--uninstall] [--force]`.
 
 Filling __USER_HOME__ in the template at install time; not at runtime, because
-launchd's plist parser doesn't expand env vars in <string> values.
+launchd's plist parser doesn't expand env vars in <string> values. Mirrors
+install_schedule_plist.py for com.scout.heartbeat.plist.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ import os
 import subprocess
 from pathlib import Path
 
-PLIST_NAME = "com.scout.schedule-tick.plist"
+PLIST_NAME = "com.scout.heartbeat.plist"
 TEMPLATE = Path(__file__).parent.parent / "defaults" / PLIST_NAME
 
 
@@ -46,7 +47,7 @@ def uninstall_plist(*, agents_dir: Path | None = None, bootout: bool = False) ->
     if bootout:
         uid = os.getuid()
         subprocess.run(
-            ["launchctl", "bootout", f"gui/{uid}/com.scout.schedule-tick"],
+            ["launchctl", "bootout", f"gui/{uid}/com.scout.heartbeat"],
             check=False,
         )
     if target.exists():
