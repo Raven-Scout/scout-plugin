@@ -13,17 +13,5 @@
     "automation",
     "scheduling",
     "obsidian"
-  ],
-  "commands": [
-    "commands/scout-setup.md",
-    "commands/scout-status.md",
-    "commands/scout-work.md",
-    "commands/scout-meta-review.md"
-  ],
-  "skills": [
-    "skills/scout-briefing.md",
-    "skills/scout-consolidation.md",
-    "skills/scout-dream.md",
-    "skills/scout-research.md"
   ]
 }
