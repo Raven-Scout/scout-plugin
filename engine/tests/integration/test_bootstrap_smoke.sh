@@ -9,7 +9,7 @@ set -euo pipefail
 TEST_VAULT=$(mktemp -d -t scout-smoke-XXXXXX)
 trap 'rm -rf "$TEST_VAULT"' EXIT
 
-SCOUTCTL="${SCOUTCTL:-$HOME/scout-plugin-plan-8/.venv/bin/scoutctl}"
+SCOUTCTL="${SCOUTCTL:-$HOME/scout-plugin/.venv/bin/scoutctl}"
 
 if [ ! -x "$SCOUTCTL" ]; then
     echo "FAIL: scoutctl not found at $SCOUTCTL" >&2
