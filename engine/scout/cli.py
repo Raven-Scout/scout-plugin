@@ -884,6 +884,75 @@ def _register_bootstrap() -> None:
             typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=report.exit_code)
 
+    @bootstrap_app.command("migrate-legacy")
+    def cli_bootstrap_migrate_legacy(
+        user_name: str = typer.Option(..., "--user-name"),
+        user_email: str = typer.Option(..., "--user-email"),
+        instance_name: str = typer.Option("Scout", "--instance-name"),
+        user_slack_id: str = typer.Option("", "--user-slack-id"),
+        github_username: str = typer.Option("", "--github-username"),
+        github_repos: str = typer.Option("", "--github-repos"),
+        claude_bin: str = typer.Option("/usr/local/bin/claude", "--claude-bin"),
+        timezone: str = typer.Option("America/New_York", "--timezone"),
+        max_budget: str = typer.Option("5.00", "--max-budget"),
+        platform: str = typer.Option("macos", "--platform"),
+        connectors: str = typer.Option(
+            "", "--connectors", help="Comma-separated enabled connector names"
+        ),
+        skip_jobs: bool = typer.Option(
+            True,
+            "--no-jobs/--rebootstrap-jobs",
+            help="Default --no-jobs: leave launchd/cron untouched; use --rebootstrap-jobs to reinstall them.",
+        ),
+    ) -> None:
+        """One-time migration of a Plan-5-era vault to Plan 8 format.
+
+        Required: vault must exist with .scout-state/ but no scout-config.yaml.
+        Establishes the Plan 8 baseline (snapshots + scout-config.yaml + cat-1
+        regen) without touching live SKILL/DREAMING/RESEARCH content. Legacy
+        runners with hand-edits are backed up to .bak.YYYY-MM-DD before
+        regeneration from the current plugin templates.
+        """
+        from scout import __version__
+        from scout import paths as _paths
+        from scout.scripts.bootstrap import BootstrapConfig, migrate_legacy
+
+        vault = _paths.data_dir()
+        cfg = BootstrapConfig(
+            vault=vault,
+            plugin_root=Path(__file__).parent.parent.parent,
+            instance_name=instance_name,
+            instance_name_lower=instance_name.lower().replace(" ", "-"),
+            user_name=user_name,
+            user_email=user_email,
+            timezone=timezone,
+            platform=platform,
+            plugin_version=__version__,
+            enabled_connectors=set(
+                c.strip() for c in connectors.split(",") if c.strip()
+            ),
+            connector_inputs={
+                "user_slack_id": user_slack_id,
+                "github_username": github_username,
+                "github_repos": github_repos,
+                "claude_bin": claude_bin,
+                "max_budget": max_budget,
+            },
+            skip_jobs=skip_jobs,
+            skip_claude=True,
+        )
+        result = migrate_legacy(cfg)
+        typer.echo(f"migrated: {result.vault}")
+        typer.echo(f"snapshots recorded: {', '.join(result.snapshots_recorded) or 'none'}")
+        for b in result.backups:
+            typer.echo(f"  backup: {b}")
+        typer.echo(f"doctor: {result.doctor.severity.value}")
+        for w in result.doctor.warnings:
+            typer.echo(f"  warning: {w}", err=True)
+        for e in result.doctor.errors:
+            typer.echo(f"  error: {e}", err=True)
+        raise typer.Exit(code=result.doctor.exit_code)
+
 
 _register_bootstrap()
 
