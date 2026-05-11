@@ -26,8 +26,8 @@ def _config(vault: Path, *, plugin_root: Path) -> BootstrapConfig:
         plugin_version="0.4.0",
         enabled_connectors=set(),
         connector_inputs={},
-        skip_jobs=True,        # don't touch ~/Library/LaunchAgents in tests
-        skip_claude=True,      # don't run a real Claude session
+        skip_jobs=True,  # don't touch ~/Library/LaunchAgents in tests
+        skip_claude=True,  # don't run a real Claude session
     )
 
 
@@ -87,6 +87,7 @@ def test_install_records_plugin_version(tmp_path):
     install(_config(vault, plugin_root=plugin))
     config_text = (vault / "scout-config.yaml").read_text()
     import yaml
+
     cfg = yaml.safe_load(config_text)
     assert cfg["plugin"]["version_at_last_setup"] == "0.4.0"
     assert cfg["plugin"]["version_at_last_update"] == "0.4.0"

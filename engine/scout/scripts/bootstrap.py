@@ -149,6 +149,7 @@ def _atomic_write(path: Path, content: str) -> None:
 
 # ---------- stages ----------
 
+
 def _stage_create_dirs(cfg: BootstrapConfig) -> None:
     for rel in _CAT1_DIR_LAYOUT:
         (cfg.vault / rel).mkdir(parents=True, exist_ok=True)
@@ -407,7 +408,7 @@ def install(cfg: BootstrapConfig) -> InstallResult:
     try:
         _stage_create_dirs(cfg)
         _stage_cat1_writes(cfg)
-        _stage_install_only_seeds(cfg)   # <-- NEW
+        _stage_install_only_seeds(cfg)  # <-- NEW
         _stage_seed_schedule(cfg)
         _stage_cat1b_runners(cfg, is_upgrade=False)
         _stage_cat4_install(cfg)
@@ -431,9 +432,7 @@ def _is_legacy_vault(vault: Path) -> bool:
 def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
     """Run the upgrade pipeline. Refuses if no vault or if vault is legacy (pre-Plan-8)."""
     if not _vault_exists(cfg.vault):
-        raise FileNotFoundError(
-            f"no vault at {cfg.vault} — run /scout-setup instead."
-        )
+        raise FileNotFoundError(f"no vault at {cfg.vault} — run /scout-setup instead.")
     if _is_legacy_vault(cfg.vault):
         raise RuntimeError(
             f"legacy vault detected at {cfg.vault} (no scout-config.yaml). "
@@ -485,8 +484,7 @@ def migrate_legacy(cfg: BootstrapConfig) -> MigrateLegacyResult:
     """
     if not (cfg.vault / ".scout-state").exists():
         raise FileNotFoundError(
-            f"no vault at {cfg.vault} (no .scout-state/ directory) — "
-            f"run /scout-setup for a fresh install."
+            f"no vault at {cfg.vault} (no .scout-state/ directory) — run /scout-setup for a fresh install."
         )
     if (cfg.vault / "scout-config.yaml").exists():
         raise FileExistsError(

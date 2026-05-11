@@ -90,9 +90,7 @@ def remove_stale_lock(lock_path: Path) -> None:
         lock_path.unlink()
 
 
-def acquire_lock_with_wait(
-    lock_path: Path, *, timeout_s: int = 300, poll_s: int = 10
-) -> None:
+def acquire_lock_with_wait(lock_path: Path, *, timeout_s: int = 300, poll_s: int = 10) -> None:
     """Acquire with up to ``timeout_s`` of polling. Raise LockBusyError on timeout."""
     deadline = time.monotonic() + timeout_s
     while True:

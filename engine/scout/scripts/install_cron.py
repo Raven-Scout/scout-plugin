@@ -33,19 +33,14 @@ def _list_crontab() -> str:
 
 def _apply_crontab(content: str) -> None:
     """Apply the new crontab via temp-file. Atomic from user's perspective."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".cron", delete=False, encoding="utf-8"
-    ) as tf:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".cron", delete=False, encoding="utf-8") as tf:
         tf.write(content)
         path = tf.name
     try:
-        proc = subprocess.run(
-            ["crontab", path], capture_output=True, text=True, check=False
-        )
+        proc = subprocess.run(["crontab", path], capture_output=True, text=True, check=False)
         if proc.returncode != 0:
             raise CrontabApplyError(
-                f"crontab apply failed (rc={proc.returncode}): "
-                f"{proc.stderr or proc.stdout or '(no output)'}"
+                f"crontab apply failed (rc={proc.returncode}): {proc.stderr or proc.stdout or '(no output)'}"
             )
     finally:
         if os.path.exists(path):
@@ -95,6 +90,7 @@ def _backup(previous: str, backup_dir: Path) -> None:
     except OSError as e:
         # Best-effort — don't mask the successful crontab apply.
         import sys
+
         print(f"warning: failed to write crontab backup: {e}", file=sys.stderr)
 
 

@@ -44,7 +44,9 @@ class OnMissPolicy(enum.Enum):
 
 class SlotRuntime(enum.Enum):
     LOCAL = "local"
-    REMOTE = "remote"  # Reserved for a future plan (remote routine integration via Anthropic routines API); not yet wired. Loader accepts; dispatcher rejects.
+    # Reserved for a future plan (remote routine integration via Anthropic
+    # routines API); not yet wired. Loader accepts; dispatcher rejects.
+    REMOTE = "remote"
 
 
 class SlotPriority(enum.IntEnum):
