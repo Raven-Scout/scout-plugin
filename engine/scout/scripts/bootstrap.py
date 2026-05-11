@@ -462,14 +462,20 @@ def migrate_legacy(cfg: BootstrapConfig) -> MigrateLegacyResult:
                 content = live.read_text(encoding="utf-8")
                 _atomic_write(snapshot_dir / f"{kind}.md", content)
                 snapshots_recorded.append(f"{kind}.md")
-        # 2. cat-1 writes with the now-correct template vars.
+        # 2. Seed .scout-state/schedule.yaml if missing. Legacy Plan-5-era
+        #    vaults never explicitly wrote this file; the live dispatcher
+        #    silently falls back to packaged defaults. Make the vault copy
+        #    explicit so the doctor reports green and future schedule edits
+        #    have a stable home.
+        _stage_seed_schedule(cfg)
+        # 3. cat-1 writes with the now-correct template vars.
         _stage_cat1_writes(cfg)
-        # 3. cat-1b runner regen — backs up legacy runners.
+        # 4. cat-1b runner regen — backs up legacy runners.
         backups = _stage_cat1b_runners(cfg, is_upgrade=True)
-        # 4. SKIP cat-4 merge: snapshots just established equal current live.
-        # 5. Jobs.
+        # 5. SKIP cat-4 merge: snapshots just established equal current live.
+        # 6. Jobs.
         _stage_jobs_install(cfg)
-        # 6. Version stamps (is_upgrade=False so both version_at_last_setup and
+        # 7. Version stamps (is_upgrade=False so both version_at_last_setup and
         #    version_at_last_update are written; setup marks "migrated at this
         #    plugin version", matching how a freshly-installed vault records it).
         _stage_version_stamp(cfg, is_upgrade=False)

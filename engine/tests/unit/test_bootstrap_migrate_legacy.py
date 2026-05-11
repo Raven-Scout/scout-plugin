@@ -101,6 +101,16 @@ def test_migrate_legacy_preserves_cat4_live_files(tmp_path):
     assert (tmp_path / "DREAMING.md").read_text() == original_dreaming
 
 
+def test_migrate_legacy_seeds_schedule_yaml(tmp_path):
+    """schedule.yaml must be seeded so the doctor reports green post-migration."""
+    _populate_legacy_vault(tmp_path)
+    plugin = Path(__file__).parent.parent.parent.parent
+    migrate_legacy(_config(tmp_path, plugin_root=plugin))
+    schedule = tmp_path / ".scout-state" / "schedule.yaml"
+    assert schedule.exists()
+    assert "schema_version" in schedule.read_text()
+
+
 def test_migrate_legacy_records_snapshots(tmp_path):
     """Snapshots in .scout-state/last-assembled/ should match current live files."""
     _populate_legacy_vault(tmp_path)
