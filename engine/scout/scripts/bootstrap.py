@@ -66,6 +66,14 @@ class UpgradeResult:
     backups: list[str] = field(default_factory=list)
 
 
+@dataclass
+class MigrateLegacyResult:
+    vault: Path
+    doctor: DoctorReport
+    backups: list[str] = field(default_factory=list)
+    snapshots_recorded: list[str] = field(default_factory=list)
+
+
 # ---------- shared helpers ----------
 
 _CAT1_DIR_LAYOUT = (
@@ -366,11 +374,26 @@ def install(cfg: BootstrapConfig) -> InstallResult:
     return InstallResult(vault=cfg.vault, doctor=report)
 
 
+def _is_legacy_vault(vault: Path) -> bool:
+    """Legacy: `.scout-state/` exists but `scout-config.yaml` doesn't.
+
+    Indicates a Plan-5-era vault that pre-dates the Plan 8 config conventions.
+    Such vaults need `scoutctl bootstrap migrate-legacy` before `upgrade` works.
+    """
+    return (vault / ".scout-state").exists() and not (vault / "scout-config.yaml").exists()
+
+
 def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
-    """Run the upgrade pipeline. Stage 1 refuses if no vault."""
+    """Run the upgrade pipeline. Refuses if no vault or if vault is legacy (pre-Plan-8)."""
     if not _vault_exists(cfg.vault):
         raise FileNotFoundError(
             f"no vault at {cfg.vault} — run /scout-setup instead."
+        )
+    if _is_legacy_vault(cfg.vault):
+        raise RuntimeError(
+            f"legacy vault detected at {cfg.vault} (no scout-config.yaml). "
+            f"Run `scoutctl bootstrap migrate-legacy` first to establish a "
+            f"Plan 8 baseline before running upgrade."
         )
     _refuse_pending_sidecars(cfg.vault)
     lock = cfg.vault / ".scout-logs" / ".scout-session.lock"
@@ -390,4 +413,72 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         doctor=report,
         conflicts=conflicts,
         backups=backups,
+    )
+
+
+def migrate_legacy(cfg: BootstrapConfig) -> MigrateLegacyResult:
+    """One-time migration of a Plan-5-era vault to Plan 8 format.
+
+    Required: cfg.vault must have ``.scout-state/`` but no ``scout-config.yaml``.
+
+    Actions (in order):
+      1. Acquire global lock.
+      2. Snapshot current SKILL.md / DREAMING.md / RESEARCH.md to
+         ``.scout-state/last-assembled/`` as the merge baseline. Live files
+         never touched.
+      3. Run cat-1 writes — overwrites plugin-owned scripts/hooks/plists with
+         templates rendered against the user-provided cfg vars.
+      4. Run cat-1b runner regen with hand-edit detection. Legacy runners
+         (heavily customized) get backed up; fresh templates installed.
+      5. Skip cat-4 merge entirely — snapshots just established, nothing to
+         merge.
+      6. Job lifecycle (subject to cfg.skip_jobs).
+      7. Write version stamps to a fresh scout-config.yaml.
+      8. Doctor.
+
+    After this, the vault is Plan 8-compatible and `upgrade()` works normally.
+    """
+    if not (cfg.vault / ".scout-state").exists():
+        raise FileNotFoundError(
+            f"no vault at {cfg.vault} (no .scout-state/ directory) — "
+            f"run /scout-setup for a fresh install."
+        )
+    if (cfg.vault / "scout-config.yaml").exists():
+        raise FileExistsError(
+            f"vault at {cfg.vault} is not a legacy vault (scout-config.yaml "
+            f"exists). Use `scoutctl bootstrap upgrade` instead."
+        )
+    lock = cfg.vault / ".scout-logs" / ".scout-session.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    acquire_lock_with_wait(lock)
+    snapshots_recorded: list[str] = []
+    try:
+        # 1. Establish snapshots from current live cat-4 files.
+        snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        for kind in ("SKILL", "DREAMING", "RESEARCH"):
+            live = cfg.vault / f"{kind}.md"
+            if live.exists():
+                content = live.read_text(encoding="utf-8")
+                _atomic_write(snapshot_dir / f"{kind}.md", content)
+                snapshots_recorded.append(f"{kind}.md")
+        # 2. cat-1 writes with the now-correct template vars.
+        _stage_cat1_writes(cfg)
+        # 3. cat-1b runner regen — backs up legacy runners.
+        backups = _stage_cat1b_runners(cfg, is_upgrade=True)
+        # 4. SKIP cat-4 merge: snapshots just established equal current live.
+        # 5. Jobs.
+        _stage_jobs_install(cfg)
+        # 6. Version stamps (is_upgrade=False so both version_at_last_setup and
+        #    version_at_last_update are written; setup marks "migrated at this
+        #    plugin version", matching how a freshly-installed vault records it).
+        _stage_version_stamp(cfg, is_upgrade=False)
+    finally:
+        release_lock(lock)
+    report = run_doctor(vault=cfg.vault, check_jobs=not cfg.skip_jobs)
+    return MigrateLegacyResult(
+        vault=cfg.vault,
+        doctor=report,
+        backups=backups,
+        snapshots_recorded=snapshots_recorded,
     )
