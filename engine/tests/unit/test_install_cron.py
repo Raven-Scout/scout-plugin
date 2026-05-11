@@ -101,12 +101,7 @@ def test_install_writes_backup_of_previous_crontab(fake, tmp_path):
 
 
 def test_uninstall_removes_managed_block(fake, tmp_path):
-    fake.content = (
-        "# user line\n"
-        "# >>> scout-managed >>>\n"
-        "*/5 * * * * scoutctl schedule tick\n"
-        "# <<< scout-managed <<<\n"
-    )
+    fake.content = "# user line\n# >>> scout-managed >>>\n*/5 * * * * scoutctl schedule tick\n# <<< scout-managed <<<\n"
     cron_mod.uninstall_cron(home=tmp_path, backup_dir=tmp_path)
     assert "# >>> scout-managed >>>" not in fake.content
     assert "# user line" in fake.content
@@ -120,11 +115,7 @@ def test_uninstall_silent_when_no_block(fake, tmp_path):
 
 def test_install_when_crontab_is_only_managed_block(fake, tmp_path):
     """If the user's crontab is only the managed block, install replaces cleanly with no leading blank."""
-    fake.content = (
-        "# >>> scout-managed >>>\n"
-        "*/99 * * * * old-content\n"
-        "# <<< scout-managed <<<\n"
-    )
+    fake.content = "# >>> scout-managed >>>\n*/99 * * * * old-content\n# <<< scout-managed <<<\n"
     cron_mod.install_cron(home=tmp_path, backup_dir=tmp_path)
     # No leading blank line
     assert not fake.content.startswith("\n")
@@ -135,12 +126,7 @@ def test_install_when_crontab_is_only_managed_block(fake, tmp_path):
 
 def test_install_with_corrupt_unclosed_block(fake, tmp_path):
     """Open marker without close — strip leaves it alone (no truncation)."""
-    fake.content = (
-        "# user line A\n"
-        "# >>> scout-managed >>>\n"
-        "*/5 * * * * orphaned-line\n"
-        "# user line B\n"
-    )
+    fake.content = "# user line A\n# >>> scout-managed >>>\n*/5 * * * * orphaned-line\n# user line B\n"
     # Should still apply: install adds a fresh block at the end while leaving
     # the corrupt block in place. User has to clean up manually.
     cron_mod.install_cron(home=tmp_path, backup_dir=tmp_path)
@@ -153,12 +139,7 @@ def test_install_with_corrupt_unclosed_block(fake, tmp_path):
 
 def test_uninstall_writes_backup(fake, tmp_path):
     """uninstall_cron also writes a backup of the prior crontab."""
-    fake.content = (
-        "# user line\n"
-        "# >>> scout-managed >>>\n"
-        "*/5 * * * * scoutctl schedule tick\n"
-        "# <<< scout-managed <<<\n"
-    )
+    fake.content = "# user line\n# >>> scout-managed >>>\n*/5 * * * * scoutctl schedule tick\n# <<< scout-managed <<<\n"
     cron_mod.uninstall_cron(home=tmp_path, backup_dir=tmp_path)
     backups = list(tmp_path.glob(".crontab.scout-bak.*"))
     assert len(backups) == 1

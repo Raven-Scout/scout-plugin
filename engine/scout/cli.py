@@ -621,8 +621,11 @@ def _register_schedule() -> None:
         """Install or remove com.scout.heartbeat.plist."""
         from scout.scripts.install_heartbeat_plist import (
             install_plist as _i,
+        )
+        from scout.scripts.install_heartbeat_plist import (
             uninstall_plist as _u,
         )
+
         if uninstall:
             _u(bootout=bootstrap)
             typer.echo("uninstalled com.scout.heartbeat.plist")
@@ -641,9 +644,14 @@ def _register_schedule() -> None:
         """Install or remove the Linux scout-managed crontab block."""
         from scout.scripts.install_cron import (
             CrontabApplyError,
+        )
+        from scout.scripts.install_cron import (
             install_cron as _i,
+        )
+        from scout.scripts.install_cron import (
             uninstall_cron as _u,
         )
+
         try:
             if uninstall:
                 _u(home=Path.home())
@@ -662,14 +670,22 @@ def _register_schedule() -> None:
     ) -> None:
         """Platform-aware installer (launchd on macOS, cron on Linux)."""
         import platform as _platform
+
         system = _platform.system()
         if system == "Darwin":
-            from scout.scripts.install_schedule_plist import (
-                install_plist as install_st, uninstall_plist as uninstall_st,
+            from scout.scripts.install_heartbeat_plist import (
+                install_plist as install_hb,
             )
             from scout.scripts.install_heartbeat_plist import (
-                install_plist as install_hb, uninstall_plist as uninstall_hb,
+                uninstall_plist as uninstall_hb,
             )
+            from scout.scripts.install_schedule_plist import (
+                install_plist as install_st,
+            )
+            from scout.scripts.install_schedule_plist import (
+                uninstall_plist as uninstall_st,
+            )
+
             if uninstall:
                 uninstall_st(bootout=True)
                 uninstall_hb(bootout=True)
@@ -680,6 +696,7 @@ def _register_schedule() -> None:
             typer.echo("installed launchd plists")
         elif system == "Linux":
             from scout.scripts.install_cron import install_cron, uninstall_cron
+
             if uninstall:
                 uninstall_cron(home=Path.home())
                 typer.echo("uninstalled scout-managed crontab block")
@@ -795,8 +812,8 @@ def _register_bootstrap() -> None:
         connectors: str = typer.Option("", "--connectors", help="Comma-separated enabled connector names"),
     ) -> None:
         """Install Scout into the user's vault directory."""
-        from scout import paths as _paths
         from scout import __version__
+        from scout import paths as _paths
         from scout.scripts.bootstrap import BootstrapConfig, install
 
         vault = _paths.data_dir()
@@ -830,8 +847,8 @@ def _register_bootstrap() -> None:
         skip_claude: bool = typer.Option(False, "--skip-claude"),
     ) -> None:
         """Upgrade an existing vault against the current plugin templates."""
-        from scout import paths as _paths
         from scout import __version__
+        from scout import paths as _paths
         from scout.scripts.bootstrap import BootstrapConfig, upgrade
 
         vault = _paths.data_dir()
@@ -840,6 +857,7 @@ def _register_bootstrap() -> None:
             typer.echo(f"no vault at {vault} — run /scout-setup", err=True)
             raise typer.Exit(code=2)
         import yaml as _yaml
+
         existing = _yaml.safe_load(cfg_path.read_text()) or {}
         connectors = set(existing.get("connectors", {}).get("enabled") or [])
         instance = existing.get("instance", {})
@@ -896,9 +914,7 @@ def _register_bootstrap() -> None:
         timezone: str = typer.Option("America/New_York", "--timezone"),
         max_budget: str = typer.Option("5.00", "--max-budget"),
         platform: str = typer.Option("macos", "--platform"),
-        connectors: str = typer.Option(
-            "", "--connectors", help="Comma-separated enabled connector names"
-        ),
+        connectors: str = typer.Option("", "--connectors", help="Comma-separated enabled connector names"),
         skip_jobs: bool = typer.Option(
             True,
             "--no-jobs/--rebootstrap-jobs",
@@ -928,9 +944,7 @@ def _register_bootstrap() -> None:
             timezone=timezone,
             platform=platform,
             plugin_version=__version__,
-            enabled_connectors=set(
-                c.strip() for c in connectors.split(",") if c.strip()
-            ),
+            enabled_connectors=set(c.strip() for c in connectors.split(",") if c.strip()),
             connector_inputs={
                 "user_slack_id": user_slack_id,
                 "github_username": github_username,

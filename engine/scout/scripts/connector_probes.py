@@ -15,8 +15,8 @@ import yaml
 
 
 class ProbeKind(Enum):
-    MCP_TOOL = "mcp_tool"   # primary is an MCP tool name to call
-    BASH = "bash"           # primary is "bash"; command is the shell command
+    MCP_TOOL = "mcp_tool"  # primary is an MCP tool name to call
+    BASH = "bash"  # primary is "bash"; command is the shell command
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class Probe:
     name: str
     kind: ProbeKind
     tool_chain: list[str] = field(default_factory=list)  # MCP_TOOL only
-    bash_command: str = ""                                # BASH only
+    bash_command: str = ""  # BASH only
     needs_user_input: list[str] = field(default_factory=list)
 
 
@@ -32,10 +32,7 @@ def load_registry(path: Path) -> dict[str, Probe]:
     """Parse connector-probes.yaml into typed Probe objects."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
-        raise ValueError(
-            f"connector-probes.yaml must be a YAML mapping at the top level, "
-            f"got {type(raw).__name__}"
-        )
+        raise ValueError(f"connector-probes.yaml must be a YAML mapping at the top level, got {type(raw).__name__}")
     out: dict[str, Probe] = {}
     for name, body in raw.items():
         if not isinstance(body, dict):

@@ -48,7 +48,7 @@ def _populate_legacy_vault(vault: Path) -> None:
     (vault / "DREAMING.md").write_text("# DREAMING\n\nVault-customized content. " * 100)
     (vault / "RESEARCH.md").write_text("# RESEARCH\n\nVault-customized content. " * 50)
     # Legacy runners with hand-edited content.
-    (vault / "run-scout.sh").write_text("#!/bin/bash\n# legacy hand-edited runner\nSCOUT_DIR=\"...\"\n")
+    (vault / "run-scout.sh").write_text('#!/bin/bash\n# legacy hand-edited runner\nSCOUT_DIR="..."\n')
     (vault / "run-dreaming.sh").write_text("#!/bin/bash\n# legacy\n")
     (vault / "run-research.sh").write_text("#!/bin/bash\n# legacy\n")
 
@@ -160,6 +160,7 @@ def test_migrate_then_upgrade_works(tmp_path):
     cfg = _config(tmp_path, plugin_root=plugin)
     cfg.plugin_version = "0.4.1"
     from scout.scripts.bootstrap import upgrade as _upgrade
+
     _upgrade(cfg)  # no exception expected
     new_cfg = yaml.safe_load((tmp_path / "scout-config.yaml").read_text())
     assert new_cfg["plugin"]["version_at_last_update"] == "0.4.1"
@@ -190,6 +191,7 @@ def test_migrate_then_upgrade_preserves_live_cat4(tmp_path):
     cfg = _config(tmp_path, plugin_root=plugin)
     cfg.plugin_version = "0.4.1"
     from scout.scripts.bootstrap import upgrade as _upgrade
+
     _upgrade(cfg)
     # Live cat-4 must STILL match pre-migrate content.
     assert (tmp_path / "SKILL.md").read_text() == pre_migrate_skill
@@ -253,6 +255,7 @@ def test_upgrade_sidecar_when_base_equals_theirs_but_ours_diverges(tmp_path):
     cfg = _config(tmp_path, plugin_root=plugin)
     cfg.plugin_version = "0.4.1"
     from scout.scripts.bootstrap import upgrade as _upgrade
+
     result = _upgrade(cfg)
     # Live must be untouched.
     assert live.read_text() == synthetic

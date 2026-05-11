@@ -58,7 +58,5 @@ def three_way_merge(*, base: str, ours: str, theirs: str) -> MergeResult:
         # git merge-file: returncode 0 = clean, 1..127 = conflict count,
         # 128/255 = fatal git error. Treat fatal as "raise".
         if proc.returncode < 0 or proc.returncode > 127:
-            raise RuntimeError(
-                f"git merge-file exited {proc.returncode}: {proc.stderr.strip()}"
-            )
+            raise RuntimeError(f"git merge-file exited {proc.returncode}: {proc.stderr.strip()}")
         return MergeResult(content=proc.stdout, conflicts=proc.returncode > 0)

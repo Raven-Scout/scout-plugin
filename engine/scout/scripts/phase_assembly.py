@@ -75,9 +75,7 @@ def parse_phase_file(path: Path) -> list[PhaseSection]:
                 "Wrap in brackets: [briefing]"
             )
         else:
-            raise ValueError(
-                f"{path} [{section_id}]: 'mode' must be a YAML list, got {type(raw_mode).__name__}"
-            )
+            raise ValueError(f"{path} [{section_id}]: 'mode' must be a YAML list, got {type(raw_mode).__name__}")
 
         # Validate ``requires``: must be a string or null, not a list.
         raw_requires = fm.get("requires")
@@ -87,16 +85,13 @@ def parse_phase_file(path: Path) -> list[PhaseSection]:
             requires = raw_requires
         else:
             raise ValueError(
-                f"{path} [{section_id}]: 'requires' must be a string or null, "
-                f"got {type(raw_requires).__name__}"
+                f"{path} [{section_id}]: 'requires' must be a string or null, got {type(raw_requires).__name__}"
             )
 
         # Validate ``phase``: must be present and non-empty.
         phase_val = str(fm.get("phase", "")).strip()
         if not phase_val:
-            raise ValueError(
-                f"{path} [{section_id}]: 'phase' field is required and must be non-empty"
-            )
+            raise ValueError(f"{path} [{section_id}]: 'phase' field is required and must be non-empty")
 
         sections.append(
             PhaseSection(
