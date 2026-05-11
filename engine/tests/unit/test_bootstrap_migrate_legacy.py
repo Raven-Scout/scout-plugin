@@ -164,3 +164,68 @@ def test_migrate_then_upgrade_works(tmp_path):
     new_cfg = yaml.safe_load((tmp_path / "scout-config.yaml").read_text())
     assert new_cfg["plugin"]["version_at_last_update"] == "0.4.1"
     assert new_cfg["plugin"]["version_at_last_setup"] == "0.4.0"  # unchanged
+
+
+def test_migrate_then_upgrade_preserves_live_cat4(tmp_path):
+    """Critical regression guard from M3 incident: migrate-then-upgrade must
+    NEVER overwrite live SKILL/DREAMING/RESEARCH when their content matches
+    the snapshot. The previous degenerate-merge fast-forward silently wiped
+    vault content; the sidecar-on-base==theirs policy must prevent this.
+
+    Scenario: legacy vault → migrate → run upgrade. After upgrade:
+    - live cat-4 files should be byte-identical to pre-migrate state
+    - either no sidecars (plugin assembly == snapshot) OR sidecars exist with
+      proposed plugin content (depending on whether phase content changed)
+    - never: live SKILL.md overwritten with plugin-assembled content.
+    """
+    _populate_legacy_vault(tmp_path)
+    plugin = Path(__file__).parent.parent.parent.parent
+    pre_migrate_skill = (tmp_path / "SKILL.md").read_text()
+    pre_migrate_dreaming = (tmp_path / "DREAMING.md").read_text()
+    pre_migrate_research = (tmp_path / "RESEARCH.md").read_text()
+    migrate_legacy(_config(tmp_path, plugin_root=plugin))
+    # Post-migrate state: live files unchanged, snapshots equal them.
+    assert (tmp_path / "SKILL.md").read_text() == pre_migrate_skill
+    # Now upgrade — should not touch live cat-4.
+    cfg = _config(tmp_path, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    from scout.scripts.bootstrap import upgrade as _upgrade
+    _upgrade(cfg)
+    # Live cat-4 must STILL match pre-migrate content.
+    assert (tmp_path / "SKILL.md").read_text() == pre_migrate_skill
+    assert (tmp_path / "DREAMING.md").read_text() == pre_migrate_dreaming
+    assert (tmp_path / "RESEARCH.md").read_text() == pre_migrate_research
+
+
+def test_upgrade_sidecar_when_base_equals_theirs_but_ours_diverges(tmp_path):
+    """When snapshot==live but plugin assembly produces different content,
+    write to sidecar instead of overwriting. This is the M3-incident guard."""
+    _populate_legacy_vault(tmp_path)
+    plugin = Path(__file__).parent.parent.parent.parent
+    migrate_legacy(_config(tmp_path, plugin_root=plugin))
+
+    # Manually corrupt the snapshot to force ours != snapshot, while keeping
+    # snapshot == theirs (the no-recorded-edits scenario).
+    snapshot = tmp_path / ".scout-state" / "last-assembled" / "SKILL.md"
+    live = tmp_path / "SKILL.md"
+    # Synchronize snapshot to current live (already done by migrate, but
+    # explicit for clarity).
+    live_text = live.read_text()
+    snapshot.write_text(live_text)
+    # Now mutate live AND snapshot together (so base == theirs) but neither
+    # matches what _assemble would produce. After upgrade, ours == fresh
+    # assembly which differs from this synthetic content.
+    synthetic = "# SYNTHETIC matching snapshot\n" * 50
+    live.write_text(synthetic)
+    snapshot.write_text(synthetic)
+
+    cfg = _config(tmp_path, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    from scout.scripts.bootstrap import upgrade as _upgrade
+    result = _upgrade(cfg)
+    # Live must be untouched.
+    assert live.read_text() == synthetic
+    # A sidecar should exist with plugin content.
+    sidecar = tmp_path / "SKILL.md.proposed-merge"
+    assert sidecar.exists()
+    assert "SKILL.md" in str(result.conflicts)

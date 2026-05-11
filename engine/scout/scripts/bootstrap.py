@@ -251,7 +251,25 @@ def _stage_cat4_install(cfg: BootstrapConfig) -> None:
 
 
 def _stage_cat4_upgrade(cfg: BootstrapConfig) -> list[str]:
-    """Stage 5 (upgrade): 3-way merge with sidecar policy."""
+    """Stage 5 (upgrade): 3-way merge with sidecar policy.
+
+    Outcomes per file:
+      1. ``ours == theirs`` — no plugin change vs live. Update snapshot to
+         ``ours`` (rebases the merge baseline forward), don't touch live.
+      2. ``ours != theirs`` and 3-way merge clean — merge result written to
+         live; snapshot advanced to ``ours``.
+      3. 3-way merge reports conflicts — write conflict-marked output to
+         ``<name>.md.proposed-merge`` sidecar; live + snapshot untouched.
+      4. ``base == theirs and ours != theirs`` (no recorded vault edits but
+         plugin diverged) — write ``ours`` to sidecar; live + snapshot
+         untouched. This protects legacy-migrated vaults (where snapshot was
+         seeded equal to current live with no edit history) AND fresh vaults
+         that haven't been edited yet, so phase-content changes surface as
+         a review prompt instead of a silent overwrite.
+
+    Replaces the previous "fast-forward to ours when base==theirs" behavior,
+    which silently wiped legacy vault content. See M3 live-vault incident.
+    """
     snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     conflicts: list[str] = []
@@ -261,12 +279,27 @@ def _stage_cat4_upgrade(cfg: BootstrapConfig) -> list[str]:
         theirs = live.read_text(encoding="utf-8") if live.exists() else ours
         snap = snapshot_dir / f"{kind}.md"
         base = snap.read_text(encoding="utf-8") if snap.exists() else theirs
+        sidecar = cfg.vault / f"{kind}.md.proposed-merge"
+
+        if ours == theirs:
+            # Plugin produced the same content the vault has. Snapshot
+            # advances to ours; no live update needed.
+            _atomic_write(snap, ours)
+            continue
+
+        if base == theirs:
+            # No recorded vault edits vs base, but plugin diverged. Treat as
+            # "needs user review" rather than silent overwrite — write sidecar.
+            _atomic_write(sidecar, ours)
+            conflicts.append(sidecar.name)
+            continue
+
+        # Both sides changed vs base — actual 3-way merge needed.
         result = three_way_merge(base=base, ours=ours, theirs=theirs)
         if not result.conflicts:
             _atomic_write(live, result.content)
             _atomic_write(snap, ours)
         else:
-            sidecar = cfg.vault / f"{kind}.md.proposed-merge"
             _atomic_write(sidecar, result.content)
             conflicts.append(sidecar.name)
     return conflicts
