@@ -2,17 +2,16 @@
   "name": "scout",
   "version": "0.4.0",
   "description": "Autonomous knowledge management and daily briefing system. Monitors your work tools (Slack, Calendar, Linear, GitHub, etc.), synthesizes findings into a persistent knowledge base with a formal ontology, and delivers daily action items — all running unattended via scheduled Claude Code sessions. Six session types: Morning Briefing, Consolidation, Dreaming, Research, interactive Work sessions, and Meta Review. Pre-session hooks pre-compute KB staleness, recent git activity, PR state, and Claude Code session summaries before each run, trading a few seconds of shell work for large token savings inside the session.",
-  "commands": [
-    "commands/scout-setup.md",
-    "commands/scout-update.md",
-    "commands/scout-status.md",
-    "commands/scout-work.md",
-    "commands/scout-meta-review.md"
-  ],
-  "skills": [
-    "skills/scout-briefing.md",
-    "skills/scout-consolidation.md",
-    "skills/scout-dream.md",
-    "skills/scout-research.md"
+  "author": {
+    "name": "Jordan Burger"
+  },
+  "homepage": "https://github.com/jordanrburger/scout-plugin",
+  "repository": "https://github.com/jordanrburger/scout-plugin",
+  "keywords": [
+    "knowledge-management",
+    "briefing",
+    "automation",
+    "scheduling",
+    "obsidian"
   ]
 }

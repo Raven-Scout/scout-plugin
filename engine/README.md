@@ -28,6 +28,6 @@ pytest tests/
 
 ## See also
 
-- `../plugin.json` — Claude Code plugin manifest
+- `../.claude-plugin/plugin.json` — Claude Code plugin manifest
 - Scout unification design spec lives in the scout-app repo under
   `docs/superpowers/specs/`.
