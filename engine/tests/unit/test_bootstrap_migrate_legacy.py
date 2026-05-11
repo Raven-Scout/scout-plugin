@@ -197,6 +197,37 @@ def test_migrate_then_upgrade_preserves_live_cat4(tmp_path):
     assert (tmp_path / "RESEARCH.md").read_text() == pre_migrate_research
 
 
+def test_migrate_legacy_persists_connector_inputs(tmp_path):
+    """Critical regression guard: scout-config.yaml must persist
+    connector_inputs (claude_bin, max_budget, user_slack_id, etc.) so the
+    upgrade CLI can re-read them and pass them to BootstrapConfig.
+
+    Without this, upgrade defaults these vars to fallback values
+    (CLAUDE_BIN=/usr/local/bin/claude, MAX_BUDGET=5.00, USER_SLACK_ID=""),
+    which makes _stage_cat1b_runners detect false hand-edits on every
+    upgrade and clobber legitimate same-day .bak files.
+    """
+    _populate_legacy_vault(tmp_path)
+    plugin = Path(__file__).parent.parent.parent.parent
+    cfg = _config(tmp_path, plugin_root=plugin)
+    cfg.connector_inputs = {
+        "claude_bin": "/Users/test/.local/bin/claude",
+        "max_budget": "10.00",
+        "user_slack_id": "U12345",
+        "github_username": "testuser",
+        "github_repos": "org/repo1",
+    }
+    cfg.enabled_connectors = {"slack", "github"}
+    migrate_legacy(cfg)
+    written = yaml.safe_load((tmp_path / "scout-config.yaml").read_text())
+    assert written["connectors"]["inputs"]["claude_bin"] == "/Users/test/.local/bin/claude"
+    assert written["connectors"]["inputs"]["max_budget"] == "10.00"
+    assert written["connectors"]["inputs"]["user_slack_id"] == "U12345"
+    assert written["connectors"]["enabled"] == ["github", "slack"]
+    assert written["timezone"] == "America/New_York"
+    assert written["platform"] == "macos"
+
+
 def test_upgrade_sidecar_when_base_equals_theirs_but_ours_diverges(tmp_path):
     """When snapshot==live but plugin assembly produces different content,
     write to sidecar instead of overwriting. This is the M3-incident guard."""

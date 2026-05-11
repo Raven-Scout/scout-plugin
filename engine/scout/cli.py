@@ -852,7 +852,7 @@ def _register_bootstrap() -> None:
             user_name=user.get("name", ""),
             user_email=user.get("email", ""),
             timezone=existing.get("timezone", "America/New_York"),
-            platform="macos",  # TODO: re-detect
+            platform=existing.get("platform", "macos"),
             plugin_version=__version__,
             enabled_connectors=connectors,
             connector_inputs=existing.get("connectors", {}).get("inputs", {}),

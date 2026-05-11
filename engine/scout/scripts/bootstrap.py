@@ -335,7 +335,12 @@ def _stage_seed_schedule(cfg: BootstrapConfig) -> None:
 
 
 def _stage_version_stamp(cfg: BootstrapConfig, *, is_upgrade: bool) -> None:
-    """Stage 7: write/update plugin.version_at_last_{setup,update}."""
+    """Stage 7: write/update plugin.version_at_last_{setup,update} plus persist
+    connector_inputs so subsequent upgrades render templates with the same values
+    that setup/migration used. Without this, upgrade defaults claude_bin /
+    max_budget / user_slack_id back to their fallback values, which makes
+    cat-1b hand-edit detection fire on every upgrade.
+    """
     config_path = cfg.vault / "scout-config.yaml"
     if config_path.exists():
         existing = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -348,6 +353,13 @@ def _stage_version_stamp(cfg: BootstrapConfig, *, is_upgrade: bool) -> None:
         "name": cfg.instance_name,
         "name_lower": cfg.instance_name_lower,
     }
+    existing["timezone"] = cfg.timezone
+    existing["platform"] = cfg.platform
+    # Persist connectors: enabled list + inputs so upgrade can rebuild
+    # BootstrapConfig faithfully without losing claude_bin/max_budget/etc.
+    connectors = existing.setdefault("connectors", {})
+    connectors["enabled"] = sorted(cfg.enabled_connectors)
+    connectors["inputs"] = dict(cfg.connector_inputs)
     plugin = existing.setdefault("plugin", {})
     if not is_upgrade:
         plugin["version_at_last_setup"] = cfg.plugin_version
