@@ -83,6 +83,7 @@ _CAT1_DIR_LAYOUT = (
     "knowledge-base/personal",
     "action-items/archive",
     "action-items/meeting-prep",
+    "meetings",
     "docs",
     "scripts",
     "hooks",
@@ -113,6 +114,8 @@ _INSTALL_ONLY_TEMPLATES = (
     ("dreaming-proposals.md", "templates/dreaming-proposals.md.tmpl"),
     ("knowledge-base/scout-mistake-audit.md", "templates/scout-mistake-audit.md.tmpl"),
     ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
+    ("inbox.md", "templates/inbox.md.tmpl"),
+    ("meetings/meetings.md", "templates/meetings/meetings.md.tmpl"),
 )
 
 _CAT1B_RUNNERS = (
