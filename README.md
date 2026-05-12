@@ -100,6 +100,22 @@ A system-level audit that sits above the individual session types. Does not read
 
 Everything is a git repo. Every change Scout makes is committed with a descriptive message. The commit history is as much a part of the system as the files.
 
+### Meeting Management
+
+Scout tracks your recurring meetings in `meetings/`. Each meeting has:
+- A **home file** with attendees, running themes, key decisions
+- **Dated session files** that evolve through three phases: prep → notes → synthesis
+
+Before each meeting, Scout generates a prep file with context from the last session, related project status, and suggested talking points. After meetings, it finds transcripts from Google Drive, synthesizes them with your manual notes, and propagates decisions and action items to project files.
+
+### Inbox
+
+`inbox.md` is your quick-capture file. Dump anything — meeting notes, reminders, ideas, personal tasks. Scout processes it every run and routes entries to the right place:
+- Meeting notes → the relevant meeting's home file
+- Action items → today's action items
+- Personal tasks → knowledge graph entities
+- Ideas → research queue
+
 ## Pre-Session Hooks
 
 Scout's runner scripts call three shell hooks before launching Claude. Each hook writes a cache file into `.scout-cache/`, which the skill files read instead of running the same queries from inside the session. This trades a few seconds of shell work for a meaningful reduction in tool calls and tokens per session.
@@ -214,7 +230,7 @@ scout-plugin/
     scout-dream.md          -- Launch a dreaming session (background)
     scout-research.md       -- Launch a research session (background)
   phases/
-    core/                   -- Always included (git, KB management, action items)
+    core/                   -- Always included (git, KB management, action items, inbox, meetings)
     connectors/             -- One per tool (Slack, Calendar, Linear, etc.)
     modes/                  -- Dreaming-specific (feedback, KB deep work, wishlist)
     research/               -- Research session phases
@@ -224,6 +240,8 @@ scout-plugin/
     action-items/           -- MD-to-HTML dashboard renderer + file watcher
     docs/                   -- Wishlist templates (active / in-progress / done)
     knowledge-base/         -- KB scaffold and ontology
+    inbox.md.tmpl           -- Quick-capture template
+    meetings/               -- Meeting registry template
     run-scout.sh.tmpl
     run-dreaming.sh.tmpl
     run-research.sh.tmpl
@@ -243,6 +261,8 @@ scout-plugin/
   run-dreaming.sh           -- Dreaming runner (calls pre-session hooks)
   run-research.sh           -- Research runner
   scout-config.yaml         -- Your configuration
+  inbox.md                  -- Quick-capture file (processed every run)
+  meetings/                 -- Meeting registry + per-meeting folders (prep/notes/synthesis)
   dreaming-proposals.md     -- Proposal gate for skill improvements
   hooks/
     kb-pre-filter.sh        -- Pre-session: bucket KB files by staleness
