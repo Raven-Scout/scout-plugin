@@ -121,6 +121,47 @@ Note: derive `INSTANCE_LOWER` by lowercasing `INSTANCE_NAME` and replacing space
 
 Collect the output lines. Each loaded plist appears as a row with PID (or `-`), last exit code, and label. Exit code `0` means healthy; any other value is a warning.
 
+#### Scheduler bin-path validation (macOS)
+
+A loaded plist can still be broken if it points at a non-existent or non-executable scoutctl, or if scoutctl lives under a macOS TCC-protected directory (`~/Documents/`, `~/Desktop/`, `~/Downloads/`). Those failures are invisible to `launchctl list` — the job loads fine but every tick crashes during Python init.
+
+Read the installed schedule-tick plist and extract the scoutctl path it references:
+
+```bash
+PLIST="$HOME/Library/LaunchAgents/com.scout.schedule-tick.plist"
+if [ -f "$PLIST" ]; then
+    SCOUTCTL_BIN=$(/usr/libexec/PlistBuddy -c "Print :ProgramArguments:0" "$PLIST" 2>/dev/null)
+    echo "PLIST_SCOUTCTL_BIN=$SCOUTCTL_BIN"
+fi
+```
+
+Then verify three properties of `SCOUTCTL_BIN`:
+
+1. **Exists** — `[ -e "$SCOUTCTL_BIN" ]`. If not, flag as a broken plist.
+2. **Executable** — `[ -x "$SCOUTCTL_BIN" ]`. If not, flag.
+3. **Not under a TCC-protected dir** (after resolving symlinks). Resolve with `RESOLVED=$(readlink -f "$SCOUTCTL_BIN" 2>/dev/null || python3 -c "import os,sys;print(os.path.realpath(sys.argv[1]))" "$SCOUTCTL_BIN")`. Then check:
+   ```bash
+   case "$RESOLVED" in
+       "$HOME/Documents/"*|"$HOME/Desktop/"*|"$HOME/Downloads/"*) flag ;;
+   esac
+   ```
+
+Note: `realpath` on macOS BSD coreutils doesn't support `-f`; the Python one-liner is the portable fallback.
+
+#### Scheduler bin-path validation (Linux)
+
+If `PLATFORM` is `linux`, extract the scoutctl path from the user's crontab managed block:
+
+```bash
+SCOUTCTL_BIN=$(crontab -l 2>/dev/null | awk '
+    /^# >>> scout-managed >>>$/ { in_block = 1; next }
+    /^# <<< scout-managed <<<$/ { in_block = 0; next }
+    in_block && /scoutctl schedule tick/ { print $6; exit }
+')
+```
+
+Then check `[ -e "$SCOUTCTL_BIN" ]` and `[ -x "$SCOUTCTL_BIN" ]`. (TCC restrictions are macOS-specific; skip the protected-dir check on Linux.)
+
 ---
 
 ## Step 4: Compose and Display the Dashboard
@@ -267,6 +308,28 @@ If no entries are found for this instance:
   ⚠️  No launchd plists found for '<INSTANCE_NAME_LOWER>'. Scheduler may not be configured.
   Run `/scout-setup` and choose "Reconfigure" to set up scheduling.
 ```
+
+If the bin-path validation (step 3e sub-checks above) found issues, render one of these blocks immediately under the launchctl table:
+
+```
+  ❌ scoutctl path in plist not executable: /Users/foo/old/.venv/bin/scoutctl
+      Fix: scoutctl schedule install-plist --force
+      (the install command re-derives the canonical path from the loaded
+      plugin's venv — no manual override needed)
+```
+
+```
+  ❌ scoutctl is under ~/Documents (resolved: /Users/foo/Documents/.../scoutctl)
+      macOS TCC blocks launchd from reading this directory. Either:
+        - Move the plugin out of ~/Documents/, or
+        - Grant Full Disk Access to /opt/homebrew/bin/python3.x in
+          System Settings → Privacy & Security → Full Disk Access,
+      then re-install: scoutctl schedule install-plist --force
+```
+
+On Linux, swap "in plist" for "in crontab" and "install-plist" for "install-cron".
+
+If bin-path validation passes, no extra output — the launchctl table alone is enough.
 
 ---
 
