@@ -100,6 +100,22 @@ connectors:
         Granola is a claude.ai MCP connector with tokens that expire more often than
         Google's. Reconnect at https://claude.ai/settings/connectors.
 
+  mcp:fathom:
+    display_name: Fathom
+    tier: official
+    capabilities: [inbound]
+    # Meeting transcripts + AI summaries + action items. Same weekday-oriented
+    # scope as Granola — work-week meetings dominate the signal.
+    required_in_types: [briefing, consolidation]
+    remediation:
+      first_fix: "Reconnect Fathom at https://claude.ai/settings/connectors — Fathom MCP tokens periodically expire."
+      detail: |
+        Fathom is a claude.ai MCP connector providing meeting transcripts,
+        summaries, action items, and person/topic search. Reconnect at
+        https://claude.ai/settings/connectors → click Reconnect on the Fathom
+        row. If the connector is missing entirely, re-add it via the Add
+        connector flow.
+
   mcp:claude_ai_Google_Drive:
     display_name: Google Drive
     tier: official
