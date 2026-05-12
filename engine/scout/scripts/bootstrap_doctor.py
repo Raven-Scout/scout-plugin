@@ -72,8 +72,7 @@ def _check_macos_plist_scoutctl_bin(*, home: Path) -> tuple[list[str], list[str]
         return errors, warnings
     scoutctl_bin = Path(args[0])
     fix_hint = (
-        "Fix with: scoutctl schedule install-plist --force "
-        "(re-derives the canonical path from the loaded plugin's venv)"
+        "Fix: scoutctl schedule install-plist --force (re-derives the canonical path from the loaded plugin's venv)"
     )
     if not scoutctl_bin.exists():
         errors.append(f"plist references non-existent scoutctl: {scoutctl_bin}. {fix_hint}")
@@ -127,14 +126,18 @@ def _check_linux_cron_scoutctl_bin() -> tuple[list[str], list[str]]:
             continue
         # Standard cron line: 5 time fields + command. Token at index 5 is the
         # executable path (assumes no whitespace in the path — same assumption
-        # baked into install_cron's template).
+        # baked into install_cron's template). Defensive sanity check: the
+        # token must look like a scoutctl path. If the user hand-edited the
+        # managed block to use `@daily` shorthand (1 cron token instead of 5)
+        # or otherwise broke the layout, parts[5] would point at the wrong
+        # token — better to bail than to falsely accuse a different binary.
         parts = line.split()
-        if len(parts) >= 6:
+        if len(parts) >= 6 and parts[5].endswith("/scoutctl"):
             scoutctl_bin = Path(parts[5])
         break
     if scoutctl_bin is None:
         return errors, warnings
-    fix_hint = "Fix with: scoutctl schedule install-cron (re-derives the canonical path from the loaded plugin's venv)"
+    fix_hint = "Fix: scoutctl schedule install-cron (re-derives the canonical path from the loaded plugin's venv)"
     if not scoutctl_bin.exists():
         errors.append(f"crontab references non-existent scoutctl: {scoutctl_bin}. {fix_hint}")
     elif not os.access(scoutctl_bin, os.X_OK):

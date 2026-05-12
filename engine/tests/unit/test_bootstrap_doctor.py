@@ -349,3 +349,65 @@ def test_cron_scoutctl_bin_missing_is_red_on_linux(tmp_path, monkeypatch):
     monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
     report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
     assert any("non-existent scoutctl" in e and "install-cron" in e for e in report.errors)
+
+
+# Defensive branches: corrupt plist, empty ProgramArguments, no-cron-block
+
+
+def test_plist_corrupt_xml_yields_warning(tmp_path, monkeypatch):
+    """plistlib raises InvalidFileException on a malformed plist → warning, not error."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    plist_dir = tmp_path / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True)
+    (plist_dir / "com.scout.schedule-tick.plist").write_text("not a valid plist <<<")
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    # The corrupt-plist branch is informational; a separate launchctl-list
+    # error would already mark this RED, but the plist parse failure itself
+    # is a warning (yellow) — we don't want to escalate on a parse glitch
+    # when launchctl might still load it.
+    assert any("could not parse" in w and "com.scout.schedule-tick.plist" in w for w in report.warnings)
+
+
+def test_plist_empty_program_arguments_yields_warning(tmp_path, monkeypatch):
+    """ProgramArguments=[] in the plist is structurally valid but unusable → warning."""
+    import plistlib
+
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    plist_dir = tmp_path / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True)
+    with (plist_dir / "com.scout.schedule-tick.plist").open("wb") as f:
+        plistlib.dump({"Label": "com.scout.schedule-tick", "ProgramArguments": []}, f)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert any("ProgramArguments empty" in w for w in report.warnings)
+
+
+def test_cron_no_scout_managed_block_yields_no_errors_on_linux(tmp_path, monkeypatch):
+    """Linux: crontab has user content but no scout-managed block → check returns silently.
+
+    Useful: a user mid-uninstall, or a fresh Linux machine with cron entries
+    that aren't Scout. Doctor shouldn't complain about Scout's cron when
+    Scout's cron isn't there.
+    """
+    _populate_minimal_vault(tmp_path)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Linux")
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.os.name", "posix")
+
+    from subprocess import CompletedProcess
+
+    def fake_run(args, **_kwargs):
+        if args[:2] == ["crontab", "-l"]:
+            return CompletedProcess(args, 0, stdout="0 * * * * /usr/bin/something-else\n", stderr="")
+        if args[:2] == ["launchctl", "list"]:
+            raise FileNotFoundError("launchctl")
+        return CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert not any("scoutctl" in e for e in report.errors)
+    assert not any("scoutctl" in w for w in report.warnings)
