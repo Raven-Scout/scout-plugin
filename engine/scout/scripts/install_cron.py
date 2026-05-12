@@ -72,8 +72,19 @@ def _strip_managed_block(text: str) -> str:
 
 
 def _render_block(home: Path) -> str:
-    """Render the cron-managed-block template with HOME substituted."""
-    return TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", str(home))
+    """Render the cron-managed-block template with HOME + scoutctl path substituted.
+
+    The scoutctl path is derived from the running engine's plugin root via
+    ``install_schedule_plist.resolve_scoutctl_bin`` — same single source of
+    truth as the macOS plist.
+    """
+    from scout.scripts.install_schedule_plist import resolve_scoutctl_bin
+
+    return (
+        TEMPLATE.read_text(encoding="utf-8")
+        .replace("__USER_HOME__", str(home))
+        .replace("__SCOUTCTL_BIN__", str(resolve_scoutctl_bin()))
+    )
 
 
 def _backup(previous: str, backup_dir: Path) -> None:

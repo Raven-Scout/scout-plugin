@@ -3,6 +3,6 @@
 # Do not edit by hand — your changes will be lost on the next /scout-update.
 SHELL=/bin/bash
 PATH=__USER_HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
-*/5 * * * * __USER_HOME__/scout-plugin/.venv/bin/scoutctl schedule tick >> __USER_HOME__/Scout/.scout-logs/cron.log 2>&1
+*/5 * * * * __SCOUTCTL_BIN__ schedule tick >> __USER_HOME__/Scout/.scout-logs/cron.log 2>&1
 */30 * * * * __USER_HOME__/Scout/scripts/heartbeat.sh >> __USER_HOME__/Scout/.scout-logs/cron.log 2>&1
 # <<< scout-managed <<<

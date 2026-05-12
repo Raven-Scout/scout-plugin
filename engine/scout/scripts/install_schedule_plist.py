@@ -1,7 +1,8 @@
 """Helper for `scoutctl schedule install-plist [--uninstall] [--force]`.
 
-Filling __USER_HOME__ in the template at install time; not at runtime, because
-launchd's plist parser doesn't expand env vars in <string> values.
+Filling __USER_HOME__ and __SCOUTCTL_BIN__ in the template at install time;
+not at runtime, because launchd's plist parser doesn't expand env vars in
+<string> values.
 """
 
 from __future__ import annotations
@@ -12,6 +13,29 @@ from pathlib import Path
 
 PLIST_NAME = "com.scout.schedule-tick.plist"
 TEMPLATE = Path(__file__).parent.parent / "defaults" / PLIST_NAME
+
+
+def resolve_scoutctl_bin() -> Path:
+    """Return the scoutctl bound to THIS plugin checkout.
+
+    Convention: the venv lives at ``<plugin_root>/.venv/`` and scoutctl is
+    its standard console-script entry point. We derive ``plugin_root`` from
+    the running engine's package location, so the answer is correct
+    whichever install method seeded the venv:
+      - canonical ``~/scout-plugin/`` git clone,
+      - ``LOCAL_PLUGINS/`` dev tree,
+      - marketplace install under ``~/.claude/plugins/marketplaces/...``.
+
+    The slash commands enforce this same convention on the way in
+    (``$CLAUDE_PLUGIN_ROOT/.venv/bin/scoutctl`` with a VENV_MISMATCH check
+    against the editable-installed source), so there is intentionally no
+    knob to point the plist at an unrelated scoutctl — that would create
+    drift between the scheduler and the engine the user thinks is loaded.
+    """
+    import scout
+
+    plugin_root = Path(scout.__file__).parent.parent.parent
+    return plugin_root / ".venv" / "bin" / "scoutctl"
 
 
 def install_plist(
@@ -27,7 +51,11 @@ def install_plist(
     target = agents_dir / PLIST_NAME
     if target.exists() and not force:
         raise FileExistsError(target)
-    rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", str(home))
+    rendered = (
+        TEMPLATE.read_text(encoding="utf-8")
+        .replace("__USER_HOME__", str(home))
+        .replace("__SCOUTCTL_BIN__", str(resolve_scoutctl_bin()))
+    )
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
         # `launchctl bootstrap gui/$UID <plist>` loads the job. Best-effort.

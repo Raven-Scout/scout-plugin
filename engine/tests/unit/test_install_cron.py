@@ -61,6 +61,15 @@ def test_install_into_empty_crontab(fake, tmp_path):
     assert "scoutctl schedule tick" in fake.content
     assert "heartbeat.sh" in fake.content
     assert str(tmp_path) in fake.content  # __USER_HOME__ replaced
+    assert "__SCOUTCTL_BIN__" not in fake.content  # placeholder substituted
+
+
+def test_install_uses_resolver_for_scoutctl_path(fake, tmp_path):
+    """Rendered crontab references the scoutctl returned by resolve_scoutctl_bin()."""
+    from scout.scripts.install_schedule_plist import resolve_scoutctl_bin
+
+    cron_mod.install_cron(home=tmp_path, backup_dir=tmp_path)
+    assert f"{resolve_scoutctl_bin()} schedule tick" in fake.content
 
 
 def test_install_replaces_existing_managed_block(fake, tmp_path):
