@@ -2,7 +2,7 @@
 phase: research
 name: Knowledge Integration
 slot: integration
-mode: research
+mode: [research]
 requires: null
 ---
 

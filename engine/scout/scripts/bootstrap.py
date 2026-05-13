@@ -220,12 +220,21 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
     vars_ = _template_vars(cfg)
     phases_root = cfg.plugin_root / "phases"
     bodies: list[str] = [f"# {kind}\n\n**BASE_DIR:** `{cfg.vault}`\n"]
+    # Map assembly target → which modes this assembly is consumed by.
+    # SKILL.md is read by BOTH briefing- and consolidation-type runs (run-scout.sh
+    # auto-detects which); DREAMING.md by dreaming runs only; RESEARCH.md by
+    # research runs only. Phases declaring `mode: [...]` get filtered to only
+    # those whose mode list intersects the target. Phases with no `mode:`
+    # (legacy / cross-cutting) land in every target.
     if kind == "SKILL":
         sources = [phases_root / "core", phases_root / "connectors"]
+        target_modes = {"briefing", "consolidation"}
     elif kind == "DREAMING":
         sources = [phases_root / "core", phases_root / "modes"]
+        target_modes = {"dreaming"}
     else:  # RESEARCH
         sources = [phases_root / "core", phases_root / "research"]
+        target_modes = {"research"}
     for src_dir in sources:
         if not src_dir.exists():
             continue
@@ -238,7 +247,11 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
                 # '---' horizontal rules in markdown bodies (e.g., kb-management.md).
                 # Tracked as a Plan 8 followup to harden A5's parser.
                 continue
-            kept = select_sections(sections, enabled_connectors=cfg.enabled_connectors)
+            kept = select_sections(
+                sections,
+                enabled_connectors=cfg.enabled_connectors,
+                modes=target_modes,
+            )
             for s in kept:
                 bodies.append(render_template(s.body, vars_))
     return "\n\n".join(bodies)
