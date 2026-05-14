@@ -188,5 +188,226 @@ def test_check_jobs_with_both_jobs_present_is_green(tmp_path, monkeypatch):
 
     monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
     monkeypatch.setattr("scout.scripts.bootstrap_doctor.os.name", "posix")
-    report = run_doctor(vault=tmp_path, check_jobs=True)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
     assert report.severity is Severity.GREEN
+
+
+# MINOR 7 — scoutctl-bin-path checks (macOS plist + Linux cron)
+
+
+def _write_plist(home: Path, scoutctl_bin: Path) -> Path:
+    """Write a minimal schedule-tick plist that points at scoutctl_bin."""
+    import plistlib
+
+    plist_dir = home / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True, exist_ok=True)
+    plist_path = plist_dir / "com.scout.schedule-tick.plist"
+    with plist_path.open("wb") as f:
+        plistlib.dump(
+            {
+                "Label": "com.scout.schedule-tick",
+                "ProgramArguments": [str(scoutctl_bin), "schedule", "tick"],
+                "StartInterval": 300,
+            },
+            f,
+        )
+    return plist_path
+
+
+def _stub_jobs_present(monkeypatch) -> None:
+    """Make the launchctl-list check pass so the bin-path check is what drives severity."""
+    from subprocess import CompletedProcess
+
+    def fake_run(args, **_kwargs):
+        return CompletedProcess(
+            args,
+            0,
+            stdout="-\t0\tcom.scout.schedule-tick\n-\t0\tcom.scout.heartbeat\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.os.name", "posix")
+
+
+def test_plist_scoutctl_bin_missing_is_red(tmp_path, monkeypatch):
+    """plist references a path that doesn't exist → RED with fix hint."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    _write_plist(tmp_path, tmp_path / "nonexistent" / "scoutctl")
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert report.severity is Severity.RED
+    assert any("non-existent scoutctl" in e for e in report.errors)
+    assert any("install-plist --force" in e for e in report.errors)
+
+
+def test_plist_scoutctl_bin_not_executable_is_red(tmp_path, monkeypatch):
+    """plist references a file that exists but isn't executable → RED with fix hint."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    scoutctl = tmp_path / "venv" / "bin" / "scoutctl"
+    scoutctl.parent.mkdir(parents=True)
+    scoutctl.write_text("#!/bin/sh\nexit 0\n")
+    scoutctl.chmod(0o644)  # not executable
+    _write_plist(tmp_path, scoutctl)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert report.severity is Severity.RED
+    assert any("non-executable scoutctl" in e for e in report.errors)
+
+
+def test_plist_scoutctl_bin_in_documents_is_red_with_tcc_hint(tmp_path, monkeypatch):
+    """scoutctl resolves under ~/Documents/ → RED with TCC-aware explanation."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    # The actual binary lives under tmp_path/Documents/... and is executable.
+    scoutctl = tmp_path / "Documents" / "scout-plugin" / ".venv" / "bin" / "scoutctl"
+    scoutctl.parent.mkdir(parents=True)
+    scoutctl.write_text("#!/bin/sh\nexit 0\n")
+    scoutctl.chmod(0o755)
+    _write_plist(tmp_path, scoutctl)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert report.severity is Severity.RED
+    assert any("~/Documents" in e and "TCC" in e for e in report.errors)
+
+
+def test_plist_scoutctl_bin_in_documents_via_symlink_is_red(tmp_path, monkeypatch):
+    """scoutctl reachable via a symlink that resolves into ~/Documents → still RED.
+
+    This catches the LOCAL_PLUGINS-symlinked-into-home pattern that originally
+    motivated the bin-path-configurable refactor.
+    """
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    real = tmp_path / "Documents" / "LOCAL_PLUGINS" / "scout-plugin" / ".venv" / "bin" / "scoutctl"
+    real.parent.mkdir(parents=True)
+    real.write_text("#!/bin/sh\nexit 0\n")
+    real.chmod(0o755)
+    link = tmp_path / "scout-plugin"
+    link.symlink_to(real.parent.parent.parent)  # ~/scout-plugin -> Documents/LOCAL_PLUGINS/scout-plugin
+    via_symlink = link / ".venv" / "bin" / "scoutctl"
+    _write_plist(tmp_path, via_symlink)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert report.severity is Severity.RED
+    assert any("~/Documents" in e for e in report.errors)
+
+
+def test_plist_scoutctl_bin_outside_protected_dirs_is_green(tmp_path, monkeypatch):
+    """Happy path: plist references a real executable scoutctl outside protected dirs."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    scoutctl = tmp_path / "scout-plugin" / ".venv" / "bin" / "scoutctl"
+    scoutctl.parent.mkdir(parents=True)
+    scoutctl.write_text("#!/bin/sh\nexit 0\n")
+    scoutctl.chmod(0o755)
+    _write_plist(tmp_path, scoutctl)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert report.severity is Severity.GREEN
+
+
+def test_bin_path_check_skipped_when_check_jobs_false(tmp_path, monkeypatch):
+    """check_jobs=False suppresses both launchctl AND the new bin-path check."""
+    _populate_minimal_vault(tmp_path)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    _write_plist(tmp_path, tmp_path / "definitely-missing" / "scoutctl")
+
+    report = run_doctor(vault=tmp_path, check_jobs=False, home=tmp_path)
+    assert report.severity is Severity.GREEN
+
+
+def test_cron_scoutctl_bin_missing_is_red_on_linux(tmp_path, monkeypatch):
+    """Linux: crontab references a non-existent scoutctl → RED with fix hint."""
+    _populate_minimal_vault(tmp_path)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Linux")
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.os.name", "posix")
+
+    from subprocess import CompletedProcess
+
+    missing = tmp_path / "missing" / "scoutctl"
+    crontab_output = (
+        f"# >>> scout-managed >>>\n*/5 * * * * {missing} schedule tick >> /tmp/cron.log 2>&1\n# <<< scout-managed <<<\n"
+    )
+
+    def fake_run(args, **_kwargs):
+        if args[:2] == ["crontab", "-l"]:
+            return CompletedProcess(args, 0, stdout=crontab_output, stderr="")
+        # launchctl on Linux returns FileNotFoundError → demoted to warning
+        if args[:2] == ["launchctl", "list"]:
+            raise FileNotFoundError("launchctl")
+        return CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert any("non-existent scoutctl" in e and "install-cron" in e for e in report.errors)
+
+
+# Defensive branches: corrupt plist, empty ProgramArguments, no-cron-block
+
+
+def test_plist_corrupt_xml_yields_warning(tmp_path, monkeypatch):
+    """plistlib raises InvalidFileException on a malformed plist → warning, not error."""
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    plist_dir = tmp_path / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True)
+    (plist_dir / "com.scout.schedule-tick.plist").write_text("not a valid plist <<<")
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    # The corrupt-plist branch is informational; a separate launchctl-list
+    # error would already mark this RED, but the plist parse failure itself
+    # is a warning (yellow) — we don't want to escalate on a parse glitch
+    # when launchctl might still load it.
+    assert any("could not parse" in w and "com.scout.schedule-tick.plist" in w for w in report.warnings)
+
+
+def test_plist_empty_program_arguments_yields_warning(tmp_path, monkeypatch):
+    """ProgramArguments=[] in the plist is structurally valid but unusable → warning."""
+    import plistlib
+
+    _populate_minimal_vault(tmp_path)
+    _stub_jobs_present(monkeypatch)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Darwin")
+    plist_dir = tmp_path / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True)
+    with (plist_dir / "com.scout.schedule-tick.plist").open("wb") as f:
+        plistlib.dump({"Label": "com.scout.schedule-tick", "ProgramArguments": []}, f)
+
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert any("ProgramArguments empty" in w for w in report.warnings)
+
+
+def test_cron_no_scout_managed_block_yields_no_errors_on_linux(tmp_path, monkeypatch):
+    """Linux: crontab has user content but no scout-managed block → check returns silently.
+
+    Useful: a user mid-uninstall, or a fresh Linux machine with cron entries
+    that aren't Scout. Doctor shouldn't complain about Scout's cron when
+    Scout's cron isn't there.
+    """
+    _populate_minimal_vault(tmp_path)
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.platform.system", lambda: "Linux")
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.os.name", "posix")
+
+    from subprocess import CompletedProcess
+
+    def fake_run(args, **_kwargs):
+        if args[:2] == ["crontab", "-l"]:
+            return CompletedProcess(args, 0, stdout="0 * * * * /usr/bin/something-else\n", stderr="")
+        if args[:2] == ["launchctl", "list"]:
+            raise FileNotFoundError("launchctl")
+        return CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.subprocess.run", fake_run)
+    report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
+    assert not any("scoutctl" in e for e in report.errors)
+    assert not any("scoutctl" in w for w in report.warnings)

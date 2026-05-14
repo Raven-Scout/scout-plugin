@@ -7,6 +7,8 @@ diagnostic via `scoutctl bootstrap doctor`. Never mutates the vault.
 from __future__ import annotations
 
 import os
+import platform
+import plistlib
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -39,11 +41,125 @@ _REQUIRED_CAT1_FILES = (
     "hooks/kb-pre-filter.sh",
 )
 
+# macOS TCC-protected directories — launchd-spawned processes cannot read files
+# inside these without Full Disk Access granted to the executable.
+_MACOS_TCC_PROTECTED_DIRS = ("Documents", "Desktop", "Downloads")
 
-def run_doctor(*, vault: Path, check_jobs: bool = True) -> DoctorReport:
+
+def _check_macos_plist_scoutctl_bin(*, home: Path) -> tuple[list[str], list[str]]:
+    """Inspect the installed schedule-tick plist's scoutctl path.
+
+    Reports as error if the file doesn't exist or isn't executable. Reports
+    as error if the resolved path falls under a macOS TCC-protected directory
+    (launchd cannot read those without Full Disk Access). Returns empty if
+    the plist isn't installed — that case is already covered by the
+    launchctl-list check upstream.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    plist_path = home / "Library" / "LaunchAgents" / "com.scout.schedule-tick.plist"
+    if not plist_path.exists():
+        return errors, warnings
+    try:
+        with plist_path.open("rb") as f:
+            data = plistlib.load(f)
+    except (plistlib.InvalidFileException, OSError) as e:
+        warnings.append(f"could not parse {plist_path.name}: {e}")
+        return errors, warnings
+    args = data.get("ProgramArguments") or []
+    if not args:
+        warnings.append(f"{plist_path.name}: ProgramArguments empty")
+        return errors, warnings
+    scoutctl_bin = Path(args[0])
+    fix_hint = (
+        "Fix: scoutctl schedule install-plist --force (re-derives the canonical path from the loaded plugin's venv)"
+    )
+    if not scoutctl_bin.exists():
+        errors.append(f"plist references non-existent scoutctl: {scoutctl_bin}. {fix_hint}")
+        return errors, warnings
+    if not os.access(scoutctl_bin, os.X_OK):
+        errors.append(f"plist references non-executable scoutctl: {scoutctl_bin}. {fix_hint}")
+        return errors, warnings
+    # TCC dir check: macOS sandbox blocks launchd-spawned processes from reading
+    # files in protected dirs. We compare RESOLVED paths so a symlinked plugin
+    # that lands in ~/Documents is still caught.
+    resolved = scoutctl_bin.resolve()
+    home_resolved = home.resolve()
+    for protected in _MACOS_TCC_PROTECTED_DIRS:
+        protected_path = home_resolved / protected
+        try:
+            resolved.relative_to(protected_path)
+        except ValueError:
+            continue
+        errors.append(
+            f"scoutctl resolves into ~/{protected} ({resolved}). macOS TCC blocks "
+            f"launchd from reading this directory without Full Disk Access. Move the "
+            f"plugin out of ~/{protected}, then re-install: "
+            f"scoutctl schedule install-plist --force"
+        )
+        break
+    return errors, warnings
+
+
+def _check_linux_cron_scoutctl_bin() -> tuple[list[str], list[str]]:
+    """Inspect the Linux scout-managed cron block for the scoutctl path."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        proc = subprocess.run(["crontab", "-l"], capture_output=True, text=True, check=False, timeout=5)
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return errors, warnings
+    if proc.returncode != 0:
+        return errors, warnings
+    in_block = False
+    scoutctl_bin: Path | None = None
+    for line in proc.stdout.splitlines():
+        stripped = line.strip()
+        if stripped == "# >>> scout-managed >>>":
+            in_block = True
+            continue
+        if stripped == "# <<< scout-managed <<<":
+            break
+        if not in_block:
+            continue
+        if "scoutctl schedule tick" not in line:
+            continue
+        # Standard cron line: 5 time fields + command. Token at index 5 is the
+        # executable path (assumes no whitespace in the path — same assumption
+        # baked into install_cron's template). Defensive sanity check: the
+        # token must look like a scoutctl path. If the user hand-edited the
+        # managed block to use `@daily` shorthand (1 cron token instead of 5)
+        # or otherwise broke the layout, parts[5] would point at the wrong
+        # token — better to bail than to falsely accuse a different binary.
+        parts = line.split()
+        if len(parts) >= 6 and parts[5].endswith("/scoutctl"):
+            scoutctl_bin = Path(parts[5])
+        break
+    if scoutctl_bin is None:
+        return errors, warnings
+    fix_hint = "Fix: scoutctl schedule install-cron (re-derives the canonical path from the loaded plugin's venv)"
+    if not scoutctl_bin.exists():
+        errors.append(f"crontab references non-existent scoutctl: {scoutctl_bin}. {fix_hint}")
+    elif not os.access(scoutctl_bin, os.X_OK):
+        errors.append(f"crontab references non-executable scoutctl: {scoutctl_bin}. {fix_hint}")
+    return errors, warnings
+
+
+def _check_scheduler_bin_path(*, home: Path) -> tuple[list[str], list[str]]:
+    """Dispatch to the platform-specific scoutctl-bin-path check."""
+    system = platform.system()
+    if system == "Darwin":
+        return _check_macos_plist_scoutctl_bin(home=home)
+    if system == "Linux":
+        return _check_linux_cron_scoutctl_bin()
+    return [], []
+
+
+def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None) -> DoctorReport:
     """Run all doctor checks against ``vault``. Pure read."""
     errors: list[str] = []
     warnings: list[str] = []
+    home = home or Path.home()
 
     if not vault.is_dir():
         if vault.exists():
@@ -121,6 +237,14 @@ def run_doctor(*, vault: Path, check_jobs: bool = True) -> DoctorReport:
                 errors.append("launchd: com.scout.heartbeat not registered")
         except (subprocess.SubprocessError, FileNotFoundError):
             warnings.append("launchctl unavailable — skipped job registration check")
+
+    # Scheduler scoutctl path — verify the path baked into the installed plist
+    # (macOS) or cron block (Linux) actually points to an executable scoutctl
+    # and isn't trapped in a TCC-protected directory.
+    if check_jobs:
+        bin_errors, bin_warnings = _check_scheduler_bin_path(home=home)
+        errors.extend(bin_errors)
+        warnings.extend(bin_warnings)
 
     if errors:
         return DoctorReport(severity=Severity.RED, errors=errors, warnings=warnings)

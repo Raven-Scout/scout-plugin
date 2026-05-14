@@ -29,19 +29,36 @@ EOF
 - If output is `ORPHAN_JOBS`: tell the user "Found launchd jobs but no vault — half-reset state. Run this to clean up:" then show the [Manual Reset](#manual-reset) snippet. Stop here.
 - If output is `FRESH`: continue.
 
-Check the engine venv exists:
+Locate the venv that belongs to THIS plugin checkout. Use `$CLAUDE_PLUGIN_ROOT/.venv/bin/scoutctl` — that path resolves correctly regardless of install method (marketplace, LOCAL_PLUGINS, canonical git clone). Belt-and-suspenders: fall back to `~/scout-plugin` if `$CLAUDE_PLUGIN_ROOT` is somehow unset:
 
 ```bash
-test -x "$HOME/scout-plugin/.venv/bin/scoutctl" && echo "VENV_OK" || echo "VENV_MISSING"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}"
+SCOUTCTL="$PLUGIN_ROOT/.venv/bin/scoutctl"
+test -x "$SCOUTCTL" && echo "VENV_OK" || echo "VENV_MISSING"
 ```
+
+Use `"$SCOUTCTL"` (and `$PLUGIN_ROOT`) in every subsequent invocation.
 
 - If `VENV_MISSING`: tell the user "Engine venv missing. Installing now (this typically takes 30–60 seconds)..." then run, with explicit 5-minute timeout:
 
   ```bash
-  bash ~/scout-plugin/scripts/install-venv.sh
+  bash "$PLUGIN_ROOT/scripts/install-venv.sh"
   ```
 
-  (Use the Bash tool with `timeout: 300000`.) If install fails: stop and instruct the user to run `bash ~/scout-plugin/scripts/install-venv.sh` manually, then retry `/scout-setup`.
+  (Use the Bash tool with `timeout: 300000`.) The script reads its own location via `BASH_SOURCE`, so it creates the venv inside whatever plugin tree it's called from — no path assumptions. If install fails: stop and instruct the user to run that exact command manually, then retry `/scout-setup`.
+
+If `VENV_OK`, additionally verify the venv is editable-installed FROM this plugin checkout (catches stale venvs from a prior install at a different plugin path):
+
+```bash
+PYTHON="$(dirname "$SCOUTCTL")/python"
+INSTALLED=$("$PYTHON" -c "import scout, os; print(os.path.realpath(os.path.dirname(os.path.dirname(scout.__file__))))" 2>/dev/null)
+EXPECTED=$(cd "$PLUGIN_ROOT/engine" && pwd -P)
+if [ "$INSTALLED" != "$EXPECTED" ]; then
+    echo "VENV_MISMATCH:$INSTALLED|$EXPECTED"
+fi
+```
+
+If `VENV_MISMATCH:<installed>|<expected>` is emitted, tell the user: "The venv at `$PLUGIN_ROOT/.venv/` is editable-installed from `<installed>`, but this plugin is loaded from `<expected>`. Re-installing now to pin it to this checkout..." then run `bash "$PLUGIN_ROOT/scripts/install-venv.sh"` and re-verify.
 
 ---
 
@@ -84,10 +101,10 @@ Confirm with the user: "Proceed with these connectors? Or pause to enable more f
 
 ## Step 3: Hand off to `scoutctl bootstrap install`
 
-Build the comma-separated connector list (only enabled), then run:
+Build the comma-separated connector list (only enabled), then run (use the `$SCOUTCTL` resolved in Step 0):
 
 ```bash
-~/scout-plugin/.venv/bin/scoutctl bootstrap install \
+"$SCOUTCTL" bootstrap install \
     --instance-name "<INSTANCE_NAME>" \
     --user-name "<USER_NAME>" \
     --user-email "<USER_EMAIL>" \
@@ -95,6 +112,8 @@ Build the comma-separated connector list (only enabled), then run:
     --platform "$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/')" \
     --connectors "<comma-separated-enabled-list>"
 ```
+
+The plist + cron block installed by this step automatically reference `$SCOUTCTL` — `resolve_scoutctl_bin()` derives the path from the running engine's plugin root, so the scheduler is always pinned to the venv the wizard just used.
 
 Capture exit code and stdout. The command emits one line per concern: `installed: <path>`, `doctor: green`, plus warnings for sidecar files or missing snapshots.
 

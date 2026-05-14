@@ -4,7 +4,10 @@
   com.scout.schedule-tick.plist — runs `scoutctl schedule tick` every 5 min.
 
   Installed by `scoutctl schedule install-plist`, which fills __USER_HOME__
-  at install time. Replaces the 7 per-slot legacy plists deleted in Task 11.
+  and __SCOUTCTL_BIN__ at install time. __SCOUTCTL_BIN__ defaults to
+  ~/scout-plugin/.venv/bin/scoutctl (canonical layout) but falls back to
+  the venv that ran the install command so non-canonical layouts work too.
+  Replaces the 7 per-slot legacy plists deleted in Task 11.
 -->
 <plist version="1.0">
 <dict>
@@ -12,7 +15,7 @@
     <string>com.scout.schedule-tick</string>
     <key>ProgramArguments</key>
     <array>
-        <string>__USER_HOME__/scout-plugin/.venv/bin/scoutctl</string>
+        <string>__SCOUTCTL_BIN__</string>
         <string>schedule</string>
         <string>tick</string>
     </array>

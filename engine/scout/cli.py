@@ -430,7 +430,14 @@ def _register_schedule() -> None:
             help="Remove the plist (and bootout the job) instead of installing.",
         ),
     ) -> None:
-        """Install or remove com.scout.schedule-tick.plist in ~/Library/LaunchAgents/."""
+        """Install or remove com.scout.schedule-tick.plist in ~/Library/LaunchAgents/.
+
+        The scoutctl path written into the plist is always
+        ``<plugin_root>/.venv/bin/scoutctl`` for the plugin checkout that
+        is running this command (see ``resolve_scoutctl_bin``). No override
+        knob is exposed by design — the scheduler should always point at
+        the venv that matches the currently-loaded engine.
+        """
         from pathlib import Path as _Path
 
         from scout.scripts.install_schedule_plist import install_plist as _i
@@ -641,7 +648,11 @@ def _register_schedule() -> None:
     def cli_schedule_install_cron(
         uninstall: bool = typer.Option(False, "--uninstall"),
     ) -> None:
-        """Install or remove the Linux scout-managed crontab block."""
+        """Install or remove the Linux scout-managed crontab block.
+
+        The scoutctl path written into the cron block is derived from the
+        running engine's plugin root (same contract as ``install-plist``).
+        """
         from scout.scripts.install_cron import (
             CrontabApplyError,
         )
