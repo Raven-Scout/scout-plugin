@@ -2,7 +2,7 @@
 phase: research
 name: Research Target Selection
 slot: target-selection
-mode: research
+mode: [research]
 requires: null
 ---
 

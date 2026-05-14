@@ -2,7 +2,7 @@
 phase: research
 name: Commit and Notify
 slot: commit-notify
-mode: research
+mode: [research]
 requires: null
 ---
 
@@ -34,7 +34,7 @@ Add to `knowledge-base.md` Recent Sessions table:
 phase: research
 name: Slack Research Notification
 slot: notification
-mode: research
+mode: [research]
 requires: slack
 ---
 

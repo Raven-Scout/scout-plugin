@@ -111,16 +111,28 @@ def select_sections(
     *,
     enabled_connectors: set[str],
     slot: str | None = None,
+    modes: set[str] | None = None,
 ) -> list[PhaseSection]:
-    """Filter sections: keep when requires is null OR connector enabled.
+    """Filter sections by connector, slot, and mode.
 
-    Optionally narrow to a specific slot (e.g., "outbound-scan").
+    Kept when ALL of the following hold:
+      - ``requires`` is null OR is an enabled connector
+      - ``slot`` is None OR matches the section's slot
+      - ``modes`` is None OR the section's mode is empty (applies to every
+        target) OR the section's mode list intersects ``modes``
+
+    The ``modes`` filter exists so a phase declared ``mode: [briefing]``
+    doesn't leak into a DREAMING.md assembly. Empty/absent mode means
+    "applies to every assembly target" (back-compat: phases authored
+    before mode filtering was enforced).
     """
     out: list[PhaseSection] = []
     for s in sections:
         if s.requires is not None and s.requires not in enabled_connectors:
             continue
         if slot is not None and s.slot != slot:
+            continue
+        if modes is not None and s.mode and not set(s.mode) & modes:
             continue
         out.append(s)
     return out

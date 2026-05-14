@@ -87,6 +87,48 @@ def test_select_filters_mixed_connectors_within_file():
     assert len(both) == 2
 
 
+def test_select_filters_by_modes_excludes_non_intersecting(tmp_path):
+    """Sections declaring `mode: [briefing]` are dropped when target is `dreaming`."""
+    f = tmp_path / "p.md"
+    f.write_text("---\nphase: core\nname: briefing-only\nslot: x\nmode: [briefing]\nrequires: null\n---\nBODY-B\n")
+    sections = parse_phase_file(f)
+    kept = select_sections(sections, enabled_connectors=set(), modes={"dreaming"})
+    assert kept == []
+    kept_briefing = select_sections(sections, enabled_connectors=set(), modes={"briefing"})
+    assert len(kept_briefing) == 1
+
+
+def test_select_filters_by_modes_keeps_intersecting(tmp_path):
+    """A section declaring `mode: [briefing, consolidation]` is kept by either."""
+    f = tmp_path / "p.md"
+    f.write_text(
+        "---\nphase: core\nname: shared\nslot: x\nmode: [briefing, consolidation]\nrequires: null\n---\nBODY\n"
+    )
+    sections = parse_phase_file(f)
+    for target in ({"briefing"}, {"consolidation"}, {"briefing", "consolidation"}):
+        kept = select_sections(sections, enabled_connectors=set(), modes=target)
+        assert len(kept) == 1, target
+
+
+def test_select_modes_none_disables_mode_filter(tmp_path):
+    """Passing modes=None means every mode passes (back-compat)."""
+    f = tmp_path / "p.md"
+    f.write_text("---\nphase: core\nname: briefing-only\nslot: x\nmode: [briefing]\nrequires: null\n---\nBODY\n")
+    sections = parse_phase_file(f)
+    kept = select_sections(sections, enabled_connectors=set())  # modes default = None
+    assert len(kept) == 1
+
+
+def test_select_empty_mode_list_applies_to_every_target(tmp_path):
+    """A section with no `mode:` (or `mode: []`) lands in every assembly target."""
+    f = tmp_path / "p.md"
+    f.write_text("---\nphase: core\nname: cross-cutting\nslot: x\nrequires: null\n---\nBODY\n")
+    sections = parse_phase_file(f)
+    for target in ({"briefing"}, {"dreaming"}, {"research"}):
+        kept = select_sections(sections, enabled_connectors=set(), modes=target)
+        assert len(kept) == 1, target
+
+
 def test_parse_skips_trailing_fence_junk_section(tmp_path):
     """A file ending with '---' should not yield an empty junk section."""
     p = tmp_path / "trailing.md"

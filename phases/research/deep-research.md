@@ -2,7 +2,7 @@
 phase: research
 name: Deep Research
 slot: deep-research
-mode: research
+mode: [research]
 requires: null
 ---
 
