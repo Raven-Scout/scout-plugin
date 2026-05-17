@@ -1,5 +1,5 @@
 """
-Knowledge Graph Parser
+SCOUT Knowledge Graph Parser
 
 Loads the ontology schema and entity files from the knowledge base,
 builds an in-memory graph, and exposes a query interface.
@@ -181,6 +181,12 @@ class KnowledgeGraph:
                         return False
                 except (IndexError, ValueError):
                     return False
+            elif key == "exclude_status":
+                # Negative filter — entity's status must NOT be in this set.
+                # Accepts a single string or a comma-separated string.
+                excluded = {s.strip() for s in str(value).split(",")} if isinstance(value, str) else set(value)
+                if str(entity.get("status", "")) in excluded:
+                    return False
             else:
                 if entity.get(key) != value:
                     return False
@@ -193,6 +199,76 @@ class KnowledgeGraph:
             return rel_def.get("inverse")
         return None
 
+    def name_lookup(
+        self,
+        token: str,
+        max_results: int = 5,
+        distance_threshold: float = 0.7,
+    ) -> list[dict[str, Any]]:
+        """Resolve a transcribed name token against `type: person` entities.
+
+        Implements [[scout-mistake-audit]] Pattern #58 fix — call before writing any
+        transcript-derived name into action-items, KB, or DM. Returns ranked candidates;
+        callers should treat `match_strength == "exact"` as authoritative,
+        `"fuzzy"` as a propose-with-marker, and an empty list as "route to review-queue
+        and never elevate to a 🔴 SCOUT-DM headline" (DREAMING.md §Phase 1, Pattern #58).
+
+        Match strategy:
+            1. Exact (case-insensitive) match against `name` or any value in `aliases`.
+            2. Fuzzy match via difflib `SequenceMatcher.ratio()`. The default 0.7
+               threshold ≈ Levenshtein-distance-2 on short strings (e.g. "Padak" vs
+               "Pock" scores 0.444 — below threshold; "Padak" vs "padek" scores 0.8 —
+               above). Lower threshold (0.5) catches more aggressive drift.
+        """
+        from difflib import SequenceMatcher
+
+        token_lower = token.lower().strip()
+        if not token_lower:
+            return []
+
+        candidates: list[dict[str, Any]] = []
+
+        for entity_name, entity in self.entities.items():
+            if entity.get("type") != "person":
+                continue
+
+            slug = Path(entity.get("_source_path", "")).stem
+            field_pool: list[tuple[str, str]] = [("name", entity_name)]
+            for alias in entity.get("aliases", []) or []:
+                if alias:
+                    field_pool.append(("alias", str(alias)))
+
+            best_score = 0.0
+            best_field = ""
+            best_strength = ""
+
+            for field_name, field_value in field_pool:
+                value_lower = field_value.lower().strip()
+                if not value_lower:
+                    continue
+                if value_lower == token_lower:
+                    best_score = 1.0
+                    best_field = field_name
+                    best_strength = "exact"
+                    break
+                ratio = SequenceMatcher(None, value_lower, token_lower).ratio()
+                if ratio > best_score:
+                    best_score = ratio
+                    best_field = field_name
+                    best_strength = "fuzzy" if ratio >= distance_threshold else ""
+
+            if best_strength:
+                candidates.append({
+                    "name": entity_name,
+                    "slug": slug,
+                    "match_strength": best_strength,
+                    "matched_field": best_field,
+                    "score": round(best_score, 3),
+                })
+
+        candidates.sort(key=lambda c: (c["match_strength"] != "exact", -c["score"]))
+        return candidates[:max_results]
+
 
 def main():
     """CLI entry point — load graph and run a command."""
@@ -201,10 +277,16 @@ def main():
     default_schema = os.path.join(os.path.dirname(__file__), "schema.yaml")
     default_kb = os.path.dirname(os.path.dirname(__file__))
 
-    parser = argparse.ArgumentParser(description="Knowledge Graph Parser")
-    parser.add_argument("command", choices=["validate", "export", "query", "entity", "related", "stats"])
+    parser = argparse.ArgumentParser(description="SCOUT Knowledge Graph Parser")
+    parser.add_argument("command", choices=["validate", "export", "query", "entity", "related", "stats", "name_lookup"])
     parser.add_argument("--name", help="Entity name (for entity/related commands)")
+    parser.add_argument("--token", help="Name token to resolve against people/aliases (name_lookup)")
     parser.add_argument("--type", help="Entity type filter (for query command)")
+    parser.add_argument("--status", help="Status filter (e.g. 'open', 'completed') — query command")
+    parser.add_argument("--exclude-status", dest="exclude_status", help="Comma-separated statuses to exclude (e.g. 'completed,cancelled') — query command. Use this for 'currently-actionable' tasks since entities use mixed statuses (open / in-progress / scheduled / in_service / ...).")
+    parser.add_argument("--domain", help="Domain filter (e.g. 'personal', 'work') — query command")
+    parser.add_argument("--deadline-before", dest="deadline_before", help="ISO date — return tasks with deadline <= this date (query command)")
+    parser.add_argument("--threshold", type=float, default=0.7, help="Fuzzy match cutoff for name_lookup (0.0–1.0; default 0.7 ≈ Levenshtein-2)")
     parser.add_argument("--schema", default=default_schema, help="Path to schema.yaml")
     parser.add_argument("--kb-root", default=default_kb, help="Path to knowledge-base root")
 
@@ -252,17 +334,45 @@ def main():
         rels = graph.related(args.name)
         if rels:
             for r in rels:
-                print(f"  {r['type']} -> {r['target']}")
+                print(f"  {r['type']} → {r['target']}")
         else:
             print(f"No relationships found for '{args.name}'.")
+
+    elif args.command == "name_lookup":
+        if not args.token:
+            print("Error: --token required for name_lookup command")
+            return
+        results = graph.name_lookup(args.token, distance_threshold=args.threshold)
+        if not results:
+            print(f"No KB match for '{args.token}' (threshold={args.threshold}). Route to review-queue; do NOT elevate to 🔴.")
+            return
+        for r in results:
+            print(f"  [{r['match_strength']:5s}] {r['name']} (slug={r['slug']}, matched_field={r['matched_field']}, score={r['score']})")
+        print(f"\n{len(results)} candidate(s).")
 
     elif args.command == "query":
         filters = {}
         if args.type:
             filters["type"] = args.type
+        if args.status:
+            filters["status"] = args.status
+        if args.domain:
+            filters["domain"] = args.domain
+        if args.deadline_before:
+            filters["deadline_before"] = args.deadline_before
+        if args.exclude_status:
+            filters["exclude_status"] = args.exclude_status
         results = graph.query(**filters)
         for r in results:
-            print(f"  [{r.get('type')}] {r.get('name')}")
+            extras = []
+            if r.get("status"):
+                extras.append(f"status={r['status']}")
+            if r.get("domain"):
+                extras.append(f"domain={r['domain']}")
+            if r.get("deadline"):
+                extras.append(f"deadline={r['deadline']}")
+            suffix = f"  ({', '.join(extras)})" if extras else ""
+            print(f"  [{r.get('type')}] {r.get('name')}{suffix}")
         print(f"\n{len(results)} result(s).")
 
 
