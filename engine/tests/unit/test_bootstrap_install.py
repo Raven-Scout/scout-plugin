@@ -91,3 +91,39 @@ def test_install_records_plugin_version(tmp_path):
     cfg = yaml.safe_load(config_text)
     assert cfg["plugin"]["version_at_last_setup"] == "0.4.0"
     assert cfg["plugin"]["version_at_last_update"] == "0.4.0"
+
+
+def test_install_persists_connector_inputs(tmp_path):
+    """Install must persist connector inputs so the next upgrade's
+    template renders use the user's real values instead of defaults.
+
+    Regression: cli_bootstrap_install previously hardcoded
+    connector_inputs={}, which meant fresh installs left scout-config.yaml
+    without `connectors.inputs`. The next /scout-update would then regen
+    cat-1b runners with placeholder CLAUDE_BIN / empty USER_SLACK_ID."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.enabled_connectors = {"slack", "github"}
+    cfg.connector_inputs = {
+        "user_slack_id": "U123ABC",
+        "github_username": "alice",
+        "github_repos": "org/repo-a,org/repo-b",
+        "claude_bin": "/opt/homebrew/bin/claude",
+        "max_budget": "12.50",
+    }
+    install(cfg)
+
+    import yaml
+
+    persisted = yaml.safe_load((vault / "scout-config.yaml").read_text())
+    assert persisted["connectors"]["enabled"] == ["github", "slack"]  # sorted
+    inputs = persisted["connectors"]["inputs"]
+    assert inputs["user_slack_id"] == "U123ABC"
+    assert inputs["claude_bin"] == "/opt/homebrew/bin/claude"
+    assert inputs["max_budget"] == "12.50"
+
+    # And the rendered runner picked them up rather than falling back to
+    # the template defaults — this is the failure mode the friend's vault hit.
+    runner_text = (vault / "run-scout.sh").read_text()
+    assert "/opt/homebrew/bin/claude" in runner_text

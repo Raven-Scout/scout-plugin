@@ -2,14 +2,45 @@
 # scoutctl launcher — resolves the venv Python deterministically so
 # hooks invoked from LaunchAgents (which don't inherit user PATH)
 # still find the right interpreter.
+#
+# Probe order:
+#   1. ${PLUGIN_ROOT}/.venv         — canonical location written by
+#                                     scripts/install-venv.sh
+#   2. ${PLUGIN_ROOT}/engine/.venv  — legacy / hand-built layout
+#   3. Sibling marketplaces/ tree   — recover when we're loaded from
+#                                     Claude Code's cache/ copy but the
+#                                     venv lives in marketplaces/
+#   4. system python3               — last resort; expects scout-engine on
+#                                     the global site-packages
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ENGINE_DIR="${DIR%/bin}"
-VENV_PY="${ENGINE_DIR}/.venv/bin/python"
+PLUGIN_ROOT="${ENGINE_DIR%/engine}"
 
-if [ -x "$VENV_PY" ]; then
-    exec "$VENV_PY" -m scout.cli "$@"
-else
-    exec python3 -m scout.cli "$@"
+candidates=(
+    "${PLUGIN_ROOT}/.venv/bin/python"
+    "${ENGINE_DIR}/.venv/bin/python"
+)
+
+# Claude Code installs a marketplace plugin twice: a frozen copy under
+# plugins/cache/<marketplace>/<plugin>/<version>/ (used at runtime) and a
+# clone under plugins/marketplaces/<marketplace>/ (where install-venv.sh
+# typically lands). Cross-jump when the launcher fires from cache/.
+if [[ "$PLUGIN_ROOT" == */plugins/cache/* ]]; then
+    PLUGINS_DIR="${PLUGIN_ROOT%%/cache/*}"
+    REST="${PLUGIN_ROOT#*/cache/}"
+    MARKETPLACE_NAME="${REST%%/*}"
+    candidates+=(
+        "${PLUGINS_DIR}/marketplaces/${MARKETPLACE_NAME}/.venv/bin/python"
+        "${PLUGINS_DIR}/marketplaces/${MARKETPLACE_NAME}/engine/.venv/bin/python"
+    )
 fi
+
+for VENV_PY in "${candidates[@]}"; do
+    if [ -x "$VENV_PY" ]; then
+        exec "$VENV_PY" -m scout.cli "$@"
+    fi
+done
+
+exec python3 -m scout.cli "$@"

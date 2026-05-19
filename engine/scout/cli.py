@@ -821,6 +821,17 @@ def _register_bootstrap() -> None:
         skip_jobs: bool = typer.Option(False, "--no-jobs"),
         skip_claude: bool = typer.Option(False, "--skip-claude"),
         connectors: str = typer.Option("", "--connectors", help="Comma-separated enabled connector names"),
+        # Per-connector inputs collected by /scout-setup. Mirroring the
+        # migrate-legacy flags keeps the two entrypoints symmetric and
+        # ensures cat-1b runners get rendered with the user's real
+        # claude_bin / Slack ID / etc. instead of falling back to the
+        # template defaults (which is what triggered the "regen ships
+        # placeholders" bug).
+        user_slack_id: str = typer.Option("", "--user-slack-id"),
+        github_username: str = typer.Option("", "--github-username"),
+        github_repos: str = typer.Option("", "--github-repos"),
+        claude_bin: str = typer.Option("/usr/local/bin/claude", "--claude-bin"),
+        max_budget: str = typer.Option("5.00", "--max-budget"),
     ) -> None:
         """Install Scout into the user's vault directory."""
         from scout import __version__
@@ -839,7 +850,13 @@ def _register_bootstrap() -> None:
             platform=platform,
             plugin_version=__version__,
             enabled_connectors=set(c.strip() for c in connectors.split(",") if c.strip()),
-            connector_inputs={},
+            connector_inputs={
+                "user_slack_id": user_slack_id,
+                "github_username": github_username,
+                "github_repos": github_repos,
+                "claude_bin": claude_bin,
+                "max_budget": max_budget,
+            },
             skip_jobs=skip_jobs,
             skip_claude=skip_claude,
         )

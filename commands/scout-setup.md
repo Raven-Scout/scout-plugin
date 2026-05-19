@@ -101,7 +101,7 @@ Confirm with the user: "Proceed with these connectors? Or pause to enable more f
 
 ## Step 3: Hand off to `scoutctl bootstrap install`
 
-Build the comma-separated connector list (only enabled), then run (use the `$SCOUTCTL` resolved in Step 0):
+Build the comma-separated connector list (only enabled), then run (use the `$SCOUTCTL` resolved in Step 0). Pass every connector input you collected in Step 2 — these get persisted into `scout-config.yaml` and are what cat-1b runner templates (run-scout.sh / run-dreaming.sh / run-research.sh) substitute for `CLAUDE_BIN`, `USER_SLACK_ID`, etc. Omit any flag whose connector you didn't enable; the install command supplies safe defaults.
 
 ```bash
 "$SCOUTCTL" bootstrap install \
@@ -110,7 +110,12 @@ Build the comma-separated connector list (only enabled), then run (use the `$SCO
     --user-email "<USER_EMAIL>" \
     --timezone "<TIMEZONE>" \
     --platform "$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/')" \
-    --connectors "<comma-separated-enabled-list>"
+    --connectors "<comma-separated-enabled-list>" \
+    --user-slack-id "<USER_SLACK_ID>" \
+    --github-username "<GITHUB_USERNAME>" \
+    --github-repos "<comma-separated-repos>" \
+    --claude-bin "<absolute-path-to-claude>" \
+    --max-budget "<dollars>"
 ```
 
 The plist + cron block installed by this step automatically reference `$SCOUTCTL` — `resolve_scoutctl_bin()` derives the path from the running engine's plugin root, so the scheduler is always pinned to the venv the wizard just used.
