@@ -380,6 +380,14 @@ def _stage_version_stamp(cfg: BootstrapConfig, *, is_upgrade: bool) -> None:
     plugin = existing.setdefault("plugin", {})
     if not is_upgrade:
         plugin["version_at_last_setup"] = cfg.plugin_version
+    else:
+        # Backfill version_at_last_setup if it's missing — happens for vaults
+        # whose first /scout-update predates this field being persisted, and
+        # for vaults whose scout-config.yaml had duplicate `plugin:` blocks
+        # (PyYAML silently drops the earlier one on read). Doctor requires
+        # both fields, so leaving the gap was making upgraded vaults
+        # permanently red.
+        plugin.setdefault("version_at_last_setup", cfg.plugin_version)
     plugin["version_at_last_update"] = cfg.plugin_version
     plugin.setdefault("applied_migrations", [])
     _atomic_write(config_path, yaml.safe_dump(existing, sort_keys=False))
@@ -461,6 +469,12 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
     acquire_lock_with_wait(lock)
     try:
         _stage_cat1_writes(cfg)
+        # _stage_seed_schedule is idempotent (returns early if the file
+        # exists) so it's safe to call on upgrade. Without it, vaults set
+        # up before .scout-state/schedule.yaml was a first-class file
+        # never get one written, and the dispatcher silently falls back
+        # to the packaged default.
+        _stage_seed_schedule(cfg)
         backups = _stage_cat1b_runners(cfg, is_upgrade=True)
         conflicts = _stage_cat4_upgrade(cfg)
         _stage_jobs_install(cfg)
