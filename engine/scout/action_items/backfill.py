@@ -62,12 +62,14 @@ def backfill_prefixes(
     # pre-edit parse since the post-edit text is identical except for the
     # bracketed prefix marker.
     for line_no, prefix, title in plan:
-        id_map.register(IdMapEntry(
-            ulid=new_ulid(),
-            short_prefix=prefix,
-            last_title=title,
-            last_file=target.name,
-            last_line=line_no,
-        ))
+        id_map.register(
+            IdMapEntry(
+                ulid=new_ulid(),
+                short_prefix=prefix,
+                last_title=title,
+                last_file=target.name,
+                last_line=line_no,
+            )
+        )
     id_map.save()
     return plan
