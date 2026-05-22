@@ -158,6 +158,68 @@ def cli_list(
         sys.stdout.write(format_items(items))
 
 
+@app.command("new-prefix")
+def cli_new_prefix(
+    path: Path | None = typer.Argument(
+        None,
+        help="Daily markdown file (default: today). Used to derive data_dir for the id-map.",
+    ),
+) -> None:
+    """Print a fresh `[#XXXX]` Crockford prefix not currently in the id-map.
+
+    Briefing/consolidation/dreaming prompts call this once per new task line
+    so every task carries a stable identifier from creation. Output is bare
+    (no `[#]` brackets, no newline-prefix) so callers can interpolate it
+    directly into a task line:
+
+        prefix=$(scoutctl action-items new-prefix)
+        echo "- [ ] [#${prefix}] **subject** body" >> "$DAILY"
+
+    Reads existing id-map.json to avoid collision; does NOT register the new
+    prefix — registration happens when the action-items writer next sees the
+    line with the prefix attached.
+    """
+    from scout import paths
+    from scout.id_map import IdMap
+    from scout.ids import new_short_prefix
+
+    data_dir = path.parent.parent if path is not None else paths.data_dir()
+    id_map = IdMap.load(data_dir)
+    prefix = new_short_prefix(exclude=id_map.in_use_prefixes())
+    sys.stdout.write(prefix + "\n")
+
+
+@app.command("backfill-prefixes")
+def cli_backfill_prefixes(
+    path: Path | None = typer.Argument(
+        None,
+        help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the would-be changes; don't write."),
+) -> None:
+    """Add `[#XXXX]` prefixes to every open task line that doesn't have one.
+
+    Idempotent: lines that already carry a prefix are left untouched. New
+    prefixes are minted via `scout.ids.new_short_prefix` (collision-checked
+    against `id-map.json`) and registered into the id-map as part of the
+    write. Lets existing vaults adopt the prefix convention without a
+    hand-edit pass.
+    """
+    from scout import paths
+    from scout.action_items.backfill import backfill_prefixes
+
+    target = path or paths.action_items_daily_path()
+    data_dir = path.parent.parent if path is not None else paths.data_dir()
+    added = backfill_prefixes(target=target, data_dir=data_dir, dry_run=dry_run)
+    if not added:
+        sys.stdout.write("no unprefixed open tasks found\n")
+        return
+    verb = "would add" if dry_run else "added"
+    sys.stdout.write(f"{verb} {len(added)} prefix(es):\n")
+    for line_no, prefix, title in added:
+        sys.stdout.write(f"  line {line_no}: [#{prefix}] {title}\n")
+
+
 @app.command("watch")
 def cli_watch(
     target: str | None = typer.Argument(

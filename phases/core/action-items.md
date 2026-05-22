@@ -35,25 +35,25 @@ Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
 
 ## 🔴 Urgent
 
-- **[Item title]** — [Description with specific details, not vague summaries]
+- [ ] [#XXXX] **[Item title]** — [Description with specific details, not vague summaries]
   - Source: [Which connector(s) confirmed this]
   - Context: [[wikilink-to-relevant-kb-file]]
 
 ## 🟡 To Do
 
-- **[Item title]** — [Description]
+- [ ] [#XXXX] **[Item title]** — [Description]
   - Source: [connector evidence]
   - Context: [[wikilink]]
 
 ## 🟢 Watching
 
-- **[Item title]** — [What you're tracking and why]
+- [ ] [#XXXX] **[Item title]** — [What you're tracking and why]
   - Source: [connector evidence]
   - Context: [[wikilink]]
 
 ## ✅ Done
 
-- **[Item title]** — [What was completed and how]
+- [x] [#XXXX] **[Item title]** — [What was completed and how]
   - Evidence: [Link to message, PR, calendar change, or other proof]
   - Completed: [date/time]
 
@@ -61,12 +61,50 @@ Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
 
 Items carried forward from previous days that are still open.
 
-- **[Item title]** — [Status update since last check]
+- [ ] [#XXXX] **[Item title]** — [Status update since last check]
   - Originally from: action-items-YYYY-MM-DD
   - Current status: [what's changed]
 ```
 
 All action items files must include `[[wikilinks]]` to any KB files referenced by action items.
+
+### Hard Rule — Every Task Line Has a Stable `[#XXXX]` Prefix
+
+**Every new task line you write MUST start with a fresh `[#XXXX]` 4-char Crockford prefix.** The prefix is the structural identifier scout-app uses to mark tasks done, snooze them, and attach comments — without it, the app falls back to brittle markdown-substring matching that fails on emoji, italics, em-dashes, embedded links, or any non-ASCII drift. Issue #10 of scout-app catalogs the failure modes.
+
+**Canonical task line shape:**
+```
+- [ ] [#XXXX] **<bold subject>** <optional body, links, italic context>
+```
+
+The prefix goes **after** the checkbox marker and **before** the bold subject. Exactly that order — the parser keys off it.
+
+**Mint a fresh prefix per task** by shelling out to scoutctl. The CLI collision-checks against `id-map.json` so two consecutive calls always return different prefixes:
+
+```bash
+# Inside your task-writing loop:
+PFX=$(scoutctl action-items new-prefix)
+echo "- [ ] [#${PFX}] **${SUBJECT}** ${BODY}" >> "$DAILY_FILE"
+```
+
+**Carry-forward keeps the original prefix.** When propagating an item from yesterday's file into today's, copy the `[#XXXX]` verbatim — do NOT mint a new one. The prefix is the task's identity across days; minting a new one breaks the link in scout-app's session↔task store and severs the commit-history trail.
+
+**Existing unprefixed lines (legacy carryover):** when you find a task carried forward from a pre-prefix era that lacks `[#XXXX]`, mint a fresh prefix for it on first touch. Or run the one-shot backfill at the top of the briefing:
+
+```bash
+scoutctl action-items backfill-prefixes "$DAILY_FILE"
+```
+
+The backfill is idempotent — already-prefixed lines are left alone — so it's safe to run defensively at the start of every briefing/consolidation step that writes new lines.
+
+**Self-check before commit:** every `- [ ]` and `- [x]` line in the file MUST match the regex `^\s*- \[[ x]\] \[#[0-9A-HJKMNP-TV-Z]{4}\] `. A `grep` sanity check at compose time catches drift:
+
+```bash
+grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[0-9A-HJKMNP-TV-Z]{4}\] ' && \
+    echo "ERROR: lines missing [#XXXX] prefix above — fix before commit" >&2
+```
+
+If that grep finds anything, the file is non-compliant and scout-app's writes will silently fall back to fragile subject-matching for those lines.
 
 ## Knowledge Graph Personal Tasks
 
