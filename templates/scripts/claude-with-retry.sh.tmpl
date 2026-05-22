@@ -1,0 +1,79 @@
+#!/bin/bash
+# claude-with-retry.sh — invoke `claude -p` with bounded retry for transient API errors.
+#
+# Retries on the network/API failure class that's killing long {{INSTANCE_NAME}} sessions:
+#   - "socket connection was closed unexpectedly"  (undici UND_ERR_SOCKET)
+#   - "Unable to connect to API (ECONNRESET)"
+#   - "Unable to connect to API (ConnectionRefused)"
+#   - "Stream idle timeout - partial response received"
+#   - "529 Overloaded"                              (Anthropic upstream temp)
+#
+# Does NOT retry on:
+#   - 401 / 403 auth failures   (need user intervention)
+#   - "Exceeded USD budget"     (intentional budget gate)
+#   - Any non-zero exit whose log tail doesn't match the transient list
+#
+# IMPORTANT: each retry re-runs `claude -p` from scratch with the full prompt.
+# That is safe only if the SKILL.md flow is idempotent — i.e. mid-run commits
+# leave a recoverable state and a fresh invocation will not double-commit.
+# The {{INSTANCE_NAME}} dreaming/consolidation/research modes are *documented*
+# as restartable, but verify in a dry run before relying on this in production.
+#
+# Usage:
+#   claude-with-retry.sh <log-file> <claude-bin> <claude-args...>
+#
+# Env knobs:
+#   SCOUT_RETRY_MAX=2          total attempts (default: 2 → 1 retry)
+#   SCOUT_RETRY_BACKOFF_S=60   base backoff seconds (default 60; scales linearly: 60s, 120s, ...)
+#   SCOUT_RETRY_DISABLE=1      single-attempt mode (legacy behavior)
+#
+# Exit code: the exit code of the final attempt.
+
+set -euo pipefail
+
+if [ "$#" -lt 2 ]; then
+    echo "usage: $0 <log-file> <claude-bin> <claude-args...>" >&2
+    exit 2
+fi
+
+LOG_FILE="$1"; shift
+CLAUDE_BIN="$1"; shift
+
+MAX_ATTEMPTS="${SCOUT_RETRY_MAX:-2}"
+BACKOFF_S="${SCOUT_RETRY_BACKOFF_S:-60}"
+if [ "${SCOUT_RETRY_DISABLE:-0}" = "1" ]; then
+    MAX_ATTEMPTS=1
+fi
+
+# Pipe-separated grep -E regex. Keep narrow — anything matched here triggers a retry.
+TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|529 Overloaded'
+
+attempt=1
+exit_code=0
+while :; do
+    if [ "$attempt" -gt 1 ]; then
+        echo "=== Claude retry attempt $attempt/$MAX_ATTEMPTS at $(date) ===" >> "$LOG_FILE"
+    fi
+
+    exit_code=0
+    "$CLAUDE_BIN" "$@" >> "$LOG_FILE" 2>&1 || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+        exit 0
+    fi
+
+    if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+        echo "=== Retry exhausted: $MAX_ATTEMPTS attempts, last exit $exit_code ===" >> "$LOG_FILE"
+        exit "$exit_code"
+    fi
+
+    if ! tail -50 "$LOG_FILE" | grep -qE "$TRANSIENT_PATTERNS"; then
+        echo "=== Failure not classified as transient — no retry (exit $exit_code) ===" >> "$LOG_FILE"
+        exit "$exit_code"
+    fi
+
+    sleep_s=$(( BACKOFF_S * attempt ))
+    echo "=== Transient API error detected — sleeping ${sleep_s}s before retry ===" >> "$LOG_FILE"
+    sleep "$sleep_s"
+    attempt=$(( attempt + 1 ))
+done

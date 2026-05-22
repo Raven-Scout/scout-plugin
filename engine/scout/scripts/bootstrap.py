@@ -105,6 +105,7 @@ _CAT1_TEMPLATES = (
     ("scripts/cc-session-cache.sh", "templates/scripts/cc-session-cache.sh.tmpl"),
     ("scripts/write-session-cost.sh", "templates/scripts/write-session-cost.sh.tmpl"),
     ("scripts/rate-limit-detect.sh", "templates/scripts/rate-limit-detect.sh.tmpl"),
+    ("scripts/claude-with-retry.sh", "templates/scripts/claude-with-retry.sh.tmpl"),
     ("hooks/kb-pre-filter.sh", "templates/hooks/kb-pre-filter.sh.tmpl"),
     (".gitignore", "templates/.gitignore.tmpl"),
 )
