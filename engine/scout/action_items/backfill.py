@@ -11,10 +11,18 @@ no-op (returns an empty list).
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from scout.id_map import IdMap, IdMapEntry
 from scout.ids import new_short_prefix, new_ulid
+
+# `add_prefix_to_line` only operates on lines that actually carry a checkbox
+# marker. The parser is more permissive — under sections like "Files Touched"
+# it can surface plain `- **name** — body` bullets as `status == "open"`
+# items, which then crash the writer mid-backfill. Pre-filter against the raw
+# source line to skip anything that isn't a real task.
+_CHECKBOX_RE = re.compile(r"^\s*- \[[ xX]\] ")
 
 
 def backfill_prefixes(
@@ -34,7 +42,15 @@ def backfill_prefixes(
     from scout.action_items.writer import add_prefix_to_line
 
     items = parse_file(target)
-    candidates = [i for i in items if i.status == "open" and i.short_prefix is None]
+    raw_lines = target.read_text(encoding="utf-8").splitlines()
+
+    def _has_checkbox(line_number: int) -> bool:
+        idx = line_number - 1
+        if not 0 <= idx < len(raw_lines):
+            return False
+        return _CHECKBOX_RE.match(raw_lines[idx]) is not None
+
+    candidates = [i for i in items if i.status == "open" and i.short_prefix is None and _has_checkbox(i.line_number)]
     if not candidates:
         return []
 
