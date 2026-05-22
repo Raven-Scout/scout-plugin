@@ -86,15 +86,19 @@ fi
 
 START_TIME=$(date +%s)
 
-# Run Claude in print mode — capture exit code without triggering set -e
+# Run Claude in print mode through the retry wrapper — capture exit code without triggering set -e.
+# Wrapper handles log redirection and retries on transient API errors (socket close,
+# ECONNRESET, ConnectionRefused, Stream idle timeout, 529 Overloaded). See scripts/claude-with-retry.sh.
 EXIT_CODE=0
-cd "$SCOUT_DIR" && "$CLAUDE_BIN" \
+cd "$SCOUT_DIR" && "$SCOUT_DIR/scripts/claude-with-retry.sh" \
+    "$LOG_FILE" \
+    "$CLAUDE_BIN" \
     --permission-mode auto \
     --model opus \
     --max-budget-usd {{MAX_BUDGET}} \
     --name "{{INSTANCE_NAME_LOWER}}-${MODE}-$(date +%Y%m%d-%H%M)" \
     -p "$PROMPT" \
-    >> "$LOG_FILE" 2>&1 || EXIT_CODE=$?
+    || EXIT_CODE=$?
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
