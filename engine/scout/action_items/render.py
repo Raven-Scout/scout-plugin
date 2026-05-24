@@ -104,7 +104,7 @@ COMMENT_RE = re.compile(
 def parse(md_path: Path) -> tuple[str, list[str], list[Section]]:
     """Return (title, preamble_paragraphs, sections)."""
 
-    text = md_path.read_text()
+    text = md_path.read_text(encoding="utf-8")
     lines = text.splitlines()
 
     title = ""

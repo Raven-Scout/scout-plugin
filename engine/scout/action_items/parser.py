@@ -84,7 +84,7 @@ def parse_action_items(filepath: Path) -> list[ActionItem]:
         return []
 
     items: list[ActionItem] = []
-    lines = filepath.read_text().splitlines()
+    lines = filepath.read_text(encoding="utf-8").splitlines()
 
     current_section = ""
     current_subsection = ""
