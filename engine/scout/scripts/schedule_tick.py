@@ -33,7 +33,9 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import time as _time
+import traceback
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -746,10 +748,16 @@ def fire_now(slot_key: str) -> Event:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point. Returns 0 on success, 1 on unhandled error."""
+    """CLI entry point. Returns 0 on success, 1 on unhandled error.
+
+    On unhandled exceptions, the traceback is printed to stderr so that
+    cron/launchd logs capture the failure — silent exit-1 leaves no signal
+    for diagnosing why the tick stopped firing.
+    """
     try:
         run()
     except Exception:
+        traceback.print_exc(file=sys.stderr)
         return 1
     return 0
 
