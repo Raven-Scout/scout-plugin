@@ -103,9 +103,7 @@ def test_resolve_target_auto_registers_prefix_in_file_but_not_idmap(
             short_prefix="KPTK",
         ),
     ]
-    target, ulid, via = resolve_target(
-        items=items, data_dir=fake_data_dir, by_id="KPTK", by_subject=None
-    )
+    target, ulid, via = resolve_target(items=items, data_dir=fake_data_dir, by_id="KPTK", by_subject=None)
     assert target.short_prefix == "KPTK"
     assert via == "id"
     assert ulid  # a new ULID was minted
