@@ -128,3 +128,41 @@ def test_acquire_lock_clears_stale_dead_pid(tmp_path):
     lock.write_text("999999")  # dead PID
     acquire_lock(lock)
     assert lock.read_text().strip() == str(os.getpid())
+
+
+# Regression: acquire_lock must be atomic. The previous implementation
+# did an `exists()` check, then `unlink()`, then `write_text()` — three
+# non-atomic syscalls. Two racing processes could both pass the check,
+# both write their PID, and both believe they held the lock. Issue #36.
+
+
+def test_acquire_lock_is_atomic_under_concurrent_callers(tmp_path):
+    """When two concurrent callers race to acquire the same lock,
+    exactly one must succeed and the other must see LockBusyError —
+    NOT both succeed with the second silently clobbering the first."""
+    import threading
+
+    lock = tmp_path / ".scout-session.lock"
+    results: list[str] = []
+    barrier = threading.Barrier(2)
+
+    def attempt() -> None:
+        barrier.wait()  # synchronize start
+        try:
+            acquire_lock(lock)
+        except LockBusyError:
+            results.append("busy")
+            return
+        results.append("success")
+
+    threads = [threading.Thread(target=attempt) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert sorted(results) == ["busy", "success"], (
+        f"expected exactly one success and one busy, got: {results}"
+    )
+    assert lock.exists()
+    assert lock.read_text().strip() == str(os.getpid())
