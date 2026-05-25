@@ -23,9 +23,7 @@ from scout.errors import ActionItemError
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
-_AUTHOR_PREFIX_RE = re.compile(
-    r"^(?P<head>\s+-\s+[A-Za-z][A-Za-z0-9._-]*\s*:\s+).*$"
-)
+_AUTHOR_PREFIX_RE = re.compile(r"^(?P<head>\s+-\s+[A-Za-z][A-Za-z0-9._-]*\s*:\s+).*$")
 
 
 def _today() -> dt.date:
@@ -65,9 +63,7 @@ def edit_comment(
     original = lines[line_no - 1]
     m = _AUTHOR_PREFIX_RE.match(original)
     if m is None:
-        raise ActionItemError(
-            f"edit-comment: could not parse author prefix on line {line_no}: {original!r}"
-        )
+        raise ActionItemError(f"edit-comment: could not parse author prefix on line {line_no}: {original!r}")
     replacement = m.group("head") + new_text
     replace_line(target_path, line_number=line_no, text=replacement)
 

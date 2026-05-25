@@ -115,9 +115,7 @@ def test_snooze_records_from_kind_in_marker(fake_data_dir: Path, monkeypatch: py
     assert event.payload["from_kind"] == "urgent"
 
 
-def test_snooze_omits_from_kind_when_not_provided(
-    fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_snooze_omits_from_kind_when_not_provided(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Existing callers that don't pass from_kind keep the original marker shape."""
     m = IdMap.load(fake_data_dir)
     m.register(IdMapEntry("01HXAAA", "A3F7", "task", "action-items-2026-04-26.md", 1))

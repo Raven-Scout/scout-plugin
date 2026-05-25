@@ -168,8 +168,6 @@ def test_resolve_target_by_subject_matches_title_substring(fake_data_dir: Path) 
             short_prefix="A3F7",
         ),
     ]
-    target, _, via = resolve_target(
-        items=items, data_dir=fake_data_dir, by_id=None, by_subject="task x"
-    )
+    target, _, via = resolve_target(items=items, data_dir=fake_data_dir, by_id=None, by_subject="task x")
     assert target.title == "task X"
     assert via == "subject"

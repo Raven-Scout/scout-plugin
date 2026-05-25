@@ -19,9 +19,7 @@ from scout.id_map import IdMap
 # Author allows letters/digits/`._-` to mirror the parser's tolerance.
 # The snooze marker `  - snoozed-until: YYYY-MM-DD` also fits this shape; we
 # strip those when listing comments since they are not user-authored notes.
-_COMMENT_SUB_BULLET_RE = re.compile(
-    r"^(?P<indent>\s+)-\s+(?P<author>[A-Za-z][A-Za-z0-9._-]*)\s*:\s*(?P<text>.+?)\s*$"
-)
+_COMMENT_SUB_BULLET_RE = re.compile(r"^(?P<indent>\s+)-\s+(?P<author>[A-Za-z][A-Za-z0-9._-]*)\s*:\s*(?P<text>.+?)\s*$")
 _SNOOZE_MARKER_AUTHORS = {"snoozed-until"}
 
 
@@ -38,9 +36,7 @@ def list_comment_lines(path: Path, *, task_line_number: int) -> list[tuple[int, 
     lines = path.read_text(encoding="utf-8").splitlines()
     idx = task_line_number - 1
     if not 0 <= idx < len(lines):
-        raise ActionItemError(
-            f"list_comment_lines: task line {task_line_number} out of range (1..{len(lines)})"
-        )
+        raise ActionItemError(f"list_comment_lines: task line {task_line_number} out of range (1..{len(lines)})")
     comments: list[tuple[int, str, str]] = []
     j = idx + 1
     while j < len(lines):
@@ -78,16 +74,12 @@ def select_comment(
     one row — ambiguous matches raise.
     """
     if (index is None) == (text is None):
-        raise ActionItemError(
-            "comment selector requires exactly one of --index or --text"
-        )
+        raise ActionItemError("comment selector requires exactly one of --index or --text")
     if not candidates:
         raise ActionItemError("no comments found on this task")
     if index is not None:
         if index < 1 or index > len(candidates):
-            raise ActionItemError(
-                f"--index {index} out of range; task has {len(candidates)} comment(s)"
-            )
+            raise ActionItemError(f"--index {index} out of range; task has {len(candidates)} comment(s)")
         return candidates[index - 1]
     assert text is not None
     needle = text.lower()

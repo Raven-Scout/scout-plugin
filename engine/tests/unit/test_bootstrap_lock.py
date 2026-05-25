@@ -161,8 +161,6 @@ def test_acquire_lock_is_atomic_under_concurrent_callers(tmp_path):
     for t in threads:
         t.join()
 
-    assert sorted(results) == ["busy", "success"], (
-        f"expected exactly one success and one busy, got: {results}"
-    )
+    assert sorted(results) == ["busy", "success"], f"expected exactly one success and one busy, got: {results}"
     assert lock.exists()
     assert lock.read_text().strip() == str(os.getpid())

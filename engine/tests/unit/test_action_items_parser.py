@@ -130,9 +130,7 @@ def test_parser_handles_prefix_without_priority_emoji() -> None:
 # Issue #33.
 
 
-def test_parse_file_reads_with_explicit_utf8_encoding(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_parse_file_reads_with_explicit_utf8_encoding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """parse_file must pass encoding='utf-8' to read_text — otherwise the
     platform default applies and non-UTF-8 locales silently re-encode the
     file on the round-trip parse→write."""

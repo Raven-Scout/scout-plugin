@@ -41,9 +41,7 @@ def test_render_missing_file_raises(tmp_path: Path) -> None:
 # Issue #33.
 
 
-def test_render_reads_with_explicit_utf8_encoding(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_render_reads_with_explicit_utf8_encoding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """render() must read source markdown with explicit utf-8 encoding so
     that emoji section headers and unicode titles survive the parse step on
     a non-UTF-8 default locale."""
