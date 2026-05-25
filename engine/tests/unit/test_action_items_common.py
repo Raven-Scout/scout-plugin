@@ -81,6 +81,42 @@ def test_resolve_target_unknown_id_raises(fake_data_dir: Path) -> None:
         resolve_target(items=[], data_dir=fake_data_dir, by_id="ZZZZ", by_subject=None)
 
 
+def test_resolve_target_auto_registers_prefix_in_file_but_not_idmap(
+    fake_data_dir: Path,
+) -> None:
+    """The briefing/consolidation skill writes fresh `[#XXXX]` lines directly
+    into the markdown without registering them in the id-map. When a mutator
+    sees the prefix on a parsed item but the id-map is empty, it should
+    register on-the-fly so `mark-done --by-id` keeps working without a manual
+    `backfill-prefixes` pass."""
+    items = [
+        ActionItem(
+            priority="🔥",
+            title="Rotate Kai Pricing GitHub token",
+            status="open",
+            section="Urgent",
+            context_links=[],
+            notes=[],
+            details=[],
+            raw_line="- [ ] [#KPTK] 🔥 Rotate Kai Pricing GitHub token",
+            line_number=12,
+            short_prefix="KPTK",
+        ),
+    ]
+    target, ulid, via = resolve_target(items=items, data_dir=fake_data_dir, by_id="KPTK", by_subject=None)
+    assert target.short_prefix == "KPTK"
+    assert via == "id"
+    assert ulid  # a new ULID was minted
+
+    # Persisted: a follow-up call sees the registered entry rather than
+    # auto-registering again.
+    m2 = IdMap.load(fake_data_dir)
+    e2 = m2.lookup_by_prefix("KPTK")
+    assert e2 is not None
+    assert e2.ulid == ulid
+    assert e2.last_title == "Rotate Kai Pricing GitHub token"
+
+
 def test_resolve_target_ambiguous_subject_raises(fake_data_dir: Path) -> None:
     items = [
         ActionItem(
