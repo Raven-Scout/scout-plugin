@@ -64,6 +64,26 @@ def insert_below(target: Path, *, line_number: int, text: str) -> None:
     atomic_write_lines(target, lines)
 
 
+def replace_line(target: Path, *, line_number: int, text: str) -> None:
+    """Replace the 1-indexed line wholesale with `text`."""
+    lines = _read_lines(target)
+    idx = line_number - 1
+    if not 0 <= idx < len(lines):
+        raise ActionItemError(f"replace_line: line {line_number} out of range (1..{len(lines)})")
+    lines[idx] = text
+    atomic_write_lines(target, lines)
+
+
+def delete_line(target: Path, *, line_number: int) -> None:
+    """Remove the 1-indexed line entirely."""
+    lines = _read_lines(target)
+    idx = line_number - 1
+    if not 0 <= idx < len(lines):
+        raise ActionItemError(f"delete_line: line {line_number} out of range (1..{len(lines)})")
+    del lines[idx]
+    atomic_write_lines(target, lines)
+
+
 def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
     """Insert `[#PREFIX] ` after the checkbox marker on the 1-indexed line.
 

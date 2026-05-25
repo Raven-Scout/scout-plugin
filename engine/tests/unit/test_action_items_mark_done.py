@@ -155,3 +155,63 @@ def test_mark_done_event_id_and_ts_well_formed(fake_data_dir, monkeypatch):
     event = mark_done(by_id="A3F7", data_dir=fake_data_dir)
     assert len(event.id) == 26
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", event.ts)
+
+
+# Regression: mark_done must mutate the line indicated by the parser's
+# item.line_number, not re-scan the file for the first matching raw_line.
+# The old behavior performed a second read and matched first-occurrence,
+# which under any TOCTOU race could target an unrelated line. Issue #32.
+
+
+def test_mark_done_uses_parser_line_number_even_under_external_edit(fake_data_dir, monkeypatch):
+    """The writer must use the parser's item.line_number — not a rescan
+    for the first matching raw_line. If the file is externally edited
+    between parse and write, the writer should fail loudly (line_number
+    no longer valid) rather than silently flipping a different line
+    that happens to match by content (the old find_line_number behavior)."""
+    today = dt.date(2026, 4, 26)
+    monkeypatch.setattr("scout.action_items.mark_done._today", lambda: today)
+
+    # Initial file: target task is at line 3.
+    daily = fake_data_dir / "action-items" / f"action-items-{today.isoformat()}.md"
+    daily.parent.mkdir(parents=True, exist_ok=True)
+    daily.write_text(
+        "## Section\n"
+        "\n"
+        "- [ ] target task\n"  # line 3
+        "- [ ] other task\n"
+    )
+
+    # Hook parse_file: after it returns the items (target at line 3), simulate
+    # an external edit that prepends a duplicate raw_line at line 1 and pushes
+    # the original content down. The old find_line_number-based code would
+    # rescan and return line 1 → silently flip the wrong line.
+    import scout.action_items.parser as parser_mod
+
+    real_parse = parser_mod.parse_file
+
+    def parse_then_external_edit(path):
+        items = real_parse(path)
+        path.write_text(
+            "- [ ] target task\n"  # NEW duplicate at line 1
+            "## Section\n"  # line 2
+            "\n"  # line 3 — now empty (was the target)
+            "- [ ] target task\n"  # line 4 — original target shifted down
+            "- [ ] other task\n"  # line 5
+        )
+        return items
+
+    monkeypatch.setattr("scout.action_items.mark_done.parse_file", parse_then_external_edit)
+
+    # New contract: the writer uses line_number=3 (from the parser). After the
+    # external edit, line 3 is empty — flip_checkbox raises. This is BETTER
+    # than the old behavior, which would have silently flipped the duplicate
+    # at line 1.
+    with pytest.raises(ActionItemError):
+        mark_done(by_subject="target", data_dir=fake_data_dir)
+
+    # And critically: the injected duplicate at line 1 was NOT silently flipped.
+    result = daily.read_text().splitlines()
+    assert result[0] == "- [ ] target task", (
+        f"injected duplicate at line 1 must NOT have been flipped; got: {result[0]!r}"
+    )
