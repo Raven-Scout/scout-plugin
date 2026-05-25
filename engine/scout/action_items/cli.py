@@ -59,7 +59,10 @@ def cli_snooze(
     from_kind: str | None = typer.Option(
         None,
         "--from-kind",
-        help="Source section kind (e.g. 'urgent', 'todo'). Recorded in the snoozed-until marker so a carry-forward can recover the original priority on the target day.",
+        help=(
+            "Source section kind (e.g. 'urgent', 'todo'). Recorded in the snoozed-until marker so a "
+            "carry-forward can recover the original priority on the target day."
+        ),
     ),
     path: Path | None = typer.Argument(
         None,
