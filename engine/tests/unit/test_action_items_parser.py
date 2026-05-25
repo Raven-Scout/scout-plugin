@@ -123,3 +123,29 @@ def test_parser_handles_prefix_without_priority_emoji() -> None:
     assert item.short_prefix == "E1Q2"
     assert item.priority == ""
     assert item.title == "Plain prefixed task without priority"
+
+
+# Regression: parse_file must specify encoding="utf-8" so non-UTF-8 locales
+# (e.g. LANG=C in CI) don't silently corrupt emoji/wikilink/Unicode content.
+# Issue #33.
+
+
+def test_parse_file_reads_with_explicit_utf8_encoding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """parse_file must pass encoding='utf-8' to read_text — otherwise the
+    platform default applies and non-UTF-8 locales silently re-encode the
+    file on the round-trip parse→write."""
+    md = tmp_path / "scout.md"
+    md.write_text("# X\n\n## Section\n\n- [ ] 🔴 Important task\n", encoding="utf-8")
+
+    captured: list[str | None] = []
+    real_read_text = Path.read_text
+
+    def spy(self: Path, *args: object, **kwargs: object) -> str:
+        captured.append(kwargs.get("encoding"))  # type: ignore[arg-type]
+        return real_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", spy)
+    items = parse_file(md)
+
+    assert "utf-8" in captured, f"read_text was called without encoding=utf-8: {captured}"
+    assert any(i.priority == "🔴" for i in items)

@@ -92,6 +92,47 @@ def test_snooze_event_id_and_ts_well_formed(fake_data_dir: Path, monkeypatch: py
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", event.ts)
 
 
+def test_snooze_records_from_kind_in_marker(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Optional `from_kind` is embedded in the snooze marker as a `(from-kind: …)`
+    suffix so a later carry-forward can restore the source section's priority on
+    the target day."""
+    m = IdMap.load(fake_data_dir)
+    m.register(IdMapEntry("01HXAAA", "A3F7", "task", "action-items-2026-04-26.md", 1))
+    m.save()
+    daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
+    daily.parent.mkdir(parents=True, exist_ok=True)
+    daily.write_text("## 🔴 Urgent\n\n- [ ] [#A3F7] 🔴 task\n")
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+
+    event = snooze(
+        by_id="A3F7",
+        until=dt.date(2026, 5, 1),
+        from_kind="urgent",
+        data_dir=fake_data_dir,
+    )
+
+    assert "- snoozed-until: 2026-05-01 (from-kind: urgent)" in daily.read_text()
+    assert event.payload["from_kind"] == "urgent"
+
+
+def test_snooze_omits_from_kind_when_not_provided(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Existing callers that don't pass from_kind keep the original marker shape."""
+    m = IdMap.load(fake_data_dir)
+    m.register(IdMapEntry("01HXAAA", "A3F7", "task", "action-items-2026-04-26.md", 1))
+    m.save()
+    daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
+    daily.parent.mkdir(parents=True, exist_ok=True)
+    daily.write_text("- [ ] [#A3F7] task\n")
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+
+    event = snooze(by_id="A3F7", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
+
+    text = daily.read_text()
+    assert "- snoozed-until: 2026-05-01\n" in text
+    assert "from-kind" not in text
+    assert "from_kind" not in event.payload
+
+
 def test_snooze_rejects_non_date_until(fake_data_dir: Path) -> None:
     """A string accidentally passed for `until` must fail loudly at the boundary,
     not silently AttributeError mid-mutation."""

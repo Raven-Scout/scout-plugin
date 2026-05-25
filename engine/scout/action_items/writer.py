@@ -8,11 +8,18 @@ sibling temp file in the same directory, fsync it, then rename.
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from pathlib import Path
 
 from scout.errors import ActionItemError
 from scout.ids import short_prefix_pattern
+
+# Top-level checkbox line, with any leading whitespace. Captures the indent
+# and the marker so the prefix can be inserted while preserving the indent.
+# Case-insensitive `[x]` matches `[X]` too, mirroring the parser/backfill
+# candidate regex.
+_CHECKBOX_LINE_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>- \[[ xX]\] )")
 
 
 def atomic_write_lines(target: Path, lines: list[str]) -> None:
@@ -64,8 +71,32 @@ def insert_below(target: Path, *, line_number: int, text: str) -> None:
     atomic_write_lines(target, lines)
 
 
+def replace_line(target: Path, *, line_number: int, text: str) -> None:
+    """Replace the 1-indexed line wholesale with `text`."""
+    lines = _read_lines(target)
+    idx = line_number - 1
+    if not 0 <= idx < len(lines):
+        raise ActionItemError(f"replace_line: line {line_number} out of range (1..{len(lines)})")
+    lines[idx] = text
+    atomic_write_lines(target, lines)
+
+
+def delete_line(target: Path, *, line_number: int) -> None:
+    """Remove the 1-indexed line entirely."""
+    lines = _read_lines(target)
+    idx = line_number - 1
+    if not 0 <= idx < len(lines):
+        raise ActionItemError(f"delete_line: line {line_number} out of range (1..{len(lines)})")
+    del lines[idx]
+    atomic_write_lines(target, lines)
+
+
 def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
     """Insert `[#PREFIX] ` after the checkbox marker on the 1-indexed line.
+
+    Preserves leading whitespace (the parser and backfill candidate regex
+    both accept indented top-level items, so the writer must too).
+    Accepts both `[x]` and `[X]` checkbox completion markers.
 
     Refuses if the line already carries a `[#XXXX]` prefix — the caller
     should not be asking to add one if scout.id_map already has a record.
@@ -77,11 +108,9 @@ def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
     line = lines[idx]
     if short_prefix_pattern().search(line):
         raise ActionItemError(f"add_prefix_to_line: line {line_number} already has prefix")
-    # Find the checkbox marker (`- [ ]` or `- [x]`) and insert after it.
-    for marker in ("- [ ] ", "- [x] "):
-        if line.startswith(marker):
-            lines[idx] = marker + f"[#{prefix}] " + line[len(marker) :]
-            break
-    else:
+    m = _CHECKBOX_LINE_RE.match(line)
+    if m is None:
         raise ActionItemError(f"add_prefix_to_line: line {line_number} doesn't start with a checkbox marker")
+    head_end = m.end()
+    lines[idx] = line[:head_end] + f"[#{prefix}] " + line[head_end:]
     atomic_write_lines(target, lines)

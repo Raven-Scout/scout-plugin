@@ -11,7 +11,7 @@ import datetime as dt
 from pathlib import Path
 
 from scout import paths
-from scout.action_items._common import find_line_number, resolve_target
+from scout.action_items._common import resolve_target
 from scout.action_items.parser import parse_file
 from scout.action_items.writer import flip_checkbox
 from scout.events import Event, now_iso
@@ -51,8 +51,7 @@ def mark_done(
         by_subject=by_subject,
     )
 
-    line_number = find_line_number(target_path, match.raw_line)
-    flip_checkbox(target_path, line_number=line_number, to_done=True)
+    flip_checkbox(target_path, line_number=match.line_number, to_done=True)
 
     return Event(
         id=new_ulid(),

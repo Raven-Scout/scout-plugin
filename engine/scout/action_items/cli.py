@@ -56,6 +56,14 @@ def cli_snooze(
     until: str = typer.Option(..., "--until", help="YYYY-MM-DD"),
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
     by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    from_kind: str | None = typer.Option(
+        None,
+        "--from-kind",
+        help=(
+            "Source section kind (e.g. 'urgent', 'todo'). Recorded in the snoozed-until marker so a "
+            "carry-forward can recover the original priority on the target day."
+        ),
+    ),
     path: Path | None = typer.Argument(
         None,
         help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
@@ -84,7 +92,14 @@ def cli_snooze(
         except ValueError as e:
             raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
 
-    snooze(by_id=by_id, by_subject=subject, until=target_date, date=date, data_dir=data_dir)
+    snooze(
+        by_id=by_id,
+        by_subject=subject,
+        from_kind=from_kind,
+        until=target_date,
+        date=date,
+        data_dir=data_dir,
+    )
 
 
 @app.command("add-comment")
@@ -116,6 +131,84 @@ def cli_add_comment(
             raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
 
     add_comment(by_id=by_id, by_subject=subject, comment=comment, date=date, data_dir=data_dir)
+
+
+@app.command("delete-comment")
+def cli_delete_comment(
+    subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
+    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    index: int | None = typer.Option(None, "--index", help="1-based index of the comment to delete."),
+    text: str | None = typer.Option(None, "--text", help="Case-insensitive substring of the comment body."),
+    path: Path | None = typer.Argument(
+        None,
+        help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
+    ),
+) -> None:
+    from scout.action_items.delete_comment import delete_comment
+
+    if (subject is None) == (by_id is None):
+        raise ActionItemError("delete-comment requires exactly one of --subject or --by-id")
+    if (index is None) == (text is None):
+        raise ActionItemError("delete-comment requires exactly one of --index or --text")
+
+    data_dir: Path | None = None
+    date: _dt.date | None = None
+    if path is not None:
+        data_dir = path.parent.parent
+        stem = path.stem
+        try:
+            date = _dt.date.fromisoformat(stem.removeprefix("action-items-"))
+        except ValueError as e:
+            raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
+
+    delete_comment(
+        by_id=by_id,
+        by_subject=subject,
+        index=index,
+        text=text,
+        date=date,
+        data_dir=data_dir,
+    )
+
+
+@app.command("edit-comment")
+def cli_edit_comment(
+    new_text: str = typer.Option(..., "--new-text", help="Replacement body for the comment."),
+    subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
+    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    index: int | None = typer.Option(None, "--index", help="1-based index of the comment to edit."),
+    text: str | None = typer.Option(None, "--text", help="Case-insensitive substring of the comment body."),
+    path: Path | None = typer.Argument(
+        None,
+        help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
+    ),
+) -> None:
+    from scout.action_items.edit_comment import edit_comment
+
+    if (subject is None) == (by_id is None):
+        raise ActionItemError("edit-comment requires exactly one of --subject or --by-id")
+    if (index is None) == (text is None):
+        raise ActionItemError("edit-comment requires exactly one of --index or --text")
+
+    data_dir: Path | None = None
+    date: _dt.date | None = None
+    if path is not None:
+        data_dir = path.parent.parent
+        stem = path.stem
+        try:
+            date = _dt.date.fromisoformat(stem.removeprefix("action-items-"))
+        except ValueError as e:
+            raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
+
+    edit_comment(
+        new_text=new_text,
+        by_id=by_id,
+        by_subject=subject,
+        index=index,
+        text=text,
+        date=date,
+        data_dir=data_dir,
+    )
 
 
 @app.command("render")

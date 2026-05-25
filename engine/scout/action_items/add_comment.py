@@ -14,7 +14,7 @@ import datetime as dt
 from pathlib import Path
 
 from scout import paths
-from scout.action_items._common import find_line_number, resolve_target
+from scout.action_items._common import resolve_target
 from scout.action_items.parser import parse_file
 from scout.action_items.writer import insert_below
 from scout.events import Event, now_iso
@@ -55,8 +55,7 @@ def add_comment(
         by_subject=by_subject,
     )
 
-    line_number = find_line_number(target_path, match.raw_line)
-    insert_below(target_path, line_number=line_number, text=f"  - {comment}")
+    insert_below(target_path, line_number=match.line_number, text=f"  - {comment}")
 
     return Event(
         id=new_ulid(),

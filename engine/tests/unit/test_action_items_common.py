@@ -6,24 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from scout.action_items._common import find_line_number, resolve_target
+from scout.action_items._common import resolve_target
 from scout.action_items.parser import ActionItem
 from scout.errors import ActionItemError
 from scout.id_map import IdMap, IdMapEntry
-
-
-def test_find_line_number_returns_1_indexed(tmp_path: Path) -> None:
-    f = tmp_path / "x.md"
-    f.write_text("alpha\nbeta\ngamma\n")
-    assert find_line_number(f, "beta") == 2
-    assert find_line_number(f, "alpha") == 1
-
-
-def test_find_line_number_raises_when_missing(tmp_path: Path) -> None:
-    f = tmp_path / "x.md"
-    f.write_text("only line\n")
-    with pytest.raises(ActionItemError, match="could not locate"):
-        find_line_number(f, "missing line")
 
 
 def test_resolve_target_by_id_returns_entry_and_match(fake_data_dir: Path) -> None:
@@ -136,3 +122,52 @@ def test_resolve_target_prefix_in_idmap_but_missing_from_items_raises(
     # Items list is empty — simulates the wrong-file case.
     with pytest.raises(ActionItemError, match="is in id-map but not present"):
         resolve_target(items=[], data_dir=fake_data_dir, by_id="A3F7", by_subject=None)
+
+
+# Regression: by_subject must match against item.title (cleaned), not
+# raw_line (which includes the [#XXXX] prefix marker and the priority
+# emoji). Otherwise a search for "A3F7" silently matches the prefix
+# token of an unrelated task. Issue #32.
+
+
+def test_resolve_target_by_subject_does_not_match_prefix_token(fake_data_dir: Path) -> None:
+    """A subject substring that only appears inside the [#XXXX] prefix
+    marker (and not in the cleaned title) must NOT match — users searching
+    for a prefix should use --by-id, not --by-subject."""
+    items = [
+        ActionItem(
+            priority="🔴",
+            title="task X",
+            status="open",
+            section="In Progress",
+            context_links=[],
+            notes=[],
+            details=[],
+            raw_line="- [ ] [#A3F7] 🔴 task X",
+            line_number=5,
+            short_prefix="A3F7",
+        ),
+    ]
+    with pytest.raises(ActionItemError, match="no open task matched"):
+        resolve_target(items=items, data_dir=fake_data_dir, by_id=None, by_subject="A3F7")
+
+
+def test_resolve_target_by_subject_matches_title_substring(fake_data_dir: Path) -> None:
+    """Sanity: a substring that appears in the cleaned title still matches."""
+    items = [
+        ActionItem(
+            priority="🔴",
+            title="task X",
+            status="open",
+            section="In Progress",
+            context_links=[],
+            notes=[],
+            details=[],
+            raw_line="- [ ] [#A3F7] 🔴 task X",
+            line_number=5,
+            short_prefix="A3F7",
+        ),
+    ]
+    target, _, via = resolve_target(items=items, data_dir=fake_data_dir, by_id=None, by_subject="task x")
+    assert target.title == "task X"
+    assert via == "subject"

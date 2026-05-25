@@ -30,6 +30,9 @@ from scout.scripts.schedule_tick import (
     candidates_by_key,
 )
 from scout.scripts.schedule_tick import (
+    main as tick_main,
+)
+from scout.scripts.schedule_tick import (
     run as tick_run,
 )
 
@@ -527,3 +530,19 @@ def test_spawn_runner_rejects_remote_runtime(tmp_path):
     )
     with pytest.raises(ConfigError, match="runtime: remote.*not yet implemented"):
         _spawn_runner(vault=tmp_path, slot_key="research", slot=slot)
+
+
+# main(): unhandled exceptions must surface, not be silently swallowed.
+# Regression test for issue #35 — cron/launchd had no way to diagnose failures.
+
+
+def test_main_prints_traceback_to_stderr_when_run_raises(capsys):
+    """Unhandled exceptions from run() must produce a traceback on stderr so
+    cron/launchd logs capture the failure. Exit code stays 1."""
+    boom = RuntimeError("synthetic failure for visibility test")
+    with patch("scout.scripts.schedule_tick.run", side_effect=boom):
+        rc = tick_main([])
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "synthetic failure for visibility test" in captured.err
+    assert "Traceback" in captured.err

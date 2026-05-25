@@ -8,6 +8,7 @@ between bootstrap stages and dispatcher ticks.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 from pathlib import Path
@@ -51,19 +52,42 @@ def is_lock_held_by_live_pid(lock_path: Path) -> bool:
 
 
 def acquire_lock(lock_path: Path) -> None:
-    """Take the lock by writing our PID. Raise if already held by a live PID."""
-    if is_lock_held_by_live_pid(lock_path):
+    """Take the lock by atomically creating the file with our PID.
+
+    Uses ``O_CREAT | O_EXCL`` so two racing callers cannot both believe
+    they hold the lock — one wins the create, the other gets
+    ``FileExistsError`` and we surface it as :class:`LockBusyError`.
+
+    Stale locks (file exists, but its PID is dead) are unlinked before
+    the atomic claim, so a normal warm path is unchanged.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # If a stale lock exists, remove it before claiming. The unlink is
+    # racy on its own, but combined with the O_EXCL claim below, at most
+    # one racing process succeeds.
+    if lock_path.exists() and not is_lock_held_by_live_pid(lock_path):
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
+
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError as e:
+        # Either held by a live PID, or another caller raced us to claim.
         try:
-            pid_str = lock_path.read_text(encoding="utf-8").strip()
-            pid = int(pid_str)
+            pid = int(lock_path.read_text(encoding="utf-8").strip())
         except (ValueError, OSError):
             pid = -1
-        raise LockBusyError(lock_path, pid)
-    if lock_path.exists():
-        # Stale (dead PID). Remove and continue.
-        lock_path.unlink()
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path.write_text(str(os.getpid()), encoding="utf-8")
+        raise LockBusyError(lock_path, pid) from e
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        # Roll back the partial claim so the next caller can retry cleanly.
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
+        raise
 
 
 def release_lock(lock_path: Path) -> None:

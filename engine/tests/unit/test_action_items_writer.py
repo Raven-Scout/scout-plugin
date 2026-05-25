@@ -136,3 +136,71 @@ def test_add_prefix_to_specific_line_in_multi_line_file(tmp_path: Path) -> None:
     assert target.read_text() == (
         "# Header\n\n- [ ] 🔴 first task\n- [ ] [#B5K2] 🟡 second task\n- [ ] 🟢 third task\n"
     )
+
+
+# Regression: add_prefix_to_line must accept indented checkbox lines.
+# The parser and backfill candidate regex both accept `^\s*- \[[ xX]\] `,
+# but the writer used to require zero-indent. An indented item would crash
+# the writer mid-backfill, leaving the file partially modified and the
+# id-map out of sync with the file. Issue #31.
+
+
+def test_add_prefix_to_indented_checkbox_preserves_indent(tmp_path: Path) -> None:
+    """A single-space-indented checkbox is a valid top-level item per the
+    parser. The writer must insert the prefix without losing the indent."""
+    target = tmp_path / "f.md"
+    target.write_text(" - [ ] indented one space\n")
+    from scout.action_items.writer import add_prefix_to_line
+
+    add_prefix_to_line(target, line_number=1, prefix="A3F7")
+
+    assert target.read_text() == " - [ ] [#A3F7] indented one space\n"
+
+
+def test_add_prefix_to_done_indented_checkbox_preserves_indent(tmp_path: Path) -> None:
+    target = tmp_path / "f.md"
+    target.write_text(" - [x] indented and done\n")
+    from scout.action_items.writer import add_prefix_to_line
+
+    add_prefix_to_line(target, line_number=1, prefix="B5K2")
+
+    assert target.read_text() == " - [x] [#B5K2] indented and done\n"
+
+
+def test_add_prefix_handles_uppercase_X(tmp_path: Path) -> None:
+    """The backfill candidate regex accepts `[X]` (uppercase). The writer
+    must too — otherwise a file with any externally-completed item using
+    `[X]` crashes mid-backfill (id-map state torn). See Issue #31."""
+    target = tmp_path / "f.md"
+    target.write_text("- [X] done with uppercase X\n")
+    from scout.action_items.writer import add_prefix_to_line
+
+    add_prefix_to_line(target, line_number=1, prefix="C7M9")
+
+    assert target.read_text() == "- [X] [#C7M9] done with uppercase X\n"
+
+
+def test_backfill_prefixes_handles_indented_checkbox_end_to_end(
+    fake_data_dir: Path,
+) -> None:
+    """End-to-end regression for Issue #31: a file that mixes an
+    indented checkbox with a regular one must be backfilled without the
+    writer crashing mid-loop and leaving the file partially modified."""
+    target = fake_data_dir / "action-items" / "sample.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "# Day\n"
+        "\n"
+        " - [ ] indented task\n"  # indent=1 — top-level item per parser
+        "- [ ] regular task\n"
+    )
+
+    from scout.action_items.backfill import backfill_prefixes
+
+    plan = backfill_prefixes(target=target, data_dir=fake_data_dir, dry_run=False)
+
+    assert len(plan) == 2, f"expected to backfill both items, got: {plan}"
+    out = target.read_text()
+    # Both lines must now carry a prefix, and the indent on line 3 must be preserved.
+    assert " - [ ] [#" in out, f"indent of indented line not preserved: {out!r}"
+    assert "\n- [ ] [#" in out, f"non-indented line not prefixed: {out!r}"

@@ -16,7 +16,7 @@ import datetime as dt
 from pathlib import Path
 
 from scout import paths
-from scout.action_items._common import find_line_number, resolve_target
+from scout.action_items._common import resolve_target
 from scout.action_items.parser import parse_file
 from scout.action_items.writer import insert_below
 from scout.errors import ActionItemError
@@ -34,6 +34,7 @@ def snooze(
     until: dt.date,
     by_id: str | None = None,
     by_subject: str | None = None,
+    from_kind: str | None = None,
     date: dt.date | None = None,
     data_dir: Path | None = None,
 ) -> Event:
@@ -64,22 +65,28 @@ def snooze(
         by_subject=by_subject,
     )
 
-    line_number = find_line_number(target_path, match.raw_line)
-    insert_below(
-        target_path,
-        line_number=line_number,
-        text=f"  - snoozed-until: {until.isoformat()}",
-    )
+    # The optional `(from-kind: <kind>)` tail lets downstream renderers
+    # (and the next day's consolidation pass) recover the source section's
+    # priority kind when the task carries forward. Without it, an urgent
+    # task that lands under `## 🛌 Snoozed` on the target day loses its
+    # visual urgency.
+    marker = f"  - snoozed-until: {until.isoformat()}"
+    if from_kind:
+        marker += f" (from-kind: {from_kind})"
+    insert_below(target_path, line_number=match.line_number, text=marker)
 
+    payload: dict[str, object] = {
+        "item_id": item_ulid,
+        "via": via,
+        "title": match.title,
+        "until": until.isoformat(),
+    }
+    if from_kind:
+        payload["from_kind"] = from_kind
     return Event(
         id=new_ulid(),
         ts=now_iso(),
         kind="action_item.snoozed",
         source="cli:snooze",
-        payload={
-            "item_id": item_ulid,
-            "via": via,
-            "title": match.title,
-            "until": until.isoformat(),
-        },
+        payload=payload,
     )
