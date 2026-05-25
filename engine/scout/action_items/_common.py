@@ -10,9 +10,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from scout import paths
 from scout.action_items.parser import ActionItem
 from scout.errors import ActionItemError
-from scout.id_map import IdMap
+from scout.id_map import IdMap, IdMapEntry
+from scout.ids import new_ulid
 
 # Matches the comment shape that `add-comment` writes:
 #   `  - <author>: <text>`
@@ -117,11 +119,30 @@ def resolve_target(
 
     if by_id is not None:
         entry = id_map.lookup_by_prefix(by_id)
-        if entry is None:
-            raise ActionItemError(
-                f"prefix [#{by_id}] not found in id-map; if this is a legacy line, retry with --by-subject"
-            )
         match = next((i for i in items if i.short_prefix == by_id), None)
+        if entry is None:
+            # The briefing / consolidation skill can write a fresh `[#XXXX]`
+            # line straight into the markdown without calling
+            # `add_prefix_to_line` — which means the prefix lives in the
+            # file but never gets registered. If we can see the prefix on a
+            # real task line in this same file, auto-register it now and
+            # carry on. This keeps `mark-done --by-id` working even when
+            # the skill writer skips registration. (Legacy unprefixed lines
+            # still need `--by-subject`; the error message points the way.)
+            if match is None:
+                raise ActionItemError(
+                    f"prefix [#{by_id}] not found in id-map; if this is a legacy line, retry with --by-subject"
+                )
+            entry = IdMapEntry(
+                ulid=new_ulid(),
+                short_prefix=by_id,
+                last_title=match.title,
+                last_file=str(paths.action_items_daily_path(data=data_dir).name),
+                last_line=match.line_number,
+            )
+            id_map.register(entry)
+            id_map.save()
+            return match, entry.ulid, "id"
         if match is None:
             raise ActionItemError(f"prefix [#{by_id}] is in id-map but not present in this file")
         return match, entry.ulid, "id"
