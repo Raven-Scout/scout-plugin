@@ -194,6 +194,27 @@ def heartbeat_run_cmd(
     raise typer.Exit(heartbeat_main(dry_run=dry_run))
 
 
+# `scoutctl pre-session data` replaces ~/Scout/scripts/pre-session-data.sh
+# (#74 + #76). The bash version ran a 4-subprocess pipeline per KB file plus
+# two python3 cold starts just to JSON-encode stdin. Folded into one Python
+# process here with an mtime cache for the KB date extraction.
+pre_session_app = typer.Typer(help="Pre-session data gathering for scheduled Scout runs.")
+app.add_typer(pre_session_app, name="pre-session")
+
+
+@pre_session_app.command("data")
+def pre_session_data_cmd(
+    session_type: str = typer.Argument(
+        "unknown",
+        help="Session type label (briefing | consolidation | dreaming | research).",
+    ),
+) -> None:
+    """Write .scout-cache/session-context.json from current vault + git + gh state."""
+    from scout.scripts.pre_session_data import main as psd_main
+
+    raise typer.Exit(psd_main(session_type))
+
+
 def _register_connectors() -> None:
     """scoutctl connectors {list,show,reload} — read-only roster ops in v0.4."""
     connectors_app = typer.Typer(help="Connector roster operations (read-only in v0.4).")
