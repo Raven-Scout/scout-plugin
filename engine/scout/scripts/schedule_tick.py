@@ -592,11 +592,28 @@ def _try_lock(lock_path: Path) -> Iterator[bool]:
 # ----- main entry points --------------------------------------------------
 
 
+# Process-level mtime cache for schedule.yaml. The dispatcher fires every
+# 5 min and the schedule rarely changes; re-parsing the YAML every tick is
+# pure overhead (#82). When the dispatcher runs as a long-lived process
+# (e.g. inside a daemon) this saves real work; when it runs as a one-shot
+# CLI invocation the cache is just dead weight, harmless.
+_SCHEDULE_CACHE: tuple[int, Schedule] | None = None
+
+
 def _load_or_default(vault: Path) -> Schedule:
+    global _SCHEDULE_CACHE
     sched_path = vault / ".scout-state" / "schedule.yaml"
-    if sched_path.exists():
+    if not sched_path.exists():
+        return load_default_schedule()
+    try:
+        mtime_ns = sched_path.stat().st_mtime_ns
+    except OSError:
         return load_schedule(sched_path)
-    return load_default_schedule()
+    if _SCHEDULE_CACHE is not None and _SCHEDULE_CACHE[0] == mtime_ns:
+        return _SCHEDULE_CACHE[1]
+    schedule = load_schedule(sched_path)
+    _SCHEDULE_CACHE = (mtime_ns, schedule)
+    return schedule
 
 
 @dataclass

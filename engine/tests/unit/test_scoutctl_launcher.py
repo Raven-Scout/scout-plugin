@@ -102,6 +102,53 @@ def test_cache_path_prefers_local_venv_when_present(tmp_path):
     assert "VENV=cache-local" in result.stdout, result
 
 
+def test_caches_resolved_python_path(tmp_path):
+    """Per #81: the launcher writes the resolved Python to .scoutctl-py-cache
+    so the next invocation can skip the candidate probe."""
+    plugin_root = tmp_path / "scout-plugin"
+    launcher = _stage_launcher(plugin_root)
+    _make_fake_venv(plugin_root / ".venv", "plugin-root")
+    cache = plugin_root / ".scoutctl-py-cache"
+    assert not cache.exists()
+
+    result = _run(launcher)
+    assert "VENV=plugin-root" in result.stdout, result
+    assert cache.exists(), "first run should populate the cache"
+    cached_py = cache.read_text().strip()
+    assert cached_py.endswith(".venv/bin/python")
+
+    # Drop the venv stub; the cached path is now stale and should be ignored.
+    # If the cache were honoured blindly, the launcher would fail trying to
+    # exec a missing file.
+    cached_path = Path(cached_py)
+    cached_path.unlink()
+    cache.write_text(str(cached_path) + "\n")  # leave the stale path
+    result2 = _run(launcher)
+    # With no venv and no usable cache, we fall through to `python3 -m scout.cli`.
+    # The test environment doesn't have scout globally installed in tmp_path,
+    # so this typically returns non-zero — that's OK; we only assert the
+    # launcher itself didn't crash trying to exec a stale cached path.
+    assert result2.returncode != 127, "launcher crashed on stale cache: " + result2.stderr
+
+
+def test_cache_invalidates_when_target_disappears(tmp_path):
+    """A cached path that no longer exists must trigger a fresh probe."""
+    plugin_root = tmp_path / "scout-plugin"
+    launcher = _stage_launcher(plugin_root)
+    _make_fake_venv(plugin_root / ".venv", "plugin-root")
+
+    # Pre-seed the cache with a path that doesn't exist.
+    cache = plugin_root / ".scoutctl-py-cache"
+    cache.write_text("/nonexistent/python\n")
+
+    # Should fall through to the real probe and pick the plugin-root venv.
+    result = _run(launcher)
+    assert "VENV=plugin-root" in result.stdout, result
+    # And the cache should be updated to the correct path.
+    cached_py = cache.read_text().strip()
+    assert cached_py == str(plugin_root / ".venv" / "bin" / "python")
+
+
 @pytest.mark.skipif(shutil.which("python3") is None, reason="needs system python3 for last-resort exec")
 def test_falls_back_to_system_python3_when_no_venv(tmp_path):
     """No venv anywhere → exec python3 -m scout.cli, which fails cleanly

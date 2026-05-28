@@ -452,6 +452,75 @@ def test_write_last_fire_cache_round_trip(tmp_path):
     assert round_tripped["afternoon-consolidation"] == original["afternoon-consolidation"]
 
 
+# Schedule.yaml mtime cache (#82). Reuses the parsed Schedule across ticks
+# when the file hasn't changed — the dispatcher fires every 5 min and the
+# schedule rarely moves, so the YAML parse was pure overhead.
+
+
+def test_load_or_default_caches_parsed_schedule(tmp_path, monkeypatch):
+    from scout.scripts import schedule_tick as st
+
+    state = tmp_path / ".scout-state"
+    state.mkdir()
+    sched_path = state / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  smoke-slot:\n"
+        "    type: manual\n    runner: run-scout.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: skip\n    cooldown_minutes: 5\n"
+    )
+    # Clear cache from any prior test runs in this process.
+    monkeypatch.setattr(st, "_SCHEDULE_CACHE", None)
+
+    calls = {"n": 0}
+    real_load = st.load_schedule
+
+    def counting_load_schedule(path):
+        calls["n"] += 1
+        return real_load(path)
+
+    monkeypatch.setattr(st, "load_schedule", counting_load_schedule)
+
+    s1 = st._load_or_default(tmp_path)
+    s2 = st._load_or_default(tmp_path)
+    assert s1 is s2  # same parsed object, returned from cache
+    assert calls["n"] == 1
+
+
+def test_load_or_default_invalidates_cache_on_mtime_change(tmp_path, monkeypatch):
+    from scout.scripts import schedule_tick as st
+
+    state = tmp_path / ".scout-state"
+    state.mkdir()
+    sched_path = state / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  smoke-slot:\n"
+        "    type: manual\n    runner: run-scout.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: skip\n    cooldown_minutes: 5\n"
+    )
+    monkeypatch.setattr(st, "_SCHEDULE_CACHE", None)
+
+    calls = {"n": 0}
+    real_load = st.load_schedule
+
+    def counting_load_schedule(path):
+        calls["n"] += 1
+        return real_load(path)
+
+    monkeypatch.setattr(st, "load_schedule", counting_load_schedule)
+    st._load_or_default(tmp_path)
+
+    # Rewrite with a bumped mtime → cache miss → re-parse.
+    import os
+    new_ts = sched_path.stat().st_mtime_ns + 1_000_000_000
+    sched_path.write_text(sched_path.read_text())  # touch contents
+    os.utime(sched_path, ns=(new_ts, new_ts))
+
+    st._load_or_default(tmp_path)
+    assert calls["n"] == 2
+
+
 # 6. End-to-end: run() emits Event and writes JSONL row.
 
 
