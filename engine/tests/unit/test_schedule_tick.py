@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -24,9 +25,12 @@ from scout.scripts.schedule_tick import (
     _apply_miss_rules,
     _compute_due_slots,
     _filter_winner_by_priority,
+    _get_last_fire_index,
+    _load_last_fire_cache,
     _network_ready,
     _read_last_fire_index,
     _spawn_runner,
+    _write_last_fire_cache,
     candidates_by_key,
 )
 from scout.scripts.schedule_tick import (
@@ -307,6 +311,151 @@ def test_read_last_fire_index_falls_through_legacy_usage_tracker_rows(tmp_path):
     )
     index = _read_last_fire_index(tracker)
     assert index == {}  # silently skipped; no error
+
+
+# 5b. Cached last-fire index (perf fix for #73).
+#
+# The cache lives at .scout-state/last-fire.json and is keyed by the mtimes
+# of both usage-tracker.jsonl and session-tokens.jsonl. The fast path returns
+# the cached dict in O(slots); a miss/staleness falls through to the full
+# JSONL scan via _read_last_fire_index and rewrites the cache.
+
+
+def _make_tracker(tmp_path):
+    log_dir = tmp_path / ".scout-logs"
+    log_dir.mkdir(exist_ok=True)
+    state_dir = tmp_path / ".scout-state"
+    state_dir.mkdir(exist_ok=True)
+    tracker = log_dir / "usage-tracker.jsonl"
+    tracker.write_text(
+        '{"ts":"2026-05-11T12:00:00Z","type":"briefing","scout_mode":"morning-briefing"}\n'
+        '{"ts":"2026-05-11T17:00:00Z","type":"consolidation","scout_mode":"afternoon-consolidation"}\n'
+    )
+    return tracker, state_dir
+
+
+def test_get_last_fire_index_writes_cache_on_first_call(tmp_path):
+    tracker, state_dir = _make_tracker(tmp_path)
+    assert not (state_dir / "last-fire.json").exists()
+
+    index = _get_last_fire_index(state_dir, tracker)
+
+    assert "morning-briefing" in index
+    assert "afternoon-consolidation" in index
+    # Cache was written so the next call doesn't scan again.
+    assert (state_dir / "last-fire.json").exists()
+
+
+def test_get_last_fire_index_uses_cache_when_mtimes_match(tmp_path):
+    """Cache hit: source files unchanged since warm-up → cache is honoured."""
+    tracker, state_dir = _make_tracker(tmp_path)
+
+    # Warm the cache.
+    _get_last_fire_index(state_dir, tracker)
+
+    # If we corrupt the underlying JSONL but leave its mtime untouched,
+    # the cache should still serve the previously-extracted index without
+    # re-scanning — that's the whole point of the cache.
+    original_mtime_ns = tracker.stat().st_mtime_ns
+    tracker.write_bytes(b"not-json garbage that would raise on rescan\n")
+    os.utime(tracker, ns=(original_mtime_ns, original_mtime_ns))
+
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+    cached = _load_last_fire_cache(state_dir, tracker, session_tokens)
+    assert cached is not None
+    assert "morning-briefing" in cached
+    assert "afternoon-consolidation" in cached
+
+
+def test_get_last_fire_index_invalidates_cache_on_tracker_change(tmp_path):
+    tracker, state_dir = _make_tracker(tmp_path)
+    _get_last_fire_index(state_dir, tracker)  # warm
+
+    # Append a new row → tracker mtime bumps → cache should be invalidated.
+    with tracker.open("a", encoding="utf-8") as f:
+        f.write(
+            '{"ts":"2026-05-12T08:00:00Z","type":"briefing","scout_mode":"morning-briefing"}\n'
+        )
+
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+    assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
+
+    # _get_last_fire_index detects the staleness and rebuilds.
+    fresh = _get_last_fire_index(state_dir, tracker)
+    # The newer 2026-05-12 row wins over the cached 2026-05-11 row.
+    assert fresh["morning-briefing"].day == 12
+
+
+def test_get_last_fire_index_invalidates_cache_on_session_tokens_change(tmp_path):
+    tracker, state_dir = _make_tracker(tmp_path)
+    _get_last_fire_index(state_dir, tracker)  # warm
+
+    # Touching session-tokens.jsonl must also invalidate the cache, since
+    # _read_last_fire_index reads both files.
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+    session_tokens.write_text(
+        '{"ts":"2026-05-13T09:00:00Z","scout_mode":"morning-briefing"}\n'
+    )
+
+    assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
+    fresh = _get_last_fire_index(state_dir, tracker)
+    assert fresh["morning-briefing"].day == 13
+
+
+def test_load_last_fire_cache_rejects_wrong_schema_version(tmp_path):
+    state_dir = tmp_path / ".scout-state"
+    state_dir.mkdir()
+    tracker = tmp_path / "usage-tracker.jsonl"
+    tracker.write_text("")
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+
+    # Hand-write a cache file with a bad schema version.
+    (state_dir / "last-fire.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 999,
+                "tracker_mtime_ns": tracker.stat().st_mtime_ns,
+                "session_tokens_mtime_ns": None,
+                "last_fire": {"morning-briefing": "2026-05-11T12:00:00Z"},
+            }
+        )
+    )
+    assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
+
+
+def test_load_last_fire_cache_handles_corrupt_json(tmp_path):
+    state_dir = tmp_path / ".scout-state"
+    state_dir.mkdir()
+    tracker = tmp_path / "usage-tracker.jsonl"
+    tracker.write_text("")
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+
+    (state_dir / "last-fire.json").write_text("{not valid json")
+    # Corrupt cache must not raise — it returns None and the caller rebuilds.
+    assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
+
+
+def test_write_last_fire_cache_round_trip(tmp_path):
+    state_dir = tmp_path / ".scout-state"
+    state_dir.mkdir()
+    tracker = tmp_path / "usage-tracker.jsonl"
+    tracker.write_text("")
+    session_tokens = tracker.parent / "session-tokens.jsonl"
+
+    et = ZoneInfo("America/New_York")
+    original = {
+        "morning-briefing": datetime(2026, 5, 11, 8, 0, tzinfo=et),
+        "afternoon-consolidation": datetime(2026, 5, 11, 17, 0, tzinfo=et),
+    }
+    _write_last_fire_cache(state_dir, original, tracker, session_tokens)
+
+    round_tripped = _load_last_fire_cache(state_dir, tracker, session_tokens)
+    assert round_tripped is not None
+    # Timestamps are normalised to UTC on write — compare as moments.
+    assert round_tripped["morning-briefing"] == original["morning-briefing"]
+    assert (
+        round_tripped["afternoon-consolidation"] == original["afternoon-consolidation"]
+    )
 
 
 # 6. End-to-end: run() emits Event and writes JSONL row.
