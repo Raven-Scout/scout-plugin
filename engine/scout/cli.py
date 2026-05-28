@@ -125,6 +125,23 @@ def connector_health_report_cmd() -> None:
     raise typer.Exit(chr_main())
 
 
+# `scoutctl budget check` replaces ~/Scout/scripts/budget-check.sh (#74). The
+# bash version paid 5+ python3 cold starts per pre-session check; folded
+# in-process here it's one.
+budget_app = typer.Typer(help="Budget/cost gating for scheduled Scout runs.")
+app.add_typer(budget_app, name="budget")
+
+
+@budget_app.command("check")
+def budget_check_cmd(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print the decision and config."),
+) -> None:
+    """Decide whether the next session may proceed. Exit codes: 0=proceed, 1=skip, 2=backoff."""
+    from scout.scripts.budget_check import run as budget_run
+
+    raise typer.Exit(budget_run(verbose=verbose))
+
+
 def _register_connectors() -> None:
     """scoutctl connectors {list,show,reload} — read-only roster ops in v0.4."""
     connectors_app = typer.Typer(help="Connector roster operations (read-only in v0.4).")

@@ -147,6 +147,7 @@ def _template_vars(cfg: BootstrapConfig) -> dict[str, str]:
         "GITHUB_USERNAME": cfg.connector_inputs.get("github_username", ""),
         "GITHUB_REPOS": cfg.connector_inputs.get("github_repos", ""),
         "SCOUT_DIR": str(cfg.vault),
+        "SCOUTCTL_BIN": str(cfg.plugin_root / ".venv" / "bin" / "scoutctl"),
         "TIMEZONE": cfg.timezone,
         "PLATFORM": cfg.platform,
         "MAX_BUDGET": cfg.connector_inputs.get("max_budget", "5.00"),
