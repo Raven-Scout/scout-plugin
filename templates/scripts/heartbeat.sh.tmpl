@@ -2,208 +2,38 @@
 # {{INSTANCE_NAME}} Heartbeat — polls every 30 minutes to trigger extra sessions
 # when budget is available and there's pending work.
 #
-# Designed to run via launchd every 30 minutes. Lightweight — exits
-# quickly if conditions aren't met.
+# Designed to run via launchd every 30 minutes. Lightweight — exits quickly
+# if conditions aren't met.
 #
 # Exit codes:
-#   0 = checked, no action needed (or session triggered)
+#   0 = checked (no action needed OR session launched)
 #   1 = error
 #
 # Usage: heartbeat.sh [--dry-run]
+#
+# This is a thin wrapper around `scoutctl heartbeat run`. The bash version
+# shelled out to python3 -c three times per tick just to walk the same tracker
+# file three different ways. Folded into one Python process here (#74 + #79).
 
 set -euo pipefail
 
-SCOUT_DIR="{{SCOUT_DIR}}"
-LOG_DIR="$SCOUT_DIR/.scout-logs"
-CONFIG_FILE="$SCOUT_DIR/.scout-config.yaml"
-TRACKER_FILE="$LOG_DIR/usage-tracker.jsonl"
-HEARTBEAT_LOG="$LOG_DIR/heartbeat.log"
-DRY_RUN="${1:-}"
-
-mkdir -p "$LOG_DIR"
-
-log() {
-    echo "[$(TZ={{TIMEZONE}} date '+%Y-%m-%d %H:%M %Z')] $1" >> "$HEARTBEAT_LOG"
-}
-
-# --- Gate 1: Is a session already running? ---
-if pgrep -f "claude.*{{INSTANCE_NAME_LOWER}}-" > /dev/null 2>&1; then
-    log "Session already running — skipping"
-    exit 0
-fi
-
-# --- Gate 2: Are we in off-peak hours? ---
-HOUR=$(TZ={{TIMEZONE}} date '+%H')
-OFF_PEAK_START=23
-OFF_PEAK_END=6
-
-if [ -f "$CONFIG_FILE" ]; then
-    OFF_PEAK_START=$(grep 'off_peak_start:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$OFF_PEAK_START")
-    OFF_PEAK_END=$(grep 'off_peak_end:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$OFF_PEAK_END")
-fi
-
-IS_OFF_PEAK="no"
-if [ "$HOUR" -ge "$OFF_PEAK_START" ] || [ "$HOUR" -lt "$OFF_PEAK_END" ]; then
-    IS_OFF_PEAK="yes"
-fi
-
-# --- Gate 3: Budget check ---
-BUDGET_CHECK="$SCOUT_DIR/scripts/budget-check.sh"
-if [ -x "$BUDGET_CHECK" ]; then
-    if ! "$BUDGET_CHECK" >> "$HEARTBEAT_LOG" 2>&1; then
-        log "Budget exhausted — skipping"
-        exit 0
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "heartbeat.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 1
     fi
 fi
 
-# --- Gate 4: Time since last session ---
-HEARTBEAT_MIN_GAP=120
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
+export SCOUTCTL_BIN
 
-if [ -f "$TRACKER_FILE" ]; then
-    MINUTES_SINCE_LAST=$(python3 -c "
-import json
-from datetime import datetime, timezone
-
-last_ts = None
-for line in open('$TRACKER_FILE'):
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        entry = json.loads(line)
-        ts = datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
-        if last_ts is None or ts > last_ts:
-            last_ts = ts
-    except (json.JSONDecodeError, KeyError, ValueError):
-        continue
-
-if last_ts:
-    now = datetime.now(timezone.utc)
-    print(int((now - last_ts).total_seconds() / 60))
-else:
-    print(9999)
-" 2>/dev/null || echo "9999")
-
-    if [ "$MINUTES_SINCE_LAST" -lt "$HEARTBEAT_MIN_GAP" ]; then
-        log "Last session ${MINUTES_SINCE_LAST}m ago (need ${HEARTBEAT_MIN_GAP}m) — too recent"
-        exit 0
-    fi
-else
-    MINUTES_SINCE_LAST=9999
+DRY_RUN_FLAG=()
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN_FLAG=("--dry-run")
 fi
 
-# --- Gate 5: Off-peak conservatism ---
-if [ "$IS_OFF_PEAK" = "yes" ] && [ "$MINUTES_SINCE_LAST" -lt 240 ]; then
-    log "Off-peak and last session only ${MINUTES_SINCE_LAST}m ago — conserving"
-    exit 0
-fi
-
-# --- Gate 6: Check for pending work signals ---
-HAS_WORK="no"
-
-# Signal 1: More than 4 hours since last dreaming session
-HOURS_SINCE_DREAMING=$(python3 -c "
-import json
-from datetime import datetime, timezone
-
-last_dreaming = None
-try:
-    for line in open('$TRACKER_FILE'):
-        line = line.strip()
-        if not line:
-            continue
-        entry = json.loads(line)
-        if entry.get('type') == 'dreaming':
-            ts = datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
-            if last_dreaming is None or ts > last_dreaming:
-                last_dreaming = ts
-except:
-    pass
-
-if last_dreaming:
-    now = datetime.now(timezone.utc)
-    print(int((now - last_dreaming).total_seconds() / 3600))
-else:
-    print(99)
-" 2>/dev/null || echo "99")
-
-if [ "$HOURS_SINCE_DREAMING" -ge 4 ]; then
-    HAS_WORK="yes"
-    log "Signal: ${HOURS_SINCE_DREAMING}h since last dreaming session"
-fi
-
-# Signal 2: Uncommitted changes in the repo
-if cd "$SCOUT_DIR" && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    HAS_WORK="yes"
-    log "Signal: uncommitted changes in repo"
-fi
-
-if [ "$HAS_WORK" = "no" ]; then
-    log "No pending work signals — skipping"
-    exit 0
-fi
-
-# --- All gates passed: decide session type ---
-RESEARCH_RUNNER="$SCOUT_DIR/run-research.sh"
-DREAMING_RUNNER="$SCOUT_DIR/run-dreaming.sh"
-RESEARCH_QUEUE="$SCOUT_DIR/knowledge-base/research-queue.md"
-SESSION_TYPE="dreaming"
-
-# Check hours since last research session
-HOURS_SINCE_RESEARCH=$(python3 -c "
-import json
-from datetime import datetime, timezone
-
-last_research = None
-try:
-    for line in open('$TRACKER_FILE'):
-        line = line.strip()
-        if not line:
-            continue
-        entry = json.loads(line)
-        if entry.get('type') == 'research':
-            ts = datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
-            if last_research is None or ts > last_research:
-                last_research = ts
-except:
-    pass
-
-if last_research:
-    now = datetime.now(timezone.utc)
-    print(int((now - last_research).total_seconds() / 3600))
-else:
-    print(999)
-" 2>/dev/null || echo "999")
-
-# Check if research queue has unchecked items
-HAS_RESEARCH_ITEMS="no"
-if [ -f "$RESEARCH_QUEUE" ] && grep -q '^\- \[ \]' "$RESEARCH_QUEUE" 2>/dev/null; then
-    HAS_RESEARCH_ITEMS="yes"
-fi
-
-# Prefer research if: 24h+ since last research AND queue has items AND runner exists
-if [ "$HOURS_SINCE_RESEARCH" -ge 24 ] && [ "$HAS_RESEARCH_ITEMS" = "yes" ] && [ -x "$RESEARCH_RUNNER" ]; then
-    SESSION_TYPE="research"
-fi
-
-log "All gates passed — triggering extra $SESSION_TYPE session"
-
-if [ "$DRY_RUN" = "--dry-run" ]; then
-    log "DRY RUN — would trigger $SESSION_TYPE session"
-    echo "Would trigger $SESSION_TYPE session (${HOURS_SINCE_DREAMING}h since last dreaming, ${HOURS_SINCE_RESEARCH}h since last research, budget OK)"
-    exit 0
-fi
-
-# Trigger the selected session type
-if [ "$SESSION_TYPE" = "research" ] && [ -x "$RESEARCH_RUNNER" ]; then
-    log "Launching: $RESEARCH_RUNNER"
-    nohup "$RESEARCH_RUNNER" >> "$HEARTBEAT_LOG" 2>&1 &
-    log "Research session launched (PID: $!)"
-elif [ -x "$DREAMING_RUNNER" ]; then
-    log "Launching: $DREAMING_RUNNER"
-    nohup "$DREAMING_RUNNER" >> "$HEARTBEAT_LOG" 2>&1 &
-    log "Dreaming session launched (PID: $!)"
-else
-    log "ERROR: No runner script found or not executable"
-    exit 1
-fi
+exec "$SCOUTCTL_BIN" heartbeat run "${DRY_RUN_FLAG[@]}"
