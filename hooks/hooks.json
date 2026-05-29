@@ -1,18 +1,6 @@
 {
-  "description": "Scout connector telemetry and session-token accounting hooks. Activate only inside scheduled scout runs (the Python hook short-circuits when SCOUT_MODE is unset).",
+  "description": "Scout connector telemetry and session-token accounting hooks. Activate only inside scheduled scout runs (the Python hook short-circuits when SCOUT_MODE is unset). Per #72, per-tool-call accounting was moved out of PostToolUse (which fired one Python cold-start per tool call) into the session-tool-log Stop hook that walks the transcript once at session end.",
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/engine/bin/scoutctl hook connector-log",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
@@ -20,6 +8,11 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/engine/bin/scoutctl hook session-tokens",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/bin/scoutctl hook session-tool-log",
+            "timeout": 15
           }
         ]
       }
