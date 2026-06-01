@@ -66,6 +66,14 @@ Check for events that were recently added or modified by others:
 - Changed meetings = priorities shifting
 - Cancelled meetings (by others) = something changed that {{USER_NAME}} should know about
 
+### Meeting-Table Compose-Time Cross-Check (mandatory)
+
+The today's-meetings table is a recurring source of two bugs: wrong wall-clock times and phantom (carried-but-cancelled) rows. Three hard rules at compose time:
+
+1. **Never derive wall-clock time from a recurring `eventId`/`recurringEventId` suffix** (e.g. `_R20260525T093000` is opaque UTC). The only authoritative time fields are `start.dateTime` + `start.timeZone` (or `originalStartTime.dateTime` for a series instance). Convert to the display timezone from those fields.
+2. **Assert every row against a fresh same-run query.** Call `list_events` for today's window **in this run**, and assert each table row's displayed time matches the live event start to the minute. If the table is carried from a prior run without a fresh `list_events` this run, every time cell must be flagged `[carried]`.
+3. **Phantom detection.** Every carried row must match a live event by `id`/`recurringEventId` in this run's `list_events` result. Rows with no live match must be removed or marked `[unverified — not on calendar this run]` with the query timestamp.
+
 ---
 phase: connector
 name: calendar

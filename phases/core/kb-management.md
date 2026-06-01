@@ -134,6 +134,17 @@ When writing KB content, use these markers:
 - **[unverified]** = carried forward from a previous run, not yet confirmed against any live source
 - **[stale]** = known to be outdated but kept as historical context until replacement info is found
 - **[contradicted]** = two sources disagree; both claims noted with sources cited — always add to review queue
+- **[speculative]** = an inferred causal/contributory link that no single source actually states; allowed only with this marker (see Causal-Claim Gate)
+
+### Causal-Claim Gate
+
+Any statement asserting that one issue / PR / metric / event **caused, contributed to, blocked, or drove** another is a high-risk inference — it reads as fact but is usually the run's own synthesis. Before writing such a cross-entity causal claim (in the KB or a DM):
+
+1. **Cite a primary source** that actually states the link (a comment, message, or commit that says "X because Y") → write it plainly.
+2. If no source states it but the inference is useful → write it with a **`[speculative]`** marker and the basis ("timing overlap", "same author") so {{USER_NAME}} can weigh it.
+3. If you can do neither → **drop the causal framing** and report the two facts independently.
+
+Never fan a causal claim out to multiple KB surfaces (project file + people + DM) off a single unverified inference — re-verify before propagating, or one speculative link becomes "established fact" across the KB.
 
 ### Cross-Reference Integrity
 

@@ -67,7 +67,7 @@ cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py query --type task
 ```
 
 For each personal task entity (`domain: personal`, `status: open`):
-- **Stale task** = open personal task with `created_date` older than 7 days and no activity. Flag in the notification: "Still open: [task name] — done?"
+- **Stale task** = open personal task with `created_date` older than 7 days, no activity, AND no `surface_rule` currently muting it. Flag in the notification: "Still open: [task name] — done?" A task intentionally muted by its `surface_rule` (default `do_not_surface`, no window covering today, no `always_visible_if` firing) is **not** stale — it is deliberately backgrounded; do not flag it.
 - **Deadline approaching** = task with `deadline` within 3 days. Escalate priority to 🔴 in the entity file if not already.
 - **Completion signal check** = if `completion_signal: gmail_confirmation`, check Gmail for matching confirmation. Auto-resolve if found (set `status: completed`, add `completed_date`).
 

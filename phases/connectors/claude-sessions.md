@@ -53,3 +53,15 @@ For each session activity found:
 4. If the session reveals new work not yet tracked, note it as context for the consolidation
 
 This connector catches the gap between "{{USER_NAME}} worked on something" and "the output appeared in another system." Work done in Claude sessions often shows up in GitHub, email, or Slack shortly after — but during consolidation, the session may be the earliest signal of completed or in-progress work.
+
+### Uncommitted Working-Tree Sweep
+
+A session may have changed files that were never committed — invisible to `git log` and to GitHub. For each repo a session touched, also check the working tree so "in progress" vs "done" is grounded:
+
+```bash
+cd <repo> && git status --porcelain && git log --since='<last-run-time>' --oneline
+```
+
+### Claim Gate — No "Actively Building X" Without a Cited Signal
+
+Do not assert that {{USER_NAME}} "is actively building / working on X" unless you can cite a concrete signal: a session JSONL with matching prompts, a commit SHA, an open PR, or dirty working-tree files. A session *title* or a single prompt is weak evidence — tie the claim to the tangible artifact, or downgrade it to "{{USER_NAME}} opened a session about X" rather than asserting active work.

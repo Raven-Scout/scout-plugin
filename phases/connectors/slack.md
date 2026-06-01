@@ -211,6 +211,16 @@ Scout morning briefing ready.
 - Review queue: [count] items pending your review
 ```
 
+### Sources-Checked Footer
+
+End every consolidation/briefing notification with a one-line transparency footer stating what was actually scanned, so coverage is auditable and "quiet" claims are backed by evidence:
+
+```
+Sources checked: N CC sessions · N vault/git commits · N Slack threads · N Linear updates · N Drive files
+```
+
+Only count sources you genuinely queried this run. A "quiet window" claim must be paired with non-zero scan counts — otherwise it reads as "didn't look," not "nothing happened."
+
 ### Notification Rules
 
 - Never include sensitive details in the notification — just summaries and counts.

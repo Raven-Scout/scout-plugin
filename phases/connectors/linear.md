@@ -10,6 +10,19 @@ requires: linear
 
 Check for changes to {{USER_NAME}}'s assigned issues and any newly created or assigned issues.
 
+### {{USER_NAME}}'s Own Linear Activity Since Last Run (delta-scan — surface this first)
+
+Before the issue-state scan below, build an **actor-attributed** delta of what {{USER_NAME}} did in Linear since the last run — issues he created, moved (state change), commented on, or edited. This is the Linear analog of the Slack outbound scan and is a primary signal of completed/in-progress work. Surface it **early** in the run summary (before "Today's Wins") — never silently omit it.
+
+- **Volume-sanity gate:** if the delta is suspiciously empty (zero activity) for a normally-active window, re-fetch before concluding "no Linear activity" — a silent empty result erodes trust more than a slow run.
+- **Re-fetch fast-moving issues at compose time:** any issue you're about to cite with a state framing ("In Review", "blocked") must be re-read at compose time, not carried from cache (mirrors the Gmail/Pattern #43 rule).
+
+### Project-Update Polling for {{USER_NAME}}-Led Projects (leadership pings)
+
+`list_issues` + issue comments **miss project-level status-update comments**, which is where leadership often pings. For every Linear project {{USER_NAME}} leads or owns, call `get_status_updates` (and `list_comments` on the project) for updates since the last run.
+
+**Leadership-ping headline rule:** if a project-update comment on {{USER_NAME}}'s own project comes from someone with a managerial/leadership relationship to {{USER_NAME}} (per `people.md` / the ontology `manages` relation), auto-promote it to the run summary's 🔴 headline — a manager's ask on {{USER_NAME}}'s project is the highest-priority inbound signal and must not be buried.
+
 ### Status Changes
 
 Use `list_issues` filtered to {{USER_NAME}}'s assignments to check for status changes since the last run. Status transitions to watch for:

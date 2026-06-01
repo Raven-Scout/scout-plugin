@@ -15,6 +15,16 @@ mkdir -p {{SCOUT_DIR}}/action-items/archive
 # Move files older than 7 days based on filename date
 ```
 
+## Step 0.5: Critical Blocks Check
+
+Before building the list, read `knowledge-base/scout-mistake-audit.md`. For every pattern with status **Open** that carries a {{USER_NAME}}-facing blocker — a setup task {{USER_NAME}} must do, an unanswered question {{INSTANCE_NAME}} asked him, or an approved-but-unapplied proposal:
+
+1. Check whether it's been resolved since last run (search messaging, verify files/state).
+2. If still unresolved and >24h old, surface it as a **🔴** item today: "**Still blocked:** [pattern] — [what {{USER_NAME}} needs to do]".
+3. If stuck 48h+, call it out explicitly in the run summary/notification so it isn't lost.
+
+This makes the mistake audit an active tracker, not a passive log — {{USER_NAME}} expects every run type (not just dreaming) to keep pushing critical blocks toward resolution. Track specifically: unresolved setup/integration tasks, open questions awaiting {{USER_NAME}}'s answer, and approved proposals not yet applied.
+
 ## Action Item Categories
 
 Categorize every action item using these levels:
@@ -132,6 +142,39 @@ closed_today=$(grep -cE '^\s*- \[x\] ' "$DAILY_FILE")
     echo "ERROR: open-row count dropped ($prev_open→$today_open, only $closed_today closed) — items were collapsed; expand them before commit" >&2
 ```
 
+### Hard Rule — ✅ Recently Completed Migration Is Atomic
+
+Whenever you flip an item from `[ ]` to `[x]` — or process a {{USER_NAME}}-authored `[x]`, an inline `//==<<` close-out directive ("close this out", "I don't need this anymore", "move to completed"), or a close-it-out reply — you MUST, in the same write:
+
+1. Add an entry under `## ✅ Recently Completed` summarizing the closure with date + evidence (commit hash / transcript / message ts / the inline-comment quote) and any wikilinks the prior framing carried.
+2. **Delete the original row from its origin section** (🔴/🟡/🟢). Never leave a checked row sitting in an active section — that's a duplicate-surface graveyard.
+3. If the closure is too trivial to deserve a Recently-Completed entry, still delete the origin row. Never write the entry without the inverse delete.
+
+**Inline `//==<<` close-out directives are first-class delete instructions** — acknowledging one in the next DM is insufficient; the file must be physically updated (check box → write completed entry → delete origin row → remove the marker).
+
+**Pre-commit audit** — no `[x]` rows may sit outside the Recently Completed section:
+
+```bash
+grep -nE '^\s*- \[x\]' "$DAILY_FILE" | grep -viE 'recently completed|## ✅' \
+  && echo "WARN: checked rows above are outside ✅ Recently Completed — migrate or annotate '_(kept intentionally — REASON)_' before commit" >&2
+```
+
+(Sunset: retire this rule when a programmatic `action-items` done-lifecycle ships and handles section migration deterministically.)
+
+### Hard Rule — Transcript-Derived Names Must Pass an Ontology Match
+
+Auto-transcribed sources (Granola, Gemini/Drive auto-notes, Fathom recaps, meeting summaries) frequently mis-hear names. **Never** write a transcribed name into action items, KB, or a DM without first resolving it against the knowledge graph. For every name-shaped token from a transcribed source:
+
+```bash
+cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py name_lookup --token "<Token>"
+```
+
+- **Exact match** → use the matched entity with its `[[people/<slug>]]` wikilink.
+- **Fuzzy match** (within threshold ≈ Levenshtein-2 / phonetic-equivalent) → use that entity, append a `[name-fuzzy-resolved]` marker.
+- **No match** → write at most "Contact person matching '<verbatim-token>' (no KB match — please confirm)" and route a `[transcript-drift]` entry to `review-queue.md`. **NEVER elevate an unresolved transcribed name to a 🔴 headline** — 🟡 with the explicit "no KB match" framing is the ceiling.
+
+If {{USER_NAME}} corrects a name ("who is X?", "X doesn't exist", "this is hallucinated"), bind the misheard form to the correct entity as a "known transcription drift" note so it resolves next time.
+
 ## Knowledge Graph Personal Tasks
 
 If the ontology parser is set up, query it for personal tasks and deadlines:
@@ -139,6 +182,8 @@ If the ontology parser is set up, query it for personal tasks and deadlines:
 ```bash
 cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py query --type task
 ```
+
+**`surface_rule` windows are authoritative.** Before rendering any `type: task` entity into the daily file, read its `surface_rule:` block. If `default: do_not_surface` and **no** `windows` entry covers today's date AND **no** `always_visible_if` condition fires, the task is intentionally muted — do not render it, do not flag it stale, do not mention it in the wrap notification. If a window covers today, render at that window's `surface:` priority using its `task:` label override if present. If `always_visible_if` fires, force 🔴. A task with no `surface_rule` falls back to surfacing daily until `status: completed` (back-compat). This stops long-window tasks (multi-week trips, future-dated deadlines) from polluting the daily surface during their idle phases.
 
 For the morning briefing, focus on:
 

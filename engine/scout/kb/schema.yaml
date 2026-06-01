@@ -39,7 +39,15 @@ entity_types:
   task:
     properties:
       required: [name, type, status]
-      optional: [deadline, priority, domain, completion_signal, created_date, completed_date]
+      optional: [deadline, priority, domain, completion_signal, created_date, completed_date, surface_rule]
+      # surface_rule (optional): controls when a long-window task is rendered into
+      # daily action items. Shape:
+      #   surface_rule:
+      #     default: do_not_surface        # or surface_daily (the implicit default if absent)
+      #     windows:                        # list of date ranges that re-surface the task
+      #       - {from: YYYY-MM-DD, to: YYYY-MM-DD, surface: "🟡", task: "label override"}
+      #     always_visible_if: [<condition strings>]   # force 🔴 regardless of windows
+      # Absent surface_rule == surface daily until status: completed (back-compat).
     relationships:
       - assigned_to
       - about
