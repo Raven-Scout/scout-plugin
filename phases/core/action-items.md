@@ -142,7 +142,17 @@ closed_today=$(grep -cE '^\s*- \[x\] ' "$DAILY_FILE")
     echo "ERROR: open-row count dropped ($prev_open→$today_open, only $closed_today closed) — items were collapsed; expand them before commit" >&2
 ```
 
-### Hard Rule — ✅ Recently Completed Migration Is Atomic
+### Hard Rule — Continuity-Dropoff Audit (ID-level, pre-commit)
+
+The count-guard catches *how many* dropped; this catches *which*. Before committing, diff today's open `[#XXXX]` ids against the prior day's. For every id open in N-1 but absent in N:
+
+1. It has a ✅ Recently Completed entry in today's file → confirmed closure, OK.
+2. It has an explicit `//==<<` drop directive since N-1 → confirmed drop, OK.
+3. **Otherwise → silent dropoff.** Re-add it to today's file with a `[carried-via-audit]` annotation, surface `🚨 N items silently dropped from yesterday — please verify` in the notification, and write a `review-queue.md` entry. Never let an open item vanish without one of (1)/(2).
+
+### Hard Rule — Leave-State Compose Gate
+
+Before generating any 🔴/🟡 action item that names a specific person as the next-action owner, read that person's entity file (`knowledge-base/people/<slug>.md`). If it carries an active leave/out-of-office state (a `status:` containing `leave`/`oof`/`vacation`/`paternity`/`maternity`, a dated leave block overlapping today, or a 🚨/`### ACTIVE STATUS` body header) — do NOT assign them as the owner. Reframe to 🟢 Watching with `(on leave through <date>; auto-resume on return)`, unless the action item is itself about *responding to* that leave. This prevents assigning work to someone Scout already knows is away.
 
 Whenever you flip an item from `[ ]` to `[x]` — or process a {{USER_NAME}}-authored `[x]`, an inline `//==<<` close-out directive ("close this out", "I don't need this anymore", "move to completed"), or a close-it-out reply — you MUST, in the same write:
 
@@ -200,6 +210,31 @@ During consolidation, also check for completion signals:
 - If any personal task has a `completion_signal: gmail_confirmation`, check Gmail for matching confirmations. If found, update the entity file's `status` to `completed` and add `completed_date`.
 - If {{USER_NAME}} reported completion via Slack DM, update the entity file.
 - Carry open personal tasks forward in the action items file's Personal section.
+
+## Recurring-Task Cadences (briefing AND every consolidation)
+
+Recurring commitments are **cadence-driven, not event-driven** — a "quiet delta" consolidation must still surface them. This is the load-bearing fix for missed standing commitments (e.g. a weekly Friday status update). If the KB has any `recurring_task` entities, run the cadence computer at compose time:
+
+```bash
+cd {{SCOUT_DIR}} && python recurring-task-status.py --date "$(TZ={{TIMEZONE}} date '+%Y-%m-%d')"
+# (script lives at {{SCOUT_DIR}}/scripts/recurring-task-status.py)
+```
+
+**Live-completion lookup (do this before trusting the date math).** For each entity with a `completion_evidence` source (`linear_project_update`, `slack_post`, `gmail_confirmation`), resolve the *real* last-completion date from the live source — e.g. Linear `get_project` → `lastUpdateAt`, or a Slack/Gmail search — and feed it back so the verdict reflects live evidence (the override is not written to the entity file):
+
+```bash
+python recurring-task-status.py --date "<today>" \
+    --last-completed <entity-slug>=<YYYY-MM-DD>
+```
+
+For each entity the script returns:
+
+1. **`due` / `overdue`** → **mandatory** action item. 🔴 when `surface_window` is `T-0 morning` or the item is `overdue`; 🟡 when the window is wider than 24h. Link `[[recurring-tasks/<name>]]`. `domain: personal` ones go in the Personal section.
+2. **`done`** (completion evidence satisfied for this cadence window) → surface as ✅ Recently Completed, not a TODO.
+3. **`surfacing`** (inside the window, not yet the due day) → 🟡 heads-up.
+4. **`upcoming` / `unknown`** → no action item.
+
+**Do not write "quiet window" / "nothing material" framing until the `due`/`overdue` list is exhausted** — a `weekly:friday` cadence is by definition material on a Friday.
 
 ## Mandatory Cross-Check
 

@@ -53,6 +53,13 @@ The KB is the **persistent memory** of this system. Action items are ephemeral (
   - **Upcoming Meetings**: Next relevant meetings
   - **Issues**: Key issues with links, status, and who owns them
 - Quality bar: after reading a project file, {{USER_NAME}} should understand what's happening *right now*, who's doing what, what decisions were made and why, and what they need to do next. If the file doesn't answer those questions, it's too thin.
+- **`slack_channels:` frontmatter (required for 🔴 projects):** every high-priority project file declares the Slack channels that carry its work, so runs can poll them directly (see the Slack connector's 🔴 Project Channel Poll). Shape:
+  ```yaml
+  slack_channels:
+    - id: C07A15QDGBT
+      name: "#channel-name"
+  ```
+  When a project is promoted to 🔴 without this field, add it (find the channel ids from `channels.md` or a `slack_search_channels` call).
 
 ### When to Create New KB Files
 

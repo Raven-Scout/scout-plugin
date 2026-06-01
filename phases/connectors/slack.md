@@ -79,6 +79,18 @@ Check project channels listed in `channels.md` for recent activity, even if {{US
 - Status updates from collaborators
 - Announcements that change priorities
 
+### 🔴 Project Channel Poll (mandatory)
+
+`slack_search` misses threads and non-mention activity — the recurring cause of "Scout went quiet on project X." For every 🔴-priority project file (`knowledge-base/projects/*/<name>.md` with `priority: "🔴"` or a 🔴 status), read its `slack_channels:` YAML frontmatter and **directly read each declared channel** since the last run via `slack_read_channel(channel_id=<id>, limit=20)` — do not rely on search alone. Surface: every {{USER_NAME}} @-mention, every message from a person in the project's `worked_on_by`/key-people set, and every decision/blocker. List the polled channels in the sources footer (`🔴 channels polled: #a, #b`). If a 🔴 project has no `slack_channels:` frontmatter yet, add it (see project-file conventions in kb-management).
+
+### Both Scans Required (gate)
+
+The outbound (`from:`) and inbound (`to:`/mention) scans are BOTH mandatory every run — a scan reported with only `from:{{USER_NAME}}` is incomplete and the run is not done until the inbound `to:`/mention scan has also executed. Never declare Slack "quiet" off a one-directional scan.
+
+### {{USER_NAME}}-Committed-Reply Tracking
+
+Any thread reply by {{USER_NAME}} that accepts ownership — "I'll take care of it", "Got it", "On it", "Sure" — with no later outbound message resolving it MUST be auto-carried as a 🔴 action item until either the resolving action is observed or {{USER_NAME}} explicitly drops it. This catches the failure where {{USER_NAME}} accepts a task in-thread but the underlying ask never makes it into the carry-forward set.
+
 ### What to Record
 
 For each inbound message found, note:

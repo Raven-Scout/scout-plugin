@@ -52,6 +52,22 @@ entity_types:
       - assigned_to
       - about
       - blocked_by
+  recurring_task:
+    # Standing commitment with an explicit cadence (e.g. "every Friday post the Linear
+    # project update"). Pattern #78 — confirmed cadences must be first-class entities so
+    # the briefing can derive "today is Friday, these N commitments need surfacing" without
+    # carrying the heuristic in prose. Surfaced by scripts/recurring-task-status.py.
+    # cadence DSL: weekly:<weekday>, monthly:<day-of-month>, monthly:nth:<n>:<weekday>,
+    #              quarterly:cycle-start, daily
+    # surface_window DSL: T-0 morning | T-1 day | T-7d | T-2d through T-0
+    # completion_evidence: linear_project_update | slack_post | gmail_confirmation | manual
+    properties:
+      required: [name, type, cadence, surface_window, active_from, status]
+      optional: [active_until, completion_evidence, completion_query, last_completed_date, priority, domain, sources]
+    relationships:
+      - feeds
+      - confirmed_on
+      - about
   organization:
     properties:
       required: [name, type]
