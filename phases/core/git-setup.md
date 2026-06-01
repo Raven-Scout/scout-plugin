@@ -29,6 +29,16 @@ Git is a core part of the {{INSTANCE_NAME}} system — every change is committed
 
 The commit history is as valuable as the files themselves. When verifying KB claims or understanding what was already audited, check git before querying connectors.
 
+### Vault Git-Delta Narration (consolidation/briefing — mandatory before composing)
+
+Interactive sessions ({{INSTANCE_NAME}} work sessions, manual edits, `/scout-work`, audits) commit to the vault between scheduled runs. Those commits are a **primary signal source**, not background noise — a `work [HH:MM]:` commit may already have done the thing an action item is about. Before composing the run summary:
+
+```bash
+git -C {{SCOUT_DIR}} log --since="<last run timestamp>" --pretty=format:'%h %s' --no-merges
+```
+
+Narrate any non-session commits (anything not authored by this run) in the summary. **Do not assert a "quiet window" / "nothing changed since last run" until this git scan returns zero non-session commits.** A silent delta in the vault contradicts a "quiet" claim and erodes trust.
+
 ## GitHub Access via `gh` CLI
 
 All GitHub operations use the `gh` CLI, which is authenticated and has full access to both public and private repos. **Do not use GitHub MCP tools** — they have limited scope.

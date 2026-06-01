@@ -31,8 +31,6 @@ Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
 ```markdown
 # Action Items — YYYY-MM-DD
 
-**Last consolidated:** YYYY-MM-DD HH:MM [timezone]
-
 ## 🔴 Urgent
 
 - [ ] [#XXXX] **[Item title]** — [Description with specific details, not vague summaries]
@@ -64,6 +62,12 @@ Items carried forward from previous days that are still open.
 - [ ] [#XXXX] **[Item title]** — [Status update since last check]
   - Originally from: action-items-YYYY-MM-DD
   - Current status: [what's changed]
+
+## 🪵 Run notes & connector availability
+
+_Always the LAST section of the file — run metadata is a footer for review, never a hero block at the top. First-paint should be 🔴 Urgent, not run narrative. Append newest entry first; keep only the last 3 runs (older entries roll off)._
+
+- **YYYY-MM-DD HH:MM [timezone]** ([mode]) — X new / Y completed / Z carried forward. Connectors: [available, or "degraded: <name>"].
 ```
 
 All action items files must include `[[wikilinks]]` to any KB files referenced by action items.
@@ -105,6 +109,28 @@ grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[0-9A-HJKMNP-TV-Z]{4}\]
 ```
 
 If that grep finds anything, the file is non-compliant and scout-app's writes will silently fall back to fragile subject-matching for those lines.
+
+### Hard Rule — Trim by Demotion, Never by Omission
+
+When the list grows long, achieve focus by **reprioritizing**, never by hiding items from view. "Don't overwhelm me" and "don't drop my items" are both real constraints — resolve the tension by demotion *within* view, not omission *from* view.
+
+1. Keep a tight, time-bound **🔴 Urgent** set at the top.
+2. Demote lower-priority open items down the tiers (🔴→🟡→🟢) and reorder — {{USER_NAME}} can scan a long, ordered list and ignore the bottom; he cannot recover items that aren't rendered at all.
+3. Mark an item `[unverified]` or drop it **only** when {{USER_NAME}} has explicitly said so (reply, reaction, or an inline `//==<<` directive).
+
+**Every open carried item MUST be rendered as its own `- [ ]` checkbox row in exactly one section.** Summary lines like "…plus the standing backlog (#A, #B, … etc.) — carried unchanged" are **FORBIDDEN** as a substitute for rendering individual items. An `etc.` that hides open items reads as a drop from {{USER_NAME}}'s perspective even when the IDs technically persist inside the prose string.
+
+**Compose-time count-guard (run before commit):** count the rendered open rows (`- [ ]` lines plus 🟢 Watching bullets) in today's file. That count MUST be ≥ the prior day's open-item count minus any items closed this run (`- [x]`) or dropped on an explicit {{USER_NAME}} directive. If today's count is lower, items were collapsed/omitted — expand them back into individual rows before committing.
+
+```bash
+# Compose-time count-guard
+PREV=$(ls -t {{SCOUT_DIR}}/action-items/action-items-*.md | sed -n 2p)
+prev_open=$(grep -cE '^\s*- \[ \] ' "$PREV" 2>/dev/null || echo 0)
+today_open=$(grep -cE '^\s*- \[ \] ' "$DAILY_FILE")
+closed_today=$(grep -cE '^\s*- \[x\] ' "$DAILY_FILE")
+[ "$today_open" -lt $((prev_open - closed_today)) ] && \
+    echo "ERROR: open-row count dropped ($prev_open→$today_open, only $closed_today closed) — items were collapsed; expand them before commit" >&2
+```
 
 ## Knowledge Graph Personal Tasks
 
@@ -182,4 +208,4 @@ Run every available cross-check (calendar, issue tracker, messaging, code host, 
 - If not started: include the full context from all sources, not just the one that surfaced it
 - Always include source citations showing which connectors confirmed the item
 
-Update the "Last consolidated" timestamp in the action items file after reconciliation is complete.
+After reconciliation is complete, refresh the `## 🪵 Run notes & connector availability` block at the **bottom** of the action items file — prepend this run's entry (timestamp, mode, counts, connector availability) as the newest line and trim the block to the last 3 runs. Do not write run metadata at the top of the file.
