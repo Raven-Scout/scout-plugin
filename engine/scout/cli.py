@@ -86,6 +86,17 @@ def hook_session_tokens() -> None:
     raise typer.Exit(session_tokens_main())
 
 
+@hook_app.command("session-tool-log")
+def hook_session_tool_log() -> None:
+    """Stop hook: replay tool calls from the session transcript into connector-calls JSONL.
+
+    Replaces the per-PostToolUse Python spawn in `connector-log` (#72).
+    """
+    from scout.hooks.session_tool_log import main as session_tool_log_main
+
+    raise typer.Exit(session_tool_log_main())
+
+
 @hook_app.command("kb-pre-filter")
 def hook_kb_pre_filter(
     session_type: str = typer.Option(
