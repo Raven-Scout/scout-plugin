@@ -21,7 +21,6 @@ from scout.hooks.session_tool_log import (
     write_records,
 )
 
-
 # ----- helpers ------------------------------------------------------------
 
 
@@ -111,9 +110,7 @@ def test_extract_handles_content_as_string_or_list() -> None:
     ]
     rows_list = [
         _assistant_tool_use("toolu_2", "Read", file_path="/p"),
-        _user_tool_result(
-            "toolu_2", [{"type": "text", "text": "block content"}]
-        ),
+        _user_tool_result("toolu_2", [{"type": "text", "text": "block content"}]),
     ]
     assert len(extract_tool_calls(rows_string)) == 1
     assert len(extract_tool_calls(rows_list)) == 1
@@ -167,9 +164,7 @@ def test_write_records_records_error_snippet(tmp_path: Path) -> None:
 # ----- end-to-end via run() ---------------------------------------------
 
 
-def test_run_short_circuits_when_scout_mode_unset(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_short_circuits_when_scout_mode_unset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SCOUT_MODE", raising=False)
     transcript = tmp_path / "session.jsonl"
     transcript.write_text("")
@@ -177,9 +172,7 @@ def test_run_short_circuits_when_scout_mode_unset(
     assert run(stdin=stdin) is None
 
 
-def test_run_processes_transcript_and_writes_event(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_processes_transcript_and_writes_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SCOUT_MODE", "briefing")
     monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path / "vault"))
 
@@ -195,9 +188,7 @@ def test_run_processes_transcript_and_writes_event(
         + "\n"
     )
 
-    stdin = io.StringIO(
-        json.dumps({"transcript_path": str(transcript), "session_id": "abc"})
-    )
+    stdin = io.StringIO(json.dumps({"transcript_path": str(transcript), "session_id": "abc"}))
     ev = run(stdin=stdin)
     assert ev is not None
     assert ev.kind == "session.tool_log.written"
@@ -209,9 +200,7 @@ def test_run_processes_transcript_and_writes_event(
     assert "Bash" in files[0].read_text()
 
 
-def test_run_no_op_when_transcript_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_no_op_when_transcript_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SCOUT_MODE", "briefing")
     stdin = io.StringIO(json.dumps({"transcript_path": str(tmp_path / "absent.jsonl")}))
     assert run(stdin=stdin) is None
