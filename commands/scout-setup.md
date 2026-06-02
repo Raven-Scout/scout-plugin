@@ -124,6 +124,32 @@ Capture exit code and stdout. The command emits one line per concern: `installed
 
 ---
 
+## Step 3b: Auto-update preference
+
+Ask the user:
+
+> "Should Scout keep itself up to date automatically? When on, scheduled runs apply sidecar-clean upgrades and ping you if a change needs manual review. (You can change this later via `/scout-update`.)"
+
+Wait for a yes/no answer. Then persist the preference by writing/merging the `auto_update` block directly into the freshly-created `~/Scout/scout-config.yaml`. (The vault template is not rendered at install time, so this is the only way to make the preference stick — do NOT rely on the template.)
+
+```bash
+python3 - <<'EOF'
+import pathlib, yaml
+ENABLED = True   # set to False if the user declined
+p = pathlib.Path.home() / "Scout" / "scout-config.yaml"
+cfg = yaml.safe_load(p.read_text()) or {}
+cfg.setdefault("auto_update", {})
+cfg["auto_update"]["enabled"] = ENABLED
+cfg["auto_update"].setdefault("channel", "stable")
+p.write_text(yaml.safe_dump(cfg, sort_keys=False))
+print(f"auto_update.enabled set to {ENABLED} (channel: stable).")
+EOF
+```
+
+Set `ENABLED = True` if the user said yes, `False` if they said no.
+
+---
+
 ## Step 4: Report and offer first-run
 
 Report the result to the user:

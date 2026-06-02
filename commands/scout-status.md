@@ -162,6 +162,34 @@ SCOUTCTL_BIN=$(crontab -l 2>/dev/null | awk '
 
 Then check `[ -e "$SCOUTCTL_BIN" ]` and `[ -x "$SCOUTCTL_BIN" ]`. (TCC restrictions are macOS-specific; skip the protected-dir check on Linux.)
 
+### 3f. Update status
+
+Check the installed plugin version against the latest available, and read the auto-update preference:
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}"
+"$PLUGIN_ROOT/.venv/bin/scoutctl" self-update check
+```
+
+Capture the output. The command prints the installed version, the available version, and whether an update is available (e.g. `up-to-date` or `update-available: <version>`).
+
+Then read `auto_update.enabled` from `~/Scout/scout-config.yaml` (absent ⇒ treat as `false`):
+
+```bash
+python3 - <<'EOF'
+import pathlib, yaml
+p = pathlib.Path.home() / "Scout" / "scout-config.yaml"
+if p.exists():
+    cfg = yaml.safe_load(p.read_text()) or {}
+    enabled = cfg.get("auto_update", {}).get("enabled", False)
+    print("AUTO_UPDATE_ON" if enabled else "AUTO_UPDATE_OFF")
+else:
+    print("AUTO_UPDATE_OFF")
+EOF
+```
+
+Store both results for rendering in the dashboard below.
+
 ---
 
 ## Step 4: Compose and Display the Dashboard
@@ -330,6 +358,19 @@ If the bin-path validation (step 3e sub-checks above) found issues, render one o
 On Linux, swap "in plist" for "in crontab" and "install-plist" for "install-cron".
 
 If bin-path validation passes, no extra output — the launchctl table alone is enough.
+
+---
+
+### Update status
+
+Using the version info and auto-update flag collected in step 3f, display:
+
+```
+  Plugin:       <installed-version>  (<up-to-date> or <update available: X.Y.Z>)
+  Auto-update:  on  /  off
+```
+
+If an update is available, add: "Run `/scout-update` to apply it."
 
 ---
 
