@@ -4,6 +4,16 @@ Autonomous knowledge management and daily briefing system for Claude Code. Scout
 
 You shouldn't have to manually track what happened across seven different tools yesterday, what's still pending from last week, or what changed while you were in meetings. Scout does that automatically. It reads your tools, cross-checks findings against each other, writes a coherent knowledge base, and surfaces only what matters. The knowledge base is browsable in Obsidian as an interlinked graph of projects, people, channels, and action items.
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/install.sh | bash
+```
+
+Then open Claude Code and run `/scout-setup` to create your vault.
+
+**Updating later:** run `/scout-update` — it refreshes the plugin and upgrades your vault (sidecar-safe).
+
 ## Quick Start
 
 Scout is distributed as a Claude Code plugin via a built-in marketplace catalog (`.claude-plugin/marketplace.json`). Install it with:
