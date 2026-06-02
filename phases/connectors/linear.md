@@ -146,3 +146,23 @@ If issue changes affect active projects, update the relevant project files:
 - Changed issue statuses in the project's issues section
 - New issues added to the project
 - Completed milestones or resolved blockers
+
+---
+phase: connector
+name: linear
+slot: writeback
+mode: [consolidation, briefing]
+requires: linear
+---
+
+## Linear Write-Back — Attempt the Write When Directed
+
+When {{USER_NAME}} issues a directive that maps to a Linear write — move an issue to Done, (re)assign, add a comment, set a label, change priority — **attempt the write via the Linear MCP first** rather than only flagging it for {{USER_NAME}} to do manually. Use `save_issue` (state/assignee/labels/priority) or `save_comment` as appropriate.
+
+Handle the three outcomes explicitly:
+
+1. **Success** → confirm in the run summary with the change and the issue id ("moved PROJ-123 → Done").
+2. **Permission denied** → surface the exact gap and the fix ("Linear MCP lacks write scope — enable it in the connector's OAuth settings"), then fall back to flagging the change as a manual action item so it isn't lost.
+3. **API error** → note the error briefly and fall back to the manual flag.
+
+Never silently skip a write directive. Either it succeeded (confirm it) or it didn't (say why + leave a manual action item). Treat a write the same way as any other claim: cite the resulting state from Linear, don't assume the write took.

@@ -45,6 +45,9 @@ WARN_TOTAL_THRESHOLD = 3
 WARN_ERR_RATIO = 0.5
 HEALTHY_OK_THRESHOLD = 3
 DARK_GAP_THRESHOLD = 3
+# Pattern #54: if a connector logged a healthy run in ANY mode within this window,
+# a 0-call (not 0-error) current run is "alive but unused this mode", not an outage.
+CROSS_MODE_LIVENESS_WINDOW = timedelta(hours=4)
 
 
 # ----- data structures -----------------------------------------------------
@@ -337,6 +340,16 @@ def compute_critical_alerts(
             continue
 
         last_ok = last_healthy_ts(stats, c, prior_sessions, sessions_by_id, HEALTHY_OK_THRESHOLD)
+
+        # Pattern #54: cross-mode liveness. If this run made no error calls (the
+        # connector simply wasn't exercised in this mode) AND the connector was
+        # healthy in ANY mode within the liveness window, it's alive — not an
+        # outage. Suppress the false CRITICAL. Error calls this run still alert.
+        curr_err = _err_count(stats, c, current_sid)
+        current_ts = sessions_by_id[current_sid][0]["_ts"]
+        if curr_err == 0 and last_ok is not None and current_ts - last_ok <= CROSS_MODE_LIVENESS_WINDOW:
+            continue
+
         reason = (
             f"0 successful calls in `{current_mode}` run; "
             f"{healthy}/{samples} prior `{current_mode}` runs were healthy; "
@@ -501,6 +514,8 @@ def render_health_md(
         "fires an alert in modes where it's required by `connectors.yaml`.",
         "- **Pattern #48:** if a connector has never logged a successful call across the entire "
         "window, the alert is suppressed (it's unwired, not broken — see [[Wishlist]] §wire-up).",
+        "- **Pattern #54:** if a connector was healthy in any mode within the last 4h and the "
+        "current run had 0 error calls, the CRITICAL is suppressed (alive but unused this mode).",
         "- **Warning:** any connector with ≥3 calls this run and >50% errors.",
         "",
         "Alerts are written to `.scout-logs/connector-alerts.log` and surfaced as a macOS "

@@ -254,6 +254,90 @@ def test_slack_dark_two_prior_healthy_fires_critical(fake_data_dir, monkeypatch)
     assert "Slack" in log_body
 
 
+# ----- Test 4b: Pattern #54 cross-mode liveness suppression ----------------
+
+
+def test_pattern_54_cross_mode_liveness_suppresses_critical(fake_data_dir, monkeypatch):
+    """A connector healthy in ANOTHER mode within the liveness window, dark
+    (0 calls, 0 errors) in the current mode, must NOT fire a false CRITICAL —
+    it's alive but unused this mode, not an outage (Pattern #54)."""
+    monkeypatch.setattr(chr_mod, "_default_now", _frozen_now)
+    log_dir = fake_data_dir / ".scout-logs"
+
+    # 2 prior morning-briefing runs healthy on Slack (mode-baseline → would alert).
+    base = _frozen_now() - timedelta(days=2)
+    for i, sid in enumerate(["s_prev1", "s_prev2"]):
+        _seed_session(
+            log_dir,
+            sid=sid,
+            mode="morning-briefing",
+            ts=base + timedelta(days=i),
+            calls={"mcp:claude_ai_Slack": (5, 0), "mcp:claude_ai_Linear": (5, 0)},
+        )
+
+    # A DIFFERENT-mode run (consolidation) with Slack healthy ~2h ago — inside
+    # the 4h cross-mode liveness window.
+    _seed_session(
+        log_dir,
+        sid="s_consol",
+        mode="consolidation-1pm",
+        ts=_frozen_now() - timedelta(hours=2),
+        calls={"mcp:claude_ai_Slack": (5, 0), "mcp:claude_ai_Linear": (5, 0)},
+    )
+
+    # Current morning-briefing run: Slack not exercised (0 calls, 0 errors).
+    _seed_session(
+        log_dir,
+        sid="s_curr",
+        mode="morning-briefing",
+        ts=_frozen_now() - timedelta(hours=1),
+        calls={"mcp:claude_ai_Linear": (4, 0)},
+    )
+
+    event = chr_mod.run(data_dir=fake_data_dir)
+    alerts = event.payload["alerts"] if event is not None else []
+    slack_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Slack"]
+    assert slack_alerts == [], "Slack healthy cross-mode within 4h → no false CRITICAL."
+
+
+def test_pattern_54_errors_this_run_still_alert(fake_data_dir, monkeypatch):
+    """Liveness suppression must NOT mask a real failure: error calls in the
+    current run still alert even if the connector was healthy recently."""
+    monkeypatch.setattr(chr_mod, "_default_now", _frozen_now)
+    log_dir = fake_data_dir / ".scout-logs"
+
+    base = _frozen_now() - timedelta(days=2)
+    for i, sid in enumerate(["s_prev1", "s_prev2"]):
+        _seed_session(
+            log_dir,
+            sid=sid,
+            mode="morning-briefing",
+            ts=base + timedelta(days=i),
+            calls={"mcp:claude_ai_Slack": (5, 0), "mcp:claude_ai_Linear": (5, 0)},
+        )
+    _seed_session(
+        log_dir,
+        sid="s_consol",
+        mode="consolidation-1pm",
+        ts=_frozen_now() - timedelta(hours=2),
+        calls={"mcp:claude_ai_Slack": (5, 0), "mcp:claude_ai_Linear": (5, 0)},
+    )
+    # Current run: Slack was exercised but every call FAILED → real outage.
+    _seed_session(
+        log_dir,
+        sid="s_curr",
+        mode="morning-briefing",
+        ts=_frozen_now() - timedelta(hours=1),
+        calls={"mcp:claude_ai_Slack": (0, 3), "mcp:claude_ai_Linear": (4, 0)},
+    )
+
+    event = chr_mod.run(data_dir=fake_data_dir)
+    alerts = event.payload["alerts"] if event is not None else []
+    slack_alerts = [a for a in alerts if a["connector_key"] == "mcp:claude_ai_Slack"]
+    assert len(slack_alerts) == 1, "Error calls this run still alert despite recent health."
+    assert slack_alerts[0]["level"] == "CRITICAL"
+
+
 # ----- Test 5: Weekend-only `gh CLI dark` → no alert if non-required -------
 
 
