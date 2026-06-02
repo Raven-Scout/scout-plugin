@@ -25,7 +25,9 @@ class UpdateStatus:
 
 
 def _semver_tuple(v: str) -> tuple[int, int, int]:
-    parts = (v.split("-")[0].split("."))[:3]
+    # strip pre-release (-...) and build metadata (+...) before parsing
+    core = v.split("+")[0].split("-")[0]
+    parts = core.split(".")[:3]
     nums = [int(p) for p in parts] + [0, 0, 0]
     return (nums[0], nums[1], nums[2])
 
@@ -46,8 +48,11 @@ def _installed_version() -> str:
 
 def _available_version() -> str:
     with urllib.request.urlopen(RAW_MARKETPLACE_URL, timeout=10) as resp:  # noqa: S310
-        data = json.loads(resp.read().decode("utf-8"))
-    return data["plugins"][0]["version"]
+        raw = resp.read().decode("utf-8")
+    try:
+        return json.loads(raw)["plugins"][0]["version"]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+        raise RuntimeError(f"could not parse marketplace.json from {RAW_MARKETPLACE_URL}: {e}") from e
 
 
 def check(
