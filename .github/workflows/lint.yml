@@ -26,6 +26,9 @@ jobs:
         run: .venv/bin/ruff format --check scout tests
       - name: Mypy
         run: .venv/bin/mypy scout
+      - name: Version sync guard
+        run: .venv/bin/python -m scout.scripts.versioning check
+        working-directory: engine
       - name: Shellcheck scoutctl
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
