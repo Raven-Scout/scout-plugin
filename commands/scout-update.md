@@ -24,6 +24,40 @@ Use `"$SCOUTCTL"` in every subsequent invocation.
 
 ---
 
+## Step 0.5: Refresh the plugin (Surface A) before upgrading the vault (Surface B)
+
+This command updates **both** surfaces — the plugin first, then the vault against the freshly-refreshed plugin. That order matters: upgrading the vault against a stale plugin would apply old templates and miss engine fixes that landed since the last `claude plugin install`.
+
+Pull the latest plugin code:
+
+```bash
+bash <<'EOF'
+set -e
+if [ -d "$HOME/scout-plugin/.git" ]; then
+  git -C "$HOME/scout-plugin" pull --ff-only && echo "PULLED_DIRECTORY:$HOME/scout-plugin"
+else
+  claude plugin marketplace update scout-plugin || true
+  claude plugin install scout@scout-plugin || true
+  echo "REFRESHED_MARKETPLACE"
+fi
+EOF
+```
+
+Then resolve the plugin root the rest of this upgrade runs from — prefer the maintainer git checkout when it's present; otherwise derive the path from the installed marketplace cache. Re-pin `$SCOUTCTL` to the new root so every subsequent step uses the updated engine:
+
+```bash
+NEW_ROOT="$HOME/scout-plugin"
+[ -d "$NEW_ROOT/.git" ] || NEW_ROOT="$(claude plugin list --json 2>/dev/null \
+  | python3 -c "import sys,json;print(next(p['installPath'] for m in json.load(sys.stdin).get('plugins',{}).values() for p in m if 'scout-plugin' in p['installPath']))" 2>/dev/null)"
+echo "Upgrading vault against plugin root: $NEW_ROOT"
+[ -x "$NEW_ROOT/.venv/bin/scoutctl" ] || bash "$NEW_ROOT/scripts/install-venv.sh"
+SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
+```
+
+All pre-flight and upgrade steps below use this overridden `"$SCOUTCTL"`.
+
+---
+
 ## Step 0: Pre-flight (refuse if no vault, no venv, pending sidecars, or mismatched venv)
 
 Run:
@@ -100,3 +134,42 @@ Capture exit code (0 = green, 1 = yellow, 2 = red) and stdout/stderr.
 - If exit 2: list every `error:` line. Suggest `scoutctl bootstrap doctor` for a clean read of the current state.
 
 If runner backups appeared (`run-*.sh.bak.*`), tell the user the live runners had hand-edits that have been preserved as backups; the fresh templates were installed.
+
+---
+
+## Auto-update nudge
+
+After reporting the upgrade result, check whether the user has auto-updates enabled:
+
+```bash
+python3 - <<'EOF'
+import pathlib, yaml
+p = pathlib.Path.home() / "Scout" / "scout-config.yaml"
+if p.exists():
+    cfg = yaml.safe_load(p.read_text()) or {}
+    enabled = cfg.get("auto_update", {}).get("enabled", False)
+    print("AUTO_UPDATE_ON" if enabled else "AUTO_UPDATE_OFF")
+else:
+    print("AUTO_UPDATE_OFF")
+EOF
+```
+
+- If `AUTO_UPDATE_ON`: nothing to say — auto-updates are already configured.
+- If `AUTO_UPDATE_OFF`: tell the user once: "Auto-updates are off — I can turn them on so Scout keeps itself current (sidecar-clean upgrades only; you'll be pinged on conflict). Want me to enable it?"
+
+If the user agrees, write/merge the `auto_update` block into `~/Scout/scout-config.yaml`, preserving any other keys already in the file:
+
+```bash
+python3 - <<'EOF'
+import pathlib, yaml
+p = pathlib.Path.home() / "Scout" / "scout-config.yaml"
+cfg = yaml.safe_load(p.read_text()) or {}
+cfg.setdefault("auto_update", {})
+cfg["auto_update"]["enabled"] = True
+cfg["auto_update"].setdefault("channel", "stable")
+p.write_text(yaml.safe_dump(cfg, sort_keys=False))
+print("Auto-update enabled (channel: stable).")
+EOF
+```
+
+If the user declines, acknowledge and move on — don't ask again in this session.
