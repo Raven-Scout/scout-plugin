@@ -146,6 +146,99 @@ def test_upgrade_backfills_missing_version_at_last_setup(tmp_path):
     assert after["plugin"]["version_at_last_update"] == "0.4.2"
 
 
+_PARSER_REL = "knowledge-base/ontology/parser.py"
+_PARSER_SNAP = ".scout-state/last-assembled/knowledge-base/ontology/parser.py"
+
+
+def test_install_seeds_parser_merge_snapshot(tmp_path):
+    """parser.py is now a 3-way-merge file: install must write it live AND
+    record a snapshot baseline (otherwise upgrades have no merge base)."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+    live = vault / _PARSER_REL
+    snap = vault / _PARSER_SNAP
+    assert live.exists()
+    assert snap.exists()
+    assert snap.read_text() == live.read_text()
+    assert live.read_text() == (plugin / "templates" / _PARSER_REL).read_text()
+
+
+def test_upgrade_preserves_vault_edit_to_parser(tmp_path):
+    """Pattern #68 regression: a vault-side edit to parser.py must SURVIVE an
+    upgrade (clean 3-way merge), not be clobbered by an always-overwrite."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+
+    parser = vault / _PARSER_REL
+    parser.write_text(parser.read_text() + "\n# VAULT_CUSTOM_MARKER = 1\n")
+
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    result = upgrade(cfg)
+
+    assert "# VAULT_CUSTOM_MARKER = 1" in parser.read_text(), "vault edit clobbered!"
+    assert not (vault / f"{_PARSER_REL}.proposed-merge").exists()
+    assert not any("parser.py" in c for c in result.conflicts)
+
+
+def test_upgrade_parser_conflict_writes_sidecar_live_untouched(tmp_path):
+    """Overlapping plugin + vault edits to parser.py → conflict → sidecar;
+    the working parser.py is left untouched (never a broken .py in place)."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+
+    parser = vault / _PARSER_REL
+    snap = vault / _PARSER_SNAP
+    lines = parser.read_text().splitlines(keepends=True)
+    n = len(lines) // 2
+    # base (snapshot), ours (plugin = current parser), theirs (live) all differ
+    # at line n → unresolvable overlap.
+    snap.write_text("".join(lines[:n] + ["# BASE_MARKER\n"] + lines[n + 1 :]))
+    parser.write_text("".join(lines[:n] + ["# VAULT_MARKER\n"] + lines[n + 1 :]))
+
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    result = upgrade(cfg)
+
+    sidecar = vault / f"{_PARSER_REL}.proposed-merge"
+    assert sidecar.exists()
+    assert "# VAULT_MARKER" in parser.read_text(), "live parser.py must be untouched on conflict"
+    assert any("parser.py" in c for c in result.conflicts)
+
+
+def test_upgrade_parser_migration_no_snapshot_writes_sidecar(tmp_path):
+    """Vaults predating the merge-managed parser have no snapshot. First
+    upgrade with a vault-edited parser must sidecar (not overwrite) the edit."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+
+    (vault / _PARSER_SNAP).unlink()  # simulate pre-change vault: no baseline
+    parser = vault / _PARSER_REL
+    parser.write_text(parser.read_text() + "\n# LEGACY_VAULT_EDIT = 1\n")
+
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    upgrade(cfg)
+
+    assert (vault / f"{_PARSER_REL}.proposed-merge").exists()
+    assert "# LEGACY_VAULT_EDIT = 1" in parser.read_text(), "legacy vault edit must survive"
+
+
+def test_upgrade_refuses_with_pending_parser_sidecar(tmp_path):
+    """A pending parser.py sidecar must block the next upgrade, same as the
+    brain-file sidecars."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+    (vault / f"{_PARSER_REL}.proposed-merge").write_text("# pending\n")
+    with pytest.raises(RuntimeError, match="proposed-merge"):
+        upgrade(_config(vault, plugin_root=plugin))
+
+
 def test_upgrade_leaves_existing_version_at_last_setup_alone(tmp_path):
     """When version_at_last_setup is already present, upgrade must not
     clobber it — only version_at_last_update advances."""

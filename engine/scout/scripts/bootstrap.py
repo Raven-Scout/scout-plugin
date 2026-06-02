@@ -94,10 +94,19 @@ _CAT1_DIR_LAYOUT = (
 )
 
 _CAT1_FILES_FROM_PLUGIN = {
-    "knowledge-base/ontology/parser.py": "templates/knowledge-base/ontology/parser.py",
     "knowledge-base/ontology/__init__.py": "templates/knowledge-base/ontology/__init__.py",
     "action-items/render.py": "templates/action-items/render.py",
     "scripts/recurring-task-status.py": "templates/scripts/recurring-task-status.py",
+}
+
+# Cat-1 files that are BOTH engine-owned AND user-editable in the vault, so they
+# must be 3-way merged on upgrade instead of blindly overwritten. parser.py is
+# the canonical case (Pattern #68): the always-overwrite cat-1 path clobbered
+# vault-side edits to the ontology parser on every /scout-update. These files
+# go through the same snapshot + sidecar policy as the assembled SKILL/DREAMING/
+# RESEARCH brain files (see _stage_merge_files_upgrade).
+_CAT_MERGE_FILES = {
+    "knowledge-base/ontology/parser.py": "templates/knowledge-base/ontology/parser.py",
 }
 
 _CAT1_TEMPLATES = (
@@ -325,6 +334,75 @@ def _stage_cat4_upgrade(cfg: BootstrapConfig) -> list[str]:
     return conflicts
 
 
+def _merge_snapshot_path(cfg: BootstrapConfig, vault_rel: str) -> Path:
+    """Snapshot location for a 3-way-merged cat-1 file (mirrors the assembled
+    brain-file snapshots under .scout-state/last-assembled/)."""
+    return cfg.vault / ".scout-state" / "last-assembled" / vault_rel
+
+
+def _stage_merge_files_install(cfg: BootstrapConfig) -> None:
+    """Install: write each _CAT_MERGE_FILES live from the plugin AND record a
+    snapshot so future upgrades have a merge base."""
+    for vault_rel, plugin_rel in _CAT_MERGE_FILES.items():
+        src = cfg.plugin_root / plugin_rel
+        if not src.exists():
+            continue
+        content = src.read_text(encoding="utf-8")
+        live = cfg.vault / vault_rel
+        live.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write(live, content)
+        snap = _merge_snapshot_path(cfg, vault_rel)
+        snap.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write(snap, content)
+
+
+def _stage_merge_files_upgrade(cfg: BootstrapConfig) -> list[str]:
+    """Upgrade: 3-way merge each _CAT_MERGE_FILES, identical sidecar policy to
+    _stage_cat4_upgrade — ``ours`` = plugin content, ``theirs`` = vault-live,
+    ``base`` = recorded snapshot. Clean merge → live + snapshot advance;
+    conflict (or no recorded base vs a diverged plugin) → ``<file>.proposed-merge``
+    sidecar with live + snapshot left untouched. Protects Pattern #68 vault edits
+    while still letting engine improvements flow in."""
+    conflicts: list[str] = []
+    for vault_rel, plugin_rel in _CAT_MERGE_FILES.items():
+        src = cfg.plugin_root / plugin_rel
+        if not src.exists():
+            continue
+        ours = src.read_text(encoding="utf-8")
+        live = cfg.vault / vault_rel
+        theirs = live.read_text(encoding="utf-8") if live.exists() else ours
+        snap = _merge_snapshot_path(cfg, vault_rel)
+        base = snap.read_text(encoding="utf-8") if snap.exists() else theirs
+        sidecar = cfg.vault / f"{vault_rel}.proposed-merge"
+
+        if ours == theirs:
+            snap.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(snap, ours)
+            continue
+
+        if base == theirs:
+            # No recorded vault edits vs base but plugin diverged (or first
+            # upgrade after this file became merge-managed, so no snapshot
+            # existed and base defaulted to theirs) — surface as a review
+            # prompt rather than overwriting a possibly hand-edited file.
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(sidecar, ours)
+            conflicts.append(sidecar.name)
+            continue
+
+        result = three_way_merge(base=base, ours=ours, theirs=theirs)
+        if not result.conflicts:
+            live.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(live, result.content)
+            snap.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(snap, ours)
+        else:
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(sidecar, result.content)
+            conflicts.append(sidecar.name)
+    return conflicts
+
+
 def _stage_jobs_install(cfg: BootstrapConfig) -> None:
     """Stage 6: install schedule-tick + heartbeat (or cron block)."""
     if cfg.skip_jobs:
@@ -413,6 +491,11 @@ def _refuse_pending_sidecars(vault: Path) -> None:
         for n in ("SKILL", "DREAMING", "RESEARCH")
         if (vault / f"{n}.md.proposed-merge").exists()
     ]
+    pending += [
+        f"{vault_rel}.proposed-merge"
+        for vault_rel in _CAT_MERGE_FILES
+        if (vault / f"{vault_rel}.proposed-merge").exists()
+    ]
     if pending:
         raise RuntimeError(
             f"Unresolved proposed-merge sidecar(s): {pending}. "
@@ -439,6 +522,7 @@ def install(cfg: BootstrapConfig) -> InstallResult:
         _stage_seed_schedule(cfg)
         _stage_cat1b_runners(cfg, is_upgrade=False)
         _stage_cat4_install(cfg)
+        _stage_merge_files_install(cfg)
         _stage_jobs_install(cfg)
         _stage_version_stamp(cfg, is_upgrade=False)
     finally:
@@ -480,6 +564,7 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         _stage_seed_schedule(cfg)
         backups = _stage_cat1b_runners(cfg, is_upgrade=True)
         conflicts = _stage_cat4_upgrade(cfg)
+        conflicts += _stage_merge_files_upgrade(cfg)
         _stage_jobs_install(cfg)
         _stage_version_stamp(cfg, is_upgrade=True)
     finally:
