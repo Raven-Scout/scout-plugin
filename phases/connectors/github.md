@@ -154,6 +154,17 @@ requires: github
 
 ## GitHub Cross-Check
 
+### Per-Claim Evidence Anchors
+
+Every PR / merge / review / CI state claim — whether in a DM summary or an action-item row — must carry its **own** inline evidence anchor: the specific field value that proves it, not just a trailing "Source: GitHub" line. Anchor each claim to the datum:
+
+- "merged" → cite the `mergedAt` timestamp (e.g. _merged 2026-06-01T14:22Z_)
+- "approved" / "changes requested" → cite `reviewDecision` and the reviewer
+- "CI green/red" → cite the `statusCheckRollup` conclusion
+- "PR #N exists / open" → cite `#N` and `state`
+
+A trailing source line covering a multi-claim sentence is insufficient — if a sentence asserts three states, it needs three anchors. This makes each claim independently verifiable and prevents one stale field from contaminating a whole row (Pattern #69 family).
+
 Before promoting any candidate action item to To Do, verify against GitHub:
 
 **When an action item references a specific PR, check the PR's current state:**

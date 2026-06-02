@@ -39,11 +39,35 @@ entity_types:
   task:
     properties:
       required: [name, type, status]
-      optional: [deadline, priority, domain, completion_signal, created_date, completed_date]
+      optional: [deadline, priority, domain, completion_signal, created_date, completed_date, surface_rule]
+      # surface_rule (optional): controls when a long-window task is rendered into
+      # daily action items. Shape:
+      #   surface_rule:
+      #     default: do_not_surface        # or surface_daily (the implicit default if absent)
+      #     windows:                        # list of date ranges that re-surface the task
+      #       - {from: YYYY-MM-DD, to: YYYY-MM-DD, surface: "🟡", task: "label override"}
+      #     always_visible_if: [<condition strings>]   # force 🔴 regardless of windows
+      # Absent surface_rule == surface daily until status: completed (back-compat).
     relationships:
       - assigned_to
       - about
       - blocked_by
+  recurring_task:
+    # Standing commitment with an explicit cadence (e.g. "every Friday post the Linear
+    # project update"). Pattern #78 — confirmed cadences must be first-class entities so
+    # the briefing can derive "today is Friday, these N commitments need surfacing" without
+    # carrying the heuristic in prose. Surfaced by scripts/recurring-task-status.py.
+    # cadence DSL: weekly:<weekday>, monthly:<day-of-month>, monthly:nth:<n>:<weekday>,
+    #              quarterly:cycle-start, daily
+    # surface_window DSL: T-0 morning | T-1 day | T-7d | T-2d through T-0
+    # completion_evidence: linear_project_update | slack_post | gmail_confirmation | manual
+    properties:
+      required: [name, type, cadence, surface_window, active_from, status]
+      optional: [active_until, completion_evidence, completion_query, last_completed_date, priority, domain, sources]
+    relationships:
+      - feeds
+      - confirmed_on
+      - about
   organization:
     properties:
       required: [name, type]

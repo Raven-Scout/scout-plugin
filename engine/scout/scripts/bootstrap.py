@@ -81,6 +81,7 @@ _CAT1_DIR_LAYOUT = (
     "knowledge-base/ontology/entities",
     "knowledge-base/people",
     "knowledge-base/personal",
+    "knowledge-base/recurring-tasks",
     "action-items/archive",
     "action-items/meeting-prep",
     "meetings",
@@ -96,6 +97,7 @@ _CAT1_FILES_FROM_PLUGIN = {
     "knowledge-base/ontology/parser.py": "templates/knowledge-base/ontology/parser.py",
     "knowledge-base/ontology/__init__.py": "templates/knowledge-base/ontology/__init__.py",
     "action-items/render.py": "templates/action-items/render.py",
+    "scripts/recurring-task-status.py": "templates/scripts/recurring-task-status.py",
 }
 
 _CAT1_TEMPLATES = (

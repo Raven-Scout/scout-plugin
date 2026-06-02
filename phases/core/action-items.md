@@ -15,6 +15,16 @@ mkdir -p {{SCOUT_DIR}}/action-items/archive
 # Move files older than 7 days based on filename date
 ```
 
+## Step 0.5: Critical Blocks Check
+
+Before building the list, read `knowledge-base/scout-mistake-audit.md`. For every pattern with status **Open** that carries a {{USER_NAME}}-facing blocker — a setup task {{USER_NAME}} must do, an unanswered question {{INSTANCE_NAME}} asked him, or an approved-but-unapplied proposal:
+
+1. Check whether it's been resolved since last run (search messaging, verify files/state).
+2. If still unresolved and >24h old, surface it as a **🔴** item today: "**Still blocked:** [pattern] — [what {{USER_NAME}} needs to do]".
+3. If stuck 48h+, call it out explicitly in the run summary/notification so it isn't lost.
+
+This makes the mistake audit an active tracker, not a passive log — {{USER_NAME}} expects every run type (not just dreaming) to keep pushing critical blocks toward resolution. Track specifically: unresolved setup/integration tasks, open questions awaiting {{USER_NAME}}'s answer, and approved proposals not yet applied.
+
 ## Action Item Categories
 
 Categorize every action item using these levels:
@@ -30,8 +40,6 @@ Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
 
 ```markdown
 # Action Items — YYYY-MM-DD
-
-**Last consolidated:** YYYY-MM-DD HH:MM [timezone]
 
 ## 🔴 Urgent
 
@@ -64,6 +72,12 @@ Items carried forward from previous days that are still open.
 - [ ] [#XXXX] **[Item title]** — [Status update since last check]
   - Originally from: action-items-YYYY-MM-DD
   - Current status: [what's changed]
+
+## 🪵 Run notes & connector availability
+
+_Always the LAST section of the file — run metadata is a footer for review, never a hero block at the top. First-paint should be 🔴 Urgent, not run narrative. Append newest entry first; keep only the last 3 runs (older entries roll off)._
+
+- **YYYY-MM-DD HH:MM [timezone]** ([mode]) — X new / Y completed / Z carried forward. Connectors: [available, or "degraded: <name>"].
 ```
 
 All action items files must include `[[wikilinks]]` to any KB files referenced by action items.
@@ -106,6 +120,71 @@ grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[0-9A-HJKMNP-TV-Z]{4}\]
 
 If that grep finds anything, the file is non-compliant and scout-app's writes will silently fall back to fragile subject-matching for those lines.
 
+### Hard Rule — Trim by Demotion, Never by Omission
+
+When the list grows long, achieve focus by **reprioritizing**, never by hiding items from view. "Don't overwhelm me" and "don't drop my items" are both real constraints — resolve the tension by demotion *within* view, not omission *from* view.
+
+1. Keep a tight, time-bound **🔴 Urgent** set at the top.
+2. Demote lower-priority open items down the tiers (🔴→🟡→🟢) and reorder — {{USER_NAME}} can scan a long, ordered list and ignore the bottom; he cannot recover items that aren't rendered at all.
+3. Mark an item `[unverified]` or drop it **only** when {{USER_NAME}} has explicitly said so (reply, reaction, or an inline `//==<<` directive).
+
+**Every open carried item MUST be rendered as its own `- [ ]` checkbox row in exactly one section.** Summary lines like "…plus the standing backlog (#A, #B, … etc.) — carried unchanged" are **FORBIDDEN** as a substitute for rendering individual items. An `etc.` that hides open items reads as a drop from {{USER_NAME}}'s perspective even when the IDs technically persist inside the prose string.
+
+**Compose-time count-guard (run before commit):** count the rendered open rows (`- [ ]` lines plus 🟢 Watching bullets) in today's file. That count MUST be ≥ the prior day's open-item count minus any items closed this run (`- [x]`) or dropped on an explicit {{USER_NAME}} directive. If today's count is lower, items were collapsed/omitted — expand them back into individual rows before committing.
+
+```bash
+# Compose-time count-guard
+PREV=$(ls -t {{SCOUT_DIR}}/action-items/action-items-*.md | sed -n 2p)
+prev_open=$(grep -cE '^\s*- \[ \] ' "$PREV" 2>/dev/null || echo 0)
+today_open=$(grep -cE '^\s*- \[ \] ' "$DAILY_FILE")
+closed_today=$(grep -cE '^\s*- \[x\] ' "$DAILY_FILE")
+[ "$today_open" -lt $((prev_open - closed_today)) ] && \
+    echo "ERROR: open-row count dropped ($prev_open→$today_open, only $closed_today closed) — items were collapsed; expand them before commit" >&2
+```
+
+### Hard Rule — Continuity-Dropoff Audit (ID-level, pre-commit)
+
+The count-guard catches *how many* dropped; this catches *which*. Before committing, diff today's open `[#XXXX]` ids against the prior day's. For every id open in N-1 but absent in N:
+
+1. It has a ✅ Recently Completed entry in today's file → confirmed closure, OK.
+2. It has an explicit `//==<<` drop directive since N-1 → confirmed drop, OK.
+3. **Otherwise → silent dropoff.** Re-add it to today's file with a `[carried-via-audit]` annotation, surface `🚨 N items silently dropped from yesterday — please verify` in the notification, and write a `review-queue.md` entry. Never let an open item vanish without one of (1)/(2).
+
+### Hard Rule — Leave-State Compose Gate
+
+Before generating any 🔴/🟡 action item that names a specific person as the next-action owner, read that person's entity file (`knowledge-base/people/<slug>.md`). If it carries an active leave/out-of-office state (a `status:` containing `leave`/`oof`/`vacation`/`paternity`/`maternity`, a dated leave block overlapping today, or a 🚨/`### ACTIVE STATUS` body header) — do NOT assign them as the owner. Reframe to 🟢 Watching with `(on leave through <date>; auto-resume on return)`, unless the action item is itself about *responding to* that leave. This prevents assigning work to someone Scout already knows is away.
+
+Whenever you flip an item from `[ ]` to `[x]` — or process a {{USER_NAME}}-authored `[x]`, an inline `//==<<` close-out directive ("close this out", "I don't need this anymore", "move to completed"), or a close-it-out reply — you MUST, in the same write:
+
+1. Add an entry under `## ✅ Recently Completed` summarizing the closure with date + evidence (commit hash / transcript / message ts / the inline-comment quote) and any wikilinks the prior framing carried.
+2. **Delete the original row from its origin section** (🔴/🟡/🟢). Never leave a checked row sitting in an active section — that's a duplicate-surface graveyard.
+3. If the closure is too trivial to deserve a Recently-Completed entry, still delete the origin row. Never write the entry without the inverse delete.
+
+**Inline `//==<<` close-out directives are first-class delete instructions** — acknowledging one in the next DM is insufficient; the file must be physically updated (check box → write completed entry → delete origin row → remove the marker).
+
+**Pre-commit audit** — no `[x]` rows may sit outside the Recently Completed section:
+
+```bash
+grep -nE '^\s*- \[x\]' "$DAILY_FILE" | grep -viE 'recently completed|## ✅' \
+  && echo "WARN: checked rows above are outside ✅ Recently Completed — migrate or annotate '_(kept intentionally — REASON)_' before commit" >&2
+```
+
+(Sunset: retire this rule when a programmatic `action-items` done-lifecycle ships and handles section migration deterministically.)
+
+### Hard Rule — Transcript-Derived Names Must Pass an Ontology Match
+
+Auto-transcribed sources (Granola, Gemini/Drive auto-notes, Fathom recaps, meeting summaries) frequently mis-hear names. **Never** write a transcribed name into action items, KB, or a DM without first resolving it against the knowledge graph. For every name-shaped token from a transcribed source:
+
+```bash
+cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py name_lookup --token "<Token>"
+```
+
+- **Exact match** → use the matched entity with its `[[people/<slug>]]` wikilink.
+- **Fuzzy match** (within threshold ≈ Levenshtein-2 / phonetic-equivalent) → use that entity, append a `[name-fuzzy-resolved]` marker.
+- **No match** → write at most "Contact person matching '<verbatim-token>' (no KB match — please confirm)" and route a `[transcript-drift]` entry to `review-queue.md`. **NEVER elevate an unresolved transcribed name to a 🔴 headline** — 🟡 with the explicit "no KB match" framing is the ceiling.
+
+If {{USER_NAME}} corrects a name ("who is X?", "X doesn't exist", "this is hallucinated"), bind the misheard form to the correct entity as a "known transcription drift" note so it resolves next time.
+
 ## Knowledge Graph Personal Tasks
 
 If the ontology parser is set up, query it for personal tasks and deadlines:
@@ -113,6 +192,8 @@ If the ontology parser is set up, query it for personal tasks and deadlines:
 ```bash
 cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py query --type task
 ```
+
+**`surface_rule` windows are authoritative.** Before rendering any `type: task` entity into the daily file, read its `surface_rule:` block. If `default: do_not_surface` and **no** `windows` entry covers today's date AND **no** `always_visible_if` condition fires, the task is intentionally muted — do not render it, do not flag it stale, do not mention it in the wrap notification. If a window covers today, render at that window's `surface:` priority using its `task:` label override if present. If `always_visible_if` fires, force 🔴. A task with no `surface_rule` falls back to surfacing daily until `status: completed` (back-compat). This stops long-window tasks (multi-week trips, future-dated deadlines) from polluting the daily surface during their idle phases.
 
 For the morning briefing, focus on:
 
@@ -129,6 +210,31 @@ During consolidation, also check for completion signals:
 - If any personal task has a `completion_signal: gmail_confirmation`, check Gmail for matching confirmations. If found, update the entity file's `status` to `completed` and add `completed_date`.
 - If {{USER_NAME}} reported completion via Slack DM, update the entity file.
 - Carry open personal tasks forward in the action items file's Personal section.
+
+## Recurring-Task Cadences (briefing AND every consolidation)
+
+Recurring commitments are **cadence-driven, not event-driven** — a "quiet delta" consolidation must still surface them. This is the load-bearing fix for missed standing commitments (e.g. a weekly Friday status update). If the KB has any `recurring_task` entities, run the cadence computer at compose time:
+
+```bash
+cd {{SCOUT_DIR}} && python recurring-task-status.py --date "$(TZ={{TIMEZONE}} date '+%Y-%m-%d')"
+# (script lives at {{SCOUT_DIR}}/scripts/recurring-task-status.py)
+```
+
+**Live-completion lookup (do this before trusting the date math).** For each entity with a `completion_evidence` source (`linear_project_update`, `slack_post`, `gmail_confirmation`), resolve the *real* last-completion date from the live source — e.g. Linear `get_project` → `lastUpdateAt`, or a Slack/Gmail search — and feed it back so the verdict reflects live evidence (the override is not written to the entity file):
+
+```bash
+python recurring-task-status.py --date "<today>" \
+    --last-completed <entity-slug>=<YYYY-MM-DD>
+```
+
+For each entity the script returns:
+
+1. **`due` / `overdue`** → **mandatory** action item. 🔴 when `surface_window` is `T-0 morning` or the item is `overdue`; 🟡 when the window is wider than 24h. Link `[[recurring-tasks/<name>]]`. `domain: personal` ones go in the Personal section.
+2. **`done`** (completion evidence satisfied for this cadence window) → surface as ✅ Recently Completed, not a TODO.
+3. **`surfacing`** (inside the window, not yet the due day) → 🟡 heads-up.
+4. **`upcoming` / `unknown`** → no action item.
+
+**Do not write "quiet window" / "nothing material" framing until the `due`/`overdue` list is exhausted** — a `weekly:friday` cadence is by definition material on a Friday.
 
 ## Mandatory Cross-Check
 
@@ -182,4 +288,4 @@ Run every available cross-check (calendar, issue tracker, messaging, code host, 
 - If not started: include the full context from all sources, not just the one that surfaced it
 - Always include source citations showing which connectors confirmed the item
 
-Update the "Last consolidated" timestamp in the action items file after reconciliation is complete.
+After reconciliation is complete, refresh the `## 🪵 Run notes & connector availability` block at the **bottom** of the action items file — prepend this run's entry (timestamp, mode, counts, connector availability) as the newest line and trim the block to the last 3 runs. Do not write run metadata at the top of the file.

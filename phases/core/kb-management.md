@@ -53,6 +53,13 @@ The KB is the **persistent memory** of this system. Action items are ephemeral (
   - **Upcoming Meetings**: Next relevant meetings
   - **Issues**: Key issues with links, status, and who owns them
 - Quality bar: after reading a project file, {{USER_NAME}} should understand what's happening *right now*, who's doing what, what decisions were made and why, and what they need to do next. If the file doesn't answer those questions, it's too thin.
+- **`slack_channels:` frontmatter (required for 🔴 projects):** every high-priority project file declares the Slack channels that carry its work, so runs can poll them directly (see the Slack connector's 🔴 Project Channel Poll). Shape:
+  ```yaml
+  slack_channels:
+    - id: C07A15QDGBT
+      name: "#channel-name"
+  ```
+  When a project is promoted to 🔴 without this field, add it (find the channel ids from `channels.md` or a `slack_search_channels` call).
 
 ### When to Create New KB Files
 
@@ -134,6 +141,23 @@ When writing KB content, use these markers:
 - **[unverified]** = carried forward from a previous run, not yet confirmed against any live source
 - **[stale]** = known to be outdated but kept as historical context until replacement info is found
 - **[contradicted]** = two sources disagree; both claims noted with sources cited — always add to review queue
+- **[speculative]** = an inferred causal/contributory link that no single source actually states; allowed only with this marker (see Causal-Claim Gate)
+
+### Causal-Claim Gate
+
+Any statement asserting that one issue / PR / metric / event **caused, contributed to, blocked, or drove** another is a high-risk inference — it reads as fact but is usually the run's own synthesis. Before writing such a cross-entity causal claim (in the KB or a DM):
+
+1. **Cite a primary source** that actually states the link (a comment, message, or commit that says "X because Y") → write it plainly.
+2. If no source states it but the inference is useful → write it with a **`[speculative]`** marker and the basis ("timing overlap", "same author") so {{USER_NAME}} can weigh it.
+3. If you can do neither → **drop the causal framing** and report the two facts independently.
+
+Never fan a causal claim out to multiple KB surfaces (project file + people + DM) off a single unverified inference — re-verify before propagating, or one speculative link becomes "established fact" across the KB.
+
+### Fact-Check Pass + Citations for Consequential Claims
+
+**Consequential claims carry an inline primary-source citation.** Any claim that — if wrong — would cause {{USER_NAME}} to act on bad information (who owns/built something, a strategy/decision, a status that gates action, an attribution) must cite the specific source inline: "per [Linear PROJ-123 status]", "per [DM from X 2026-05-01]", "per [PR #45 mergedAt]". A bare assertion with no traceable source is treated as `[unverified]`.
+
+**Dreaming fact-check pass (deep-work mode).** During deep-work runs, take the KB content written or changed in the last few runs (use `git log`/`git diff` to find it) and re-verify the highest-stakes claims against a **freshly re-read primary source** — do not paraphrase what a prior run already wrote (prior runs can be wrong; the KB is claims-to-verify, not facts). Correct or mark `[unverified]`/`[contradicted]` anything that doesn't hold up, and route genuine conflicts to the review queue. This is the active counterpart to the passive verification markers — hallucinations compound across runs unless something re-checks them.
 
 ### Cross-Reference Integrity
 
@@ -158,9 +182,11 @@ The KB's value depends on its graph being connected. Rules:
 
 ---
 
-## Source Equality Principle
+## Source Priority Principle
 
-**No single source is authoritative.** Every connected service — meeting transcripts, messaging, calendar, issue tracker, email, code host, session history — is an equal signal. Every claim, whether it comes from a meeting transcript, a message thread, or the existing KB itself, must be corroborated or questioned.
+**Lead signals for {{USER_NAME}}'s own work: Linear → Claude Code sessions → GitHub.** These are {{USER_NAME}}'s primary work surfaces, so they are the **lead/primary** sources for the consolidation delta-scan and for ordering the run summary: scan them first and most deeply, and lead the DM with what they show. Messaging (Slack), email, calendar, and meeting transcripts are **corroborating** signals layered on top.
+
+**No source is taken as fact without corroboration.** Lead-source priority governs *what to scan first and what to headline* — it does NOT mean a Linear/CC/GitHub datum is true by itself. Every consequential claim, from any source including the existing KB, must still be verified against a primary source before it is stated as fact (see the Fact-Check Pass and Verification Levels). Priority orders attention; it does not bypass verification.
 
 **The existing KB is NOT trusted as fact.** It contains information written by previous runs that may be incorrect, incomplete, or outdated. Every run should treat KB content as "claims to verify" rather than "facts to preserve." When you encounter a claim (e.g., "Person X built the Y feature"), ask: can I confirm this from at least one live source? If not, flag it as unverified or correct it if you find contradicting evidence.
 

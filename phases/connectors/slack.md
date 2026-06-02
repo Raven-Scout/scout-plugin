@@ -65,6 +65,12 @@ Check DMs received by {{USER_NAME}} from frequent contacts. Inbound DMs often co
 - Updates on shared work
 - FYIs that may affect priorities
 
+### Replies on {{INSTANCE_NAME}}'s Own DM Threads (mandatory)
+
+{{USER_NAME}} often replies *inside the thread* of a {{INSTANCE_NAME}} notification DM rather than starting a new message — those replies are invisible to a flat DM/mention search and silently drop task-asks. For **every** message {{INSTANCE_NAME}} (the bot) sent into the `{{USER_SLACK_ID}}` DM within the lookback window, call `slack_read_thread` on that message's timestamp and read all replies. This mirrors the dreaming Step 1a feedback harvest, but here the goal is **action items**: any reply that asks {{INSTANCE_NAME}} to do something, corrects a fact, or assigns a task becomes a candidate action item (a direct task-ask is 🔴 for today).
+
+**Coverage assertion:** do not claim "0 inbound" / "quiet window" until you have confirmed every in-window bot DM had its thread read. State the count checked (e.g., "read threads on 4 bot DMs since last run") so the coverage is auditable.
+
 ### Key Channel Activity
 
 Check project channels listed in `channels.md` for recent activity, even if {{USER_NAME}} wasn't mentioned. Important channel activity includes:
@@ -72,6 +78,18 @@ Check project channels listed in `channels.md` for recent activity, even if {{US
 - New issues or blockers raised
 - Status updates from collaborators
 - Announcements that change priorities
+
+### 🔴 Project Channel Poll (mandatory)
+
+`slack_search` misses threads and non-mention activity — the recurring cause of "Scout went quiet on project X." For every 🔴-priority project file (`knowledge-base/projects/*/<name>.md` with `priority: "🔴"` or a 🔴 status), read its `slack_channels:` YAML frontmatter and **directly read each declared channel** since the last run via `slack_read_channel(channel_id=<id>, limit=20)` — do not rely on search alone. Surface: every {{USER_NAME}} @-mention, every message from a person in the project's `worked_on_by`/key-people set, and every decision/blocker. List the polled channels in the sources footer (`🔴 channels polled: #a, #b`). If a 🔴 project has no `slack_channels:` frontmatter yet, add it (see project-file conventions in kb-management).
+
+### Both Scans Required (gate)
+
+The outbound (`from:`) and inbound (`to:`/mention) scans are BOTH mandatory every run — a scan reported with only `from:{{USER_NAME}}` is incomplete and the run is not done until the inbound `to:`/mention scan has also executed. Never declare Slack "quiet" off a one-directional scan.
+
+### {{USER_NAME}}-Committed-Reply Tracking
+
+Any thread reply by {{USER_NAME}} that accepts ownership — "I'll take care of it", "Got it", "On it", "Sure" — with no later outbound message resolving it MUST be auto-carried as a 🔴 action item until either the resolving action is observed or {{USER_NAME}} explicitly drops it. This catches the failure where {{USER_NAME}} accepts a task in-thread but the underlying ask never makes it into the carry-forward set.
 
 ### What to Record
 
@@ -204,6 +222,16 @@ Scout morning briefing ready.
 - KB areas updated: [list]
 - Review queue: [count] items pending your review
 ```
+
+### Sources-Checked Footer
+
+End every consolidation/briefing notification with a one-line transparency footer stating what was actually scanned, so coverage is auditable and "quiet" claims are backed by evidence:
+
+```
+Sources checked: N CC sessions · N vault/git commits · N Slack threads · N Linear updates · N Drive files
+```
+
+Only count sources you genuinely queried this run. A "quiet window" claim must be paired with non-zero scan counts — otherwise it reads as "didn't look," not "nothing happened."
 
 ### Notification Rules
 
