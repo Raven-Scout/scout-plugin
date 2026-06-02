@@ -23,7 +23,7 @@ _TARGETS = [
     (
         "marketplace.json",
         ".claude-plugin/marketplace.json",
-        re.compile(r'("version":\s*")(?P<v>[^"]+)(")'),
+        re.compile(r'("plugins"[\s\S]*?"version":\s*")(?P<v>[^"]+)(")'),
     ),
     (
         "pyproject.toml",
@@ -60,7 +60,10 @@ def assert_in_sync(root: Path = PLUGIN_ROOT) -> str:
 def bump(current: str, level: str) -> str:
     if re.fullmatch(r"\d+\.\d+\.\d+", level):
         return level  # explicit version passthrough
-    major, minor, patch = (int(p) for p in current.split("."))
+    parts = current.split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        raise ValueError(f"current version {current!r} is not semver X.Y.Z")
+    major, minor, patch = (int(p) for p in parts)
     if level == "major":
         return f"{major + 1}.0.0"
     if level == "minor":
@@ -71,11 +74,12 @@ def bump(current: str, level: str) -> str:
 
 
 def set_version(root: Path = PLUGIN_ROOT, version: str | None = None) -> None:
-    assert version is not None
+    if version is None:
+        raise ValueError("set_version requires a version")
     for _label, rel, rx in _TARGETS:
         path = root / rel
         text = path.read_text(encoding="utf-8")
-        new_text, n = rx.subn(rf"\g<1>{version}\g<3>", text, count=1)
+        new_text, n = rx.subn(lambda m: m.group(1) + version + m.group(3), text, count=1)
         if n != 1:
             raise ValueError(f"failed to rewrite version in {rel}")
         path.write_text(new_text, encoding="utf-8")
@@ -110,8 +114,14 @@ def main(argv: list[str] | None = None) -> int:
         if len(argv) < 2:
             print(f"{cmd} requires an argument", file=sys.stderr)
             return 2
-        current = read_versions()["plugin.json"]
-        new = bump(current, argv[1]) if cmd == "bump" else argv[1]
+        if cmd == "set":
+            if not re.fullmatch(r"\d+\.\d+\.\d+", argv[1]):
+                print(f"set requires an X.Y.Z version, got {argv[1]!r}", file=sys.stderr)
+                return 2
+            new = argv[1]
+        else:
+            current = read_versions()["plugin.json"]
+            new = bump(current, argv[1])
         set_version(version=new)
         print(new)
         return 0

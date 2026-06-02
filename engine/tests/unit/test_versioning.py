@@ -18,7 +18,21 @@ def _fake_plugin(tmp_path: Path, version: str = "1.2.3") -> Path:
     )
     (tmp_path / ".claude-plugin" / "marketplace.json").write_text(
         json.dumps(
-            {"name": "scout-plugin", "plugins": [{"name": "scout", "version": version}]},
+            {
+                "name": "scout-plugin",
+                "owner": {"name": "Jordan Burger"},
+                "description": "Marketplace for the Scout plugin",
+                "plugins": [
+                    {
+                        "name": "scout",
+                        "source": "./",
+                        "description": "Autonomous knowledge management",
+                        "version": version,
+                        "homepage": "https://github.com/jordanrburger/scout-plugin",
+                        "keywords": ["knowledge-management", "briefing"],
+                    }
+                ],
+            },
             indent=2,
         )
         + "\n"
@@ -57,8 +71,37 @@ def test_bump_levels():
     assert versioning.bump("1.2.3", "9.9.9") == "9.9.9"  # explicit passthrough
 
 
+def test_bump_invalid_level_raises():
+    with pytest.raises(ValueError):
+        versioning.bump("1.2.3", "beta")
+
+
 def test_set_version_writes_all_four_and_preserves_format(tmp_path):
     root = _fake_plugin(tmp_path, "1.2.3")
     versioning.set_version(root, "1.3.0")
     assert set(versioning.read_versions(root).values()) == {"1.3.0"}
-    json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+    plugin_text = (root / ".claude-plugin" / "plugin.json").read_text()
+    json.loads(plugin_text)
+    # indentation preserved (2-space indent json.dumps), not reserialized
+    assert '  "version": "1.3.0"' in plugin_text
+
+
+def test_promote_changelog_happy_path(tmp_path):
+    path = tmp_path / "CHANGELOG.md"
+    path.write_text("# Changelog\n\n## [Unreleased]\n\n- Added a thing\n- Fixed a bug\n")
+    versioning.promote_changelog(tmp_path, version="1.3.0", date="2026-06-02")
+    text = path.read_text()
+    assert "## [Unreleased]" in text
+    assert "## [1.3.0] - 2026-06-02" in text
+    # the entries are preserved under the new dated section
+    assert "- Added a thing" in text
+    assert "- Fixed a bug" in text
+    # fresh Unreleased sits above the dated section
+    assert text.index("## [Unreleased]") < text.index("## [1.3.0] - 2026-06-02")
+
+
+def test_promote_changelog_missing_marker_raises(tmp_path):
+    path = tmp_path / "CHANGELOG.md"
+    path.write_text("# Changelog\n\nno unreleased section here\n")
+    with pytest.raises(ValueError):
+        versioning.promote_changelog(tmp_path, version="1.3.0", date="2026-06-02")
