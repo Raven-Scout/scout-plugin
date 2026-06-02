@@ -21,7 +21,7 @@ git fetch -q origin
 # --- bump + propagate + changelog ---
 "$PY" -m scout.scripts.versioning check >/dev/null   # refuse if already drifted
 NEW="$("$PY" -m scout.scripts.versioning bump "$LEVEL")"
-TODAY="$(TZ=UTC date '+%Y-%m-%d')"
+TODAY="$(TZ=America/New_York date '+%Y-%m-%d')"
 "$PY" - "$NEW" "$TODAY" <<'EOF'
 import sys
 from scout.scripts import versioning
