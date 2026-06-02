@@ -152,6 +152,7 @@ def _template_vars(cfg: BootstrapConfig) -> dict[str, str]:
         "MAX_BUDGET": cfg.connector_inputs.get("max_budget", "5.00"),
         "CLAUDE_BIN": cfg.connector_inputs.get("claude_bin", "/usr/local/bin/claude"),
         "TODAY_DATE": _dt.date.today().isoformat(),
+        "AUTO_UPDATE_ENABLED": cfg.connector_inputs.get("auto_update_enabled", "false"),
     }
 
 

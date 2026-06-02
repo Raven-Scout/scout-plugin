@@ -57,3 +57,10 @@ off_peak:
   # Off-peak hours (local time) — heartbeat prefers these for opportunistic sessions.
   start: 23
   end: 6
+
+# Whether Scout keeps itself up to date. Set during /scout-setup; toggle via
+# /scout-update. When enabled, a scheduled run applies sidecar-clean upgrades
+# and notifies you on conflict (auto-apply ships in a later version).
+auto_update:
+  enabled: {{AUTO_UPDATE_ENABLED}}
+  channel: stable
