@@ -42,14 +42,31 @@ def test_add_comment_by_id_inserts_subbullet(fake_data_dir: Path, monkeypatch: p
     event = add_comment(by_id="A3F7", comment="Hiring manager confirmed", data_dir=fake_data_dir)
 
     text = daily.read_text()
-    assert "- [ ] [#A3F7] 🔴 Submit Lever feedback\n  - Hiring manager confirmed" in text
+    # Default author is "scout"; the `<author>:` prefix is what binds the
+    # line to the task as a comment (scout-plugin#100).
+    assert "- [ ] [#A3F7] 🔴 Submit Lever feedback\n  - scout: Hiring manager confirmed" in text
     assert "Other unrelated task" in text  # untouched
     assert isinstance(event, Event)
     assert event.kind == "action_item.commented"
     assert event.source == "cli:add_comment"
     assert event.payload["item_id"] == "01HXAAA"
     assert event.payload["via"] == "id"
+    assert event.payload["author"] == "scout"
     assert event.payload["comment"] == "Hiring manager confirmed"
+
+
+def test_add_comment_custom_author_prefix(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A GUI-supplied author is written as the `- <author>: <text>` prefix."""
+    daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
+    daily.parent.mkdir(parents=True, exist_ok=True)
+    daily.write_text("## To Do\n\n- [ ] 🔴 Followup with vendor on contract\n")
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+
+    event = add_comment(
+        by_subject="vendor", comment="test", author="Vaclav Nosek", data_dir=fake_data_dir
+    )
+    assert "  - Vaclav Nosek: test" in daily.read_text()
+    assert event.payload["author"] == "Vaclav Nosek"
 
 
 def test_add_comment_by_subject_fallback(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,7 +76,7 @@ def test_add_comment_by_subject_fallback(fake_data_dir: Path, monkeypatch: pytes
     monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
 
     event = add_comment(by_subject="vendor", comment="Email sent 4/26", data_dir=fake_data_dir)
-    assert "- Email sent 4/26" in daily.read_text()
+    assert "  - scout: Email sent 4/26" in daily.read_text()
     assert event.payload["via"] == "subject"
     assert event.payload["comment"] == "Email sent 4/26"
 

@@ -107,6 +107,9 @@ def cli_add_comment(
     comment: str = typer.Option(..., "--comment", help="Comment text to append beneath the task."),
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
     by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    author: str = typer.Option(
+        "scout", "--author", help="Comment attribution (default: scout). GUI passes the signed-in user."
+    ),
     path: Path | None = typer.Argument(
         None,
         help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
@@ -130,7 +133,7 @@ def cli_add_comment(
         except ValueError as e:
             raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
 
-    add_comment(by_id=by_id, by_subject=subject, comment=comment, date=date, data_dir=data_dir)
+    add_comment(by_id=by_id, by_subject=subject, comment=comment, author=author, date=date, data_dir=data_dir)
 
 
 @app.command("delete-comment")

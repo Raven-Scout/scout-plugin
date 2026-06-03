@@ -59,3 +59,77 @@ def test_render_reads_with_explicit_utf8_encoding(tmp_path: Path, monkeypatch: p
     render(md)
 
     assert "utf-8" in captured, f"read_text was called without encoding=utf-8: {captured}"
+
+
+# ---------------------------------------------------------------------------
+# Comment binding (scout-plugin#100)
+#
+# The `add-comment` writer emits `  - <author>: <text>` dash bullets. The
+# parser must bind those to the preceding task as comments — not drop them
+# into section bullets / extra-notes — while leaving the `- Source:` /
+# `- Context:` metadata vocabulary as plain bullets.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_binds_dash_comment_to_task(tmp_path: Path) -> None:
+    from scout.action_items.render import parse
+
+    md = tmp_path / "scout.md"
+    md.write_text(
+        "# Title\n\n## 📌 Section\n\n"
+        "- [ ] 🔴 Submit Lever feedback\n"
+        "  - scout: pinged the hiring manager\n"
+        "  - Vaclav Nosek: looks good to me\n",
+        encoding="utf-8",
+    )
+
+    _title, _preamble, sections = parse(md)
+    task = sections[0].tasks[0]
+    assert [(c.author, c.text) for c in task.comments] == [
+        ("scout", "pinged the hiring manager"),
+        ("Vaclav Nosek", "looks good to me"),  # multi-word author binds
+    ]
+    # Comments are not leaked into section-level bullets.
+    assert not any("hiring manager" in b.text for b in sections[0].bullets)
+
+
+def test_parse_keeps_metadata_subbullets_out_of_comments(tmp_path: Path) -> None:
+    from scout.action_items.render import parse
+
+    md = tmp_path / "scout.md"
+    md.write_text(
+        "# Title\n\n## 📌 Section\n\n"
+        "- [ ] 🔴 Ship the thing\n"
+        "  - Source: Linear (AI-3325)\n"
+        "  - Context: [[kai-backend]]\n"
+        "  - scout: actually started it\n",
+        encoding="utf-8",
+    )
+
+    _title, _preamble, sections = parse(md)
+    task = sections[0].tasks[0]
+    # Only the real comment binds; Source/Context stay metadata, not comments.
+    assert [(c.author, c.text) for c in task.comments] == [("scout", "actually started it")]
+
+
+def test_add_comment_render_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-to-end: a comment written by add_comment renders under its task."""
+    import datetime as dt
+
+    from scout.action_items.add_comment import add_comment
+    from scout.action_items.render import parse
+
+    data_dir = tmp_path
+    daily = data_dir / "action-items" / "action-items-2026-04-26.md"
+    daily.parent.mkdir(parents=True, exist_ok=True)
+    daily.write_text("# Action Items\n\n## To Do\n\n- [ ] 🔴 Followup with vendor\n")
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+
+    add_comment(by_subject="vendor", comment="left a voicemail", data_dir=data_dir)
+
+    _title, _preamble, sections = parse(daily)
+    task = sections[0].tasks[0]
+    assert [(c.author, c.text) for c in task.comments] == [("scout", "left a voicemail")]
+    # And it surfaces in the rendered HTML, not buried in extra-notes.
+    html_out = render(daily)
+    assert "left a voicemail" in html_out
