@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-run budget check — decides whether a session should proceed
+# Pre-run budget check — decides whether a session should proceed.
 #
 # Exit codes:
 #   0 = proceed (budget available)
@@ -7,128 +7,26 @@
 #   2 = backoff (recent failure, possible rate limit)
 #
 # Usage: budget-check.sh [--verbose]
-# Called by runner scripts before launching claude
+# Called by runner scripts before launching claude.
+#
+# This is a thin wrapper around `scoutctl budget check` — the logic lives in
+# scout.scripts.budget_check so the runner pays one Python cold start instead
+# of the 5+ that the previous bash version paid via `python3 -c '...'` calls
+# (see issue #74).
 
 set -euo pipefail
 
-TRACKER_FILE="{{SCOUT_DIR}}/.scout-logs/usage-tracker.jsonl"
-CONFIG_FILE="{{SCOUT_DIR}}/.scout-config.yaml"
-VERBOSE="${1:-}"
-
-# Defaults (overridden by config if present)
-WINDOW_HOURS=5
-DAILY_BUDGET_USD=50
-SKIP_THRESHOLD_PCT=80
-FAILURE_BACKOFF_MIN=60
-SESSION_COST_ESTIMATE=8  # conservative estimate per session
-
-log() {
-    if [ "$VERBOSE" = "--verbose" ]; then
-        echo "[budget-check] $1"
-    fi
-}
-
-# If no tracker exists yet, always proceed (first run)
-if [ ! -f "$TRACKER_FILE" ]; then
-    log "No tracker file — first run, proceeding"
-    exit 0
-fi
-
-# Parse config if it exists
-if [ -f "$CONFIG_FILE" ]; then
-    DAILY_BUDGET_USD=$(grep 'daily_budget_estimate_usd:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$DAILY_BUDGET_USD")
-    WINDOW_HOURS=$(grep 'rate_limit_window_hours:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$WINDOW_HOURS")
-    SKIP_THRESHOLD_PCT=$(grep 'skip_threshold_pct:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$SKIP_THRESHOLD_PCT")
-    FAILURE_BACKOFF_MIN=$(grep 'failure_backoff_minutes:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' || echo "$FAILURE_BACKOFF_MIN")
-fi
-
-# Calculate window budget (portion of daily budget for the rolling window)
-WINDOW_BUDGET=$(python3 -c "print(round($DAILY_BUDGET_USD * $WINDOW_HOURS / 24, 2))")
-SKIP_THRESHOLD=$(python3 -c "print(round($WINDOW_BUDGET * $SKIP_THRESHOLD_PCT / 100, 2))")
-
-log "Window: ${WINDOW_HOURS}h, Daily budget: \$${DAILY_BUDGET_USD}, Window budget: \$${WINDOW_BUDGET}, Skip at: \$${SKIP_THRESHOLD}"
-
-# Sum costs in the current window
-WINDOW_START=$(date -v-${WINDOW_HOURS}H -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -d "${WINDOW_HOURS} hours ago" -u '+%Y-%m-%dT%H:%M:%SZ')
-
-WINDOW_COST=$(python3 -c "
-import json, sys
-from datetime import datetime
-
-window_start = datetime.fromisoformat('$WINDOW_START'.replace('Z', '+00:00'))
-total = 0.0
-last_exit_code = 0
-last_ts = None
-
-for line in open('$TRACKER_FILE'):
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        entry = json.loads(line)
-        ts = datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
-        if ts >= window_start:
-            total += float(entry.get('budget_spent', 0))
-            last_exit_code = int(entry.get('exit_code', 0))
-            last_ts = ts
-    except (json.JSONDecodeError, KeyError, ValueError):
-        continue
-
-print(f'{total:.2f}|{last_exit_code}|{last_ts.isoformat() if last_ts else \"none\"}')
-")
-
-COST=$(echo "$WINDOW_COST" | cut -d'|' -f1)
-LAST_EXIT=$(echo "$WINDOW_COST" | cut -d'|' -f2)
-LAST_TS=$(echo "$WINDOW_COST" | cut -d'|' -f3)
-
-log "Window cost: \$${COST}, Last exit: ${LAST_EXIT}, Last run: ${LAST_TS}"
-
-# Check for recent rate_limit events in tracker
-LAST_RATE_LIMIT=$(python3 -c "
-import json
-from datetime import datetime, timezone, timedelta
-cutoff = datetime.now(timezone.utc) - timedelta(minutes=int('$FAILURE_BACKOFF_MIN') * 2)
-found = False
-for line in open('$TRACKER_FILE'):
-    line = line.strip()
-    if not line: continue
-    try:
-        e = json.loads(line)
-        if e.get('type') == 'rate_limit':
-            ts = datetime.fromisoformat(e['ts'].replace('Z', '+00:00'))
-            if ts >= cutoff:
-                found = True
-    except: continue
-print('yes' if found else 'no')
-" 2>/dev/null || echo "no")
-
-if [ "$LAST_RATE_LIMIT" = "yes" ]; then
-    log "Rate limit event detected within ${FAILURE_BACKOFF_MIN}m * 2 — extended backoff"
-    exit 2
-fi
-
-# Check for recent failure (possible rate limit)
-if [ "$LAST_EXIT" != "0" ] && [ "$LAST_TS" != "none" ]; then
-    MINUTES_SINCE=$(python3 -c "
-from datetime import datetime, timezone
-last = datetime.fromisoformat('$LAST_TS')
-if last.tzinfo is None:
-    last = last.replace(tzinfo=timezone.utc)
-now = datetime.now(timezone.utc)
-print(int((now - last).total_seconds() / 60))
-")
-    if [ "$MINUTES_SINCE" -lt "$FAILURE_BACKOFF_MIN" ]; then
-        log "Recent failure ${MINUTES_SINCE}m ago (backoff: ${FAILURE_BACKOFF_MIN}m) — backing off"
-        exit 2
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "budget-check.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 1
     fi
 fi
 
-# Check if window cost exceeds threshold
-SHOULD_SKIP=$(python3 -c "print('yes' if float('$COST') >= float('$SKIP_THRESHOLD') else 'no')")
-if [ "$SHOULD_SKIP" = "yes" ]; then
-    log "Window cost \$${COST} >= skip threshold \$${SKIP_THRESHOLD} — skipping"
-    exit 1
-fi
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
 
-log "Budget OK — \$${COST} spent in window (threshold: \$${SKIP_THRESHOLD})"
-exit 0
+exec "$SCOUTCTL_BIN" budget check ${1:+"$1"}
