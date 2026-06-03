@@ -428,18 +428,11 @@ def _write_shim(home: Path, target: Path) -> Path:
     return shim
 
 
-def test_shim_check_warns_when_missing_and_unreachable(tmp_path, monkeypatch):
+def test_shim_check_quiet_when_no_shim(tmp_path):
+    """A missing shim is not flagged — install/upgrade always (re)writes it,
+    and the check must stay independent of the ambient PATH."""
     from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
 
-    monkeypatch.setattr("scout.scripts.bootstrap_doctor.shutil.which", lambda _name: None)
-    _errors, warnings = _check_scoutctl_shim(home=tmp_path)
-    assert any("won't resolve" in w for w in warnings)
-
-
-def test_shim_check_quiet_when_scoutctl_otherwise_on_path(tmp_path, monkeypatch):
-    from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
-
-    monkeypatch.setattr("scout.scripts.bootstrap_doctor.shutil.which", lambda _name: "/usr/bin/scoutctl")
     _errors, warnings = _check_scoutctl_shim(home=tmp_path)
     assert warnings == []
 

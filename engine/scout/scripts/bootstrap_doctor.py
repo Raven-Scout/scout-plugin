@@ -10,7 +10,6 @@ import os
 import platform
 import plistlib
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -158,39 +157,34 @@ def _check_scheduler_bin_path(*, home: Path) -> tuple[list[str], list[str]]:
 
 
 def _check_scoutctl_shim(*, home: Path) -> tuple[list[str], list[str]]:
-    """Warn (never error) if bare `scoutctl` won't resolve for the session.
+    """Warn (never error) if the managed scoutctl shim is dangling.
 
-    The SKILL.md-driven session inherits the user's *login* PATH — not the
-    plist's `EnvironmentVariables:PATH` — so it relies on the ~/.local/bin
-    shim. If neither the shim nor any other scoutctl is reachable, the
-    session silently hand-mints action-item prefixes instead of calling the
-    CLI. This check turns that silent gap into a visible doctor warning (#99).
+    The SKILL.md-driven session relies on the ~/.local/bin shim to resolve
+    bare `scoutctl` (#99). The realistic post-install failure is a shim left
+    pointing at a plugin venv that a later update removed. We flag only that
+    dangling case — deterministically, from the shim's own contents — rather
+    than guessing reachability from the ambient PATH (which differs between
+    the doctor process and the session, and would make the result
+    environment-dependent). A missing shim isn't flagged: install and upgrade
+    always (re)write it, so absence resolves itself on the next run.
     """
     from scout.scripts.install_scoutctl_shim import SHIM_MARKER
 
     warnings: list[str] = []
     shim = home / ".local" / "bin" / "scoutctl"
-    if shim.exists():
-        # Our managed shim — confirm it still points at a live scoutctl.
-        try:
-            body = shim.read_text(encoding="utf-8")
-        except OSError:
-            return [], []
-        if SHIM_MARKER in body:
-            m = re.search(r'exec "([^"]+)"', body)
-            if m and not Path(m.group(1)).exists():
-                warnings.append(
-                    f"scoutctl shim at {shim} points at a missing target ({m.group(1)}) — "
-                    f"re-run `scoutctl bootstrap upgrade`."
-                )
-        return [], warnings
-    # No shim — only a problem if scoutctl is otherwise unreachable.
-    if shutil.which("scoutctl") is None:
-        warnings.append(
-            f"scoutctl not on PATH and no shim at {shim} — SKILL.md's bare `scoutctl` calls "
-            f"won't resolve in scheduled sessions (silent fallback to manual prefixes); "
-            f"re-run `scoutctl bootstrap upgrade` to (re)install the shim."
-        )
+    if not shim.is_file():
+        return [], []
+    try:
+        body = shim.read_text(encoding="utf-8")
+    except OSError:
+        return [], []
+    if SHIM_MARKER in body:
+        m = re.search(r'exec "([^"]+)"', body)
+        if m and not Path(m.group(1)).exists():
+            warnings.append(
+                f"scoutctl shim at {shim} points at a missing target ({m.group(1)}) — "
+                f"re-run `scoutctl bootstrap upgrade`."
+            )
     return [], warnings
 
 
