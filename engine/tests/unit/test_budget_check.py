@@ -25,7 +25,6 @@ from scout.scripts.budget_check import (
     run,
 )
 
-
 # ----- config parsing ------------------------------------------------------
 
 
@@ -56,9 +55,7 @@ def test_load_config_overrides_each_known_key(tmp_path: Path) -> None:
 def test_load_config_silently_skips_bad_values(tmp_path: Path) -> None:
     """Bash uses `grep | awk` and silently falls back on parse failures."""
     path = tmp_path / "config.yaml"
-    path.write_text(
-        "daily_budget_estimate_usd: not-a-number\nrate_limit_window_hours: 8\n"
-    )
+    path.write_text("daily_budget_estimate_usd: not-a-number\nrate_limit_window_hours: 8\n")
     cfg = load_config(path)
     assert cfg.daily_budget_usd == DEFAULT_DAILY_BUDGET_USD
     assert cfg.window_hours == 8
@@ -102,8 +99,7 @@ def test_decide_skips_when_window_cost_meets_threshold(tmp_path: Path) -> None:
     cfg = BudgetConfig(daily_budget_usd=50, window_hours=5, skip_threshold_pct=80)
     # threshold ~$8.33 — push two rows summing to $9.
     tracker.write_text(
-        _row(_now() - timedelta(hours=2), budget_spent=4.5)
-        + _row(_now() - timedelta(hours=1), budget_spent=4.5)
+        _row(_now() - timedelta(hours=2), budget_spent=4.5) + _row(_now() - timedelta(hours=1), budget_spent=4.5)
     )
 
     decision = decide(tracker, cfg, now=_now())
@@ -143,9 +139,7 @@ def test_decide_does_not_backoff_on_old_rate_limit(tmp_path: Path) -> None:
 def test_decide_backoffs_on_recent_failure(tmp_path: Path) -> None:
     tracker = tmp_path / "tracker.jsonl"
     cfg = BudgetConfig(failure_backoff_min=60)
-    tracker.write_text(
-        _row(_now() - timedelta(minutes=30), exit_code=1, budget_spent=0.0)
-    )
+    tracker.write_text(_row(_now() - timedelta(minutes=30), exit_code=1, budget_spent=0.0))
 
     decision = decide(tracker, cfg, now=_now())
     assert decision.exit_code == EXIT_BACKOFF
@@ -155,9 +149,7 @@ def test_decide_backoffs_on_recent_failure(tmp_path: Path) -> None:
 def test_decide_does_not_backoff_on_old_failure(tmp_path: Path) -> None:
     tracker = tmp_path / "tracker.jsonl"
     cfg = BudgetConfig(failure_backoff_min=60)
-    tracker.write_text(
-        _row(_now() - timedelta(minutes=120), exit_code=1, budget_spent=0.0)
-    )
+    tracker.write_text(_row(_now() - timedelta(minutes=120), exit_code=1, budget_spent=0.0))
 
     assert decide(tracker, cfg, now=_now()).exit_code == EXIT_PROCEED
 
@@ -185,7 +177,9 @@ def test_run_returns_proceed_for_empty_vault(tmp_path: Path, monkeypatch: pytest
     assert run() == EXIT_PROCEED
 
 
-def test_run_verbose_does_not_raise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+def test_run_verbose_does_not_raise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
     monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
     (tmp_path / ".scout-logs").mkdir()
     rc = run(verbose=True)
