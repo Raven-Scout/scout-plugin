@@ -373,9 +373,7 @@ def test_get_last_fire_index_invalidates_cache_on_tracker_change(tmp_path):
 
     # Append a new row → tracker mtime bumps → cache should be invalidated.
     with tracker.open("a", encoding="utf-8") as f:
-        f.write(
-            '{"ts":"2026-05-12T08:00:00Z","type":"briefing","scout_mode":"morning-briefing"}\n'
-        )
+        f.write('{"ts":"2026-05-12T08:00:00Z","type":"briefing","scout_mode":"morning-briefing"}\n')
 
     session_tokens = tracker.parent / "session-tokens.jsonl"
     assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
@@ -393,9 +391,7 @@ def test_get_last_fire_index_invalidates_cache_on_session_tokens_change(tmp_path
     # Touching session-tokens.jsonl must also invalidate the cache, since
     # _read_last_fire_index reads both files.
     session_tokens = tracker.parent / "session-tokens.jsonl"
-    session_tokens.write_text(
-        '{"ts":"2026-05-13T09:00:00Z","scout_mode":"morning-briefing"}\n'
-    )
+    session_tokens.write_text('{"ts":"2026-05-13T09:00:00Z","scout_mode":"morning-briefing"}\n')
 
     assert _load_last_fire_cache(state_dir, tracker, session_tokens) is None
     fresh = _get_last_fire_index(state_dir, tracker)
@@ -453,9 +449,7 @@ def test_write_last_fire_cache_round_trip(tmp_path):
     assert round_tripped is not None
     # Timestamps are normalised to UTC on write — compare as moments.
     assert round_tripped["morning-briefing"] == original["morning-briefing"]
-    assert (
-        round_tripped["afternoon-consolidation"] == original["afternoon-consolidation"]
-    )
+    assert round_tripped["afternoon-consolidation"] == original["afternoon-consolidation"]
 
 
 # 6. End-to-end: run() emits Event and writes JSONL row.

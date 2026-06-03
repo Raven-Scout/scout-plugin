@@ -284,9 +284,7 @@ def _write_last_fire_cache(
         "schema_version": _LAST_FIRE_CACHE_SCHEMA_VERSION,
         "tracker_mtime_ns": _file_mtime_ns(tracker_path),
         "session_tokens_mtime_ns": _file_mtime_ns(session_tokens_path),
-        "last_fire": {
-            key: ts.astimezone(_dt.UTC).isoformat().replace("+00:00", "Z") for key, ts in index.items()
-        },
+        "last_fire": {key: ts.astimezone(_dt.UTC).isoformat().replace("+00:00", "Z") for key, ts in index.items()},
     }
     try:
         with tmp_path.open("w", encoding="utf-8") as f:
