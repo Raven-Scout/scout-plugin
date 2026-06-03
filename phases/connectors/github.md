@@ -63,11 +63,12 @@ Check for GitHub activity directed at {{USER_NAME}} — review requests, assignm
 gh search prs --review-requested @me --state open --json number,title,url,repository,author
 ```
 
-Each open review request is a potential action item. Note:
-- Who requested the review
-- Which repo/project it's for
-- How long it's been waiting (prioritize older requests)
-- PR size if available (helps {{USER_NAME}} estimate effort)
+⚠️ **`--review-requested @me` expands team membership**, so this list mixes genuine review asks with {{USER_NAME}}'s *own delegated work* (a Linear issue delegated to an agent like Devin → the agent opens the PR and requests {{USER_NAME}}'s *team*). Classify each PR before treating it as a review item — see the three-bucket rule under **PRs Requesting {{USER_NAME}}'s Review** in the briefing query slot:
+1. **Own delegated work** (`devin/` branch or bot author implementing {{USER_NAME}}'s own issue, or linked issue assigned to {{USER_NAME}}) → track-to-merge, **not** review.
+2. **Requested by name** (`{{GITHUB_USERNAME}}` is a `User` in `reviewRequests`) → real review action item.
+3. **Requested via team only** → shared queue, any teammate can satisfy.
+
+Pull `gh pr view N --repo R --json author,headRefName,reviewRequests,isDraft` to classify. For buckets 2–3, note who requested it, which repo, how long it's waited (prioritize older), and PR size if available.
 
 ### New Issues Assigned
 
@@ -126,7 +127,23 @@ For each open PR, note:
 gh search prs --review-requested @me --state open --json number,title,url,repository,author,createdAt
 ```
 
-These are direct action items — {{USER_NAME}} needs to review these PRs.
+⚠️ **Do not blindly bucket these as "review these PRs."** `--review-requested @me` **expands team membership**, so this list mixes genuine review asks with {{USER_NAME}}'s *own delegated work* — e.g. a Linear issue {{USER_NAME}} delegated to an agent (Devin), where the agent opened the PR and requested {{USER_NAME}}'s *team*. That PR is "{{USER_NAME}}'s work to land/track to merge," **not** their queue to review. Presenting it as a review obligation creates a self-review loop.
+
+Classify each returned PR into one of three buckets before writing any action item. The `author` field is already fetched; pull the branch + reviewer breakdown per PR:
+
+```bash
+# For each PR number N in repo R from the list above:
+gh pr view N --repo R --json author,headRefName,reviewRequests,isDraft
+```
+
+1. **Your own delegated work → "track to merge," NOT review.** Any of:
+   - the PR's branch is an agent-delegation branch (`headRefName` starts with `devin/`, or author is a bot like `app/devin-ai-integration`), **and** it implements an issue assigned to {{USER_NAME}}; or
+   - the linked issue is assigned to {{USER_NAME}} (the PR is the implementation of {{USER_NAME}}'s own in-progress issue).
+   Surface these under in-progress/track-to-merge framing, never "review requested to you."
+2. **Requested by name (direct) → real review action item.** {{USER_NAME}}'s GitHub login (`{{GITHUB_USERNAME}}`) appears as a **User** entry in `reviewRequests`. This is a personal review ask.
+3. **Requested via team only → shared queue (softer).** {{USER_NAME}} is *not* a named `reviewRequests` user but one of their **Team** entries is. Any teammate can satisfy it — present it as a team review queue item, distinct from a direct personal request, and don't escalate it as if only {{USER_NAME}} can clear it.
+
+Only buckets 2 and 3 are review action items; bucket 1 belongs with {{USER_NAME}}'s own open work. When in doubt between a direct vs team request, check whether `{{GITHUB_USERNAME}}` is a named `reviewRequests` user.
 
 ### Recent Comments on Open PRs
 
