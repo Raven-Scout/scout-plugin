@@ -411,3 +411,53 @@ def test_cron_no_scout_managed_block_yields_no_errors_on_linux(tmp_path, monkeyp
     report = run_doctor(vault=tmp_path, check_jobs=True, home=tmp_path)
     assert not any("scoutctl" in e for e in report.errors)
     assert not any("scoutctl" in w for w in report.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Interactive scoutctl shim reachability (#99)
+# ---------------------------------------------------------------------------
+
+
+def _write_shim(home: Path, target: Path) -> Path:
+    from scout.scripts.install_scoutctl_shim import SHIM_MARKER
+
+    d = home / ".local" / "bin"
+    d.mkdir(parents=True, exist_ok=True)
+    shim = d / "scoutctl"
+    shim.write_text(f'#!/bin/sh\n{SHIM_MARKER}\nexec "{target}" "$@"\n', encoding="utf-8")
+    return shim
+
+
+def test_shim_check_warns_when_missing_and_unreachable(tmp_path, monkeypatch):
+    from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.shutil.which", lambda _name: None)
+    _errors, warnings = _check_scoutctl_shim(home=tmp_path)
+    assert any("won't resolve" in w for w in warnings)
+
+
+def test_shim_check_quiet_when_scoutctl_otherwise_on_path(tmp_path, monkeypatch):
+    from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
+
+    monkeypatch.setattr("scout.scripts.bootstrap_doctor.shutil.which", lambda _name: "/usr/bin/scoutctl")
+    _errors, warnings = _check_scoutctl_shim(home=tmp_path)
+    assert warnings == []
+
+
+def test_shim_check_quiet_when_shim_points_at_live_target(tmp_path):
+    from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
+
+    target = tmp_path / "venv" / "scoutctl"
+    target.parent.mkdir(parents=True)
+    target.write_text("#!/bin/sh\n")
+    _write_shim(tmp_path, target)
+    _errors, warnings = _check_scoutctl_shim(home=tmp_path)
+    assert warnings == []
+
+
+def test_shim_check_warns_when_shim_target_missing(tmp_path):
+    from scout.scripts.bootstrap_doctor import _check_scoutctl_shim
+
+    _write_shim(tmp_path, tmp_path / "gone" / "scoutctl")
+    _errors, warnings = _check_scoutctl_shim(home=tmp_path)
+    assert any("missing target" in w for w in warnings)

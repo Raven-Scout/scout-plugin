@@ -150,10 +150,15 @@ if [ ${#NO_DATE_FILES[@]} -gt 0 ]; then
 fi
 
 echo "## FRESH — Skip unless feedback signals" >> "$OUTPUT"
-for entry in "${FRESH_FILES[@]}"; do
-  IFS='|' read -r path age lastdate <<< "$entry"
-  echo "- $path (${age} old)" >> "$OUTPUT"
-done
+# Guard the expansion: under `set -u`, macOS system bash (3.2) throws
+# "FRESH_FILES[@]: unbound variable" when the array is empty. The STALE/
+# NO_DATE loops above are already guarded — this one was the lone gap.
+if [ ${#FRESH_FILES[@]} -gt 0 ]; then
+  for entry in "${FRESH_FILES[@]}"; do
+    IFS='|' read -r path age lastdate <<< "$entry"
+    echo "- $path (${age} old)" >> "$OUTPUT"
+  done
+fi
 
 echo "" >> "$OUTPUT"
 echo "---" >> "$OUTPUT"

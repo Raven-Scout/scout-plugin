@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import platform
 import plistlib
+import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -155,6 +157,43 @@ def _check_scheduler_bin_path(*, home: Path) -> tuple[list[str], list[str]]:
     return [], []
 
 
+def _check_scoutctl_shim(*, home: Path) -> tuple[list[str], list[str]]:
+    """Warn (never error) if bare `scoutctl` won't resolve for the session.
+
+    The SKILL.md-driven session inherits the user's *login* PATH — not the
+    plist's `EnvironmentVariables:PATH` — so it relies on the ~/.local/bin
+    shim. If neither the shim nor any other scoutctl is reachable, the
+    session silently hand-mints action-item prefixes instead of calling the
+    CLI. This check turns that silent gap into a visible doctor warning (#99).
+    """
+    from scout.scripts.install_scoutctl_shim import SHIM_MARKER
+
+    warnings: list[str] = []
+    shim = home / ".local" / "bin" / "scoutctl"
+    if shim.exists():
+        # Our managed shim — confirm it still points at a live scoutctl.
+        try:
+            body = shim.read_text(encoding="utf-8")
+        except OSError:
+            return [], []
+        if SHIM_MARKER in body:
+            m = re.search(r'exec "([^"]+)"', body)
+            if m and not Path(m.group(1)).exists():
+                warnings.append(
+                    f"scoutctl shim at {shim} points at a missing target ({m.group(1)}) — "
+                    f"re-run `scoutctl bootstrap upgrade`."
+                )
+        return [], warnings
+    # No shim — only a problem if scoutctl is otherwise unreachable.
+    if shutil.which("scoutctl") is None:
+        warnings.append(
+            f"scoutctl not on PATH and no shim at {shim} — SKILL.md's bare `scoutctl` calls "
+            f"won't resolve in scheduled sessions (silent fallback to manual prefixes); "
+            f"re-run `scoutctl bootstrap upgrade` to (re)install the shim."
+        )
+    return [], warnings
+
+
 def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None) -> DoctorReport:
     """Run all doctor checks against ``vault``. Pure read."""
     errors: list[str] = []
@@ -245,6 +284,9 @@ def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None
         bin_errors, bin_warnings = _check_scheduler_bin_path(home=home)
         errors.extend(bin_errors)
         warnings.extend(bin_warnings)
+        # Interactive/session scoutctl reachability (separate from the plist).
+        _, shim_warnings = _check_scoutctl_shim(home=home)
+        warnings.extend(shim_warnings)
 
     if errors:
         return DoctorReport(severity=Severity.RED, errors=errors, warnings=warnings)
