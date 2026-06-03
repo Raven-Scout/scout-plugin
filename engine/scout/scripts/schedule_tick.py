@@ -70,6 +70,13 @@ TRACKER_FILENAME = "usage-tracker.jsonl"
 SESSION_TOKENS_FILENAME = "session-tokens.jsonl"
 EVENT_LOG_PREFIX = "schedule-events-"
 
+# Cache of the {slot_key: latest_ts} index, keyed by source-file mtimes.
+# Avoids re-reading both JSONL trackers end-to-end on every 5-min tick once
+# they've grown to thousands of rows. Invalidated by any mtime change on either
+# source file; full JSONL scan rebuilds and rewrites the cache on miss.
+LAST_FIRE_CACHE_FILENAME = "last-fire.json"
+_LAST_FIRE_CACHE_SCHEMA_VERSION = 1
+
 # Mode-name rename map applied when reading legacy session-tokens.jsonl rows.
 # Ships in Plan 5 to bridge pre-rename JSONL data through to post-rename slot
 # keys. Once Task 7's tools/migrate-mode-names.py runs against the live vault,
@@ -204,6 +211,106 @@ def _read_last_fire_index(tracker_path: Path) -> dict[str, _dt.datetime]:
         except OSError:
             continue
     return out
+
+
+def _file_mtime_ns(path: Path) -> int | None:
+    """Return ``stat().st_mtime_ns`` for ``path``, or ``None`` if missing.
+
+    Used as the cache key for the last-fire index: any change to either tracker
+    file invalidates the cache.
+    """
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return None
+
+
+def _load_last_fire_cache(
+    state_dir: Path,
+    tracker_path: Path,
+    session_tokens_path: Path,
+) -> dict[str, _dt.datetime] | None:
+    """Return the cached ``{slot_key: latest_ts}`` index, or ``None`` on miss/stale.
+
+    The cache file lives at ``<state_dir>/last-fire.json`` and records the
+    source-file mtimes seen when the cache was built. Returns ``None`` (forcing
+    a JSONL rebuild) when:
+      - the cache file is missing or unreadable
+      - the cache schema_version doesn't match (forward-compat upgrades)
+      - either tracker file's mtime has changed since the cache was written
+        (a new fire was recorded, or session_tokens enriched the JSONL)
+    """
+    cache_path = state_dir / LAST_FIRE_CACHE_FILENAME
+    if not cache_path.exists():
+        return None
+    try:
+        with cache_path.open("r", encoding="utf-8") as f:
+            cache = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(cache, dict):
+        return None
+    if cache.get("schema_version") != _LAST_FIRE_CACHE_SCHEMA_VERSION:
+        return None
+    if cache.get("tracker_mtime_ns") != _file_mtime_ns(tracker_path):
+        return None
+    if cache.get("session_tokens_mtime_ns") != _file_mtime_ns(session_tokens_path):
+        return None
+    raw_index = cache.get("last_fire")
+    if not isinstance(raw_index, dict):
+        return None
+    out: dict[str, _dt.datetime] = {}
+    for key, ts_str in raw_index.items():
+        if not isinstance(key, str) or not isinstance(ts_str, str):
+            continue
+        try:
+            out[key] = _parse_iso_z(ts_str)
+        except ValueError:
+            continue
+    return out
+
+
+def _write_last_fire_cache(
+    state_dir: Path,
+    index: dict[str, _dt.datetime],
+    tracker_path: Path,
+    session_tokens_path: Path,
+) -> None:
+    """Atomically write the last-fire index cache. Best-effort — never raises."""
+    state_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = state_dir / LAST_FIRE_CACHE_FILENAME
+    tmp_path = cache_path.with_suffix(".json.tmp")
+    payload = {
+        "schema_version": _LAST_FIRE_CACHE_SCHEMA_VERSION,
+        "tracker_mtime_ns": _file_mtime_ns(tracker_path),
+        "session_tokens_mtime_ns": _file_mtime_ns(session_tokens_path),
+        "last_fire": {key: ts.astimezone(_dt.UTC).isoformat().replace("+00:00", "Z") for key, ts in index.items()},
+    }
+    try:
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        os.replace(tmp_path, cache_path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink()
+
+
+def _get_last_fire_index(state_dir: Path, tracker_path: Path) -> dict[str, _dt.datetime]:
+    """Return the ``{slot_key: latest_ts}`` index, using the cache when valid.
+
+    Cache layout: ``<state_dir>/last-fire.json``, mtime-keyed to both
+    ``usage-tracker.jsonl`` and ``session-tokens.jsonl``. On miss or staleness,
+    falls back to the full JSONL scan in :func:`_read_last_fire_index` and
+    rewrites the cache. This avoids re-parsing thousands of rows on every
+    5-min tick (see issue #73).
+    """
+    session_tokens_path = tracker_path.parent / SESSION_TOKENS_FILENAME
+    cached = _load_last_fire_cache(state_dir, tracker_path, session_tokens_path)
+    if cached is not None:
+        return cached
+    index = _read_last_fire_index(tracker_path)
+    _write_last_fire_cache(state_dir, index, tracker_path, session_tokens_path)
+    return index
 
 
 def _record_fire(tracker_path: Path, slot_key: str, slot: Slot, now: _dt.datetime) -> None:
@@ -525,6 +632,7 @@ def run() -> Event:
             )
         return _do_tick(
             vault=vault,
+            state_dir=state,
             log_dir=log_dir,
             tracker_path=tracker_path,
             started_at=started_at,
@@ -534,12 +642,13 @@ def run() -> Event:
 def _do_tick(
     *,
     vault: Path,
+    state_dir: Path,
     log_dir: Path,
     tracker_path: Path,
     started_at: float,
 ) -> Event:
     schedule = _load_or_default(vault)
-    last_fire = _read_last_fire_index(tracker_path)
+    last_fire = _get_last_fire_index(state_dir, tracker_path)
     now = _now()
 
     candidates = _compute_due_slots(schedule, last_fire, now)
@@ -592,6 +701,16 @@ def _do_tick(
             result.skipped.append({"slot_key": winner_key, "reason": "fire_failed"})
         else:
             _record_fire(tracker_path, winner_key, winner_slot, now)
+            # Keep the last-fire cache consistent with the row we just
+            # appended; otherwise the next tick would see a tracker-mtime
+            # mismatch and pay for a full JSONL rescan.
+            last_fire[winner_key] = now
+            _write_last_fire_cache(
+                state_dir,
+                last_fire,
+                tracker_path,
+                tracker_path.parent / SESSION_TOKENS_FILENAME,
+            )
             _emit_event(
                 log_dir,
                 kind="slot.fired",
@@ -730,7 +849,18 @@ def fire_now(slot_key: str) -> Event:
                     "error": f"{type(exc).__name__}: {exc}",
                 },
             )
+        # Snapshot the index BEFORE _record_fire so we don't lose entries:
+        # _record_fire bumps the tracker mtime, which would otherwise force
+        # _load_last_fire_cache to return None on the next call.
+        existing = _get_last_fire_index(state, tracker_path)
         _record_fire(tracker_path, slot_key, slot, now)
+        existing[slot_key] = now
+        _write_last_fire_cache(
+            state,
+            existing,
+            tracker_path,
+            tracker_path.parent / SESSION_TOKENS_FILENAME,
+        )
         return _emit_event(
             log_dir,
             kind="slot.fired",
@@ -769,8 +899,11 @@ __all__ = [
     "_apply_miss_rules",
     "_compute_due_slots",
     "_filter_winner_by_priority",
+    "_get_last_fire_index",
+    "_load_last_fire_cache",
     "_network_ready",
     "_read_last_fire_index",
+    "_write_last_fire_cache",
     "candidates_by_key",
     "fire_now",
     "main",
