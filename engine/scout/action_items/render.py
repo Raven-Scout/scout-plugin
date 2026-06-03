@@ -94,10 +94,37 @@ BULLET_RE = re.compile(r"^\s*-\s+(?P<rest>.+?)\s*$")
 TABLE_ROW_RE = re.compile(r"^\s*\|(.+)\|\s*$")
 # Indented quote-line comment bound to the preceding task:
 #   "  > scout (2026-04-18 10:20 AM ET): text"
-# Author/timestamp are captured; loose format tolerated (timestamp optional).
+# Author is captured non-greedily up to the colon so multi-word display
+# names ("Vaclav Nosek") match; the timestamp is optional.
 COMMENT_RE = re.compile(
-    r"^(?P<indent>\s+)>\s+(?P<author>[A-Za-z][A-Za-z0-9._-]*)"
+    r"^(?P<indent>\s+)>\s+(?P<author>[A-Za-z][\w .'-]*?)"
     r"(?:\s+\((?P<timestamp>[^)]+)\))?\s*:\s*(?P<text>.+?)\s*$"
+)
+# Indented dash-bullet comment bound to the preceding task — the shape the
+# `add-comment` writer and the CLI comment reader (`_common.py`) emit:
+#   "  - Vaclav Nosek: text"   /   "  - scout: text"
+# Mirrors COMMENT_RE's author tolerance. Distinguishing a comment from a
+# metadata sub-bullet (`- Source:`, `- Context:`) is done by the
+# COMMENT_METADATA_KEYS denylist below, not by the regex. See scout-plugin#100.
+COMMENT_DASH_RE = re.compile(
+    r"^(?P<indent>\s+)-\s+(?P<author>[A-Za-z][\w .'-]*?)"
+    r"(?:\s+\((?P<timestamp>[^)]+)\))?\s*:\s*(?P<text>.+?)\s*$"
+)
+# Dash sub-bullets whose "author" is one of these reserved keys are task
+# *metadata*, not conversation comments, and must not render as comments.
+# The closed vocabulary is defined by the briefing format in
+# phases/core/action-items.md (Source/Context/Evidence/Completed/…) plus the
+# machine `snoozed-until` marker. Matched case-insensitively.
+COMMENT_METADATA_KEYS = frozenset(
+    {
+        "source",
+        "context",
+        "evidence",
+        "completed",
+        "originally from",
+        "current status",
+        "snoozed-until",
+    }
 )
 
 
@@ -199,12 +226,20 @@ def parse(md_path: Path) -> tuple[str, list[str], list[Section]]:
             i += 1
             continue
 
-        # Comment line bound to the preceding task (indented quote).
+        # Comment line bound to the preceding task. Two serializations are
+        # accepted: the legacy indented quote (`  > author (ts): text`) and
+        # the dash form the `add-comment` writer emits (`  - author: text`).
+        # The dash form must beat BULLET_RE below, and is gated on the
+        # metadata-key denylist so `- Source:`/`- Context:` stay plain bullets.
         c = COMMENT_RE.match(line)
+        if c is None:
+            d = COMMENT_DASH_RE.match(line)
+            if d is not None and d.group("author").strip().lower() not in COMMENT_METADATA_KEYS:
+                c = d
         if c and current is not None and current.tasks:
             current.tasks[-1].comments.append(
                 Comment(
-                    author=c.group("author"),
+                    author=c.group("author").strip(),
                     timestamp=(c.group("timestamp") or "").strip(),
                     text=c.group("text"),
                 )
