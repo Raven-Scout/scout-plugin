@@ -62,9 +62,7 @@ def test_add_comment_custom_author_prefix(fake_data_dir: Path, monkeypatch: pyte
     daily.write_text("## To Do\n\n- [ ] 🔴 Followup with vendor on contract\n")
     monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
 
-    event = add_comment(
-        by_subject="vendor", comment="test", author="Vaclav Nosek", data_dir=fake_data_dir
-    )
+    event = add_comment(by_subject="vendor", comment="test", author="Vaclav Nosek", data_dir=fake_data_dir)
     assert "  - Vaclav Nosek: test" in daily.read_text()
     assert event.payload["author"] == "Vaclav Nosek"
 
