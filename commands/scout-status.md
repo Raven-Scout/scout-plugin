@@ -168,10 +168,10 @@ Check the installed plugin version against the latest available, and read the au
 
 ```bash
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}"
-"$PLUGIN_ROOT/.venv/bin/scoutctl" self-update check
+"$PLUGIN_ROOT/.venv/bin/scoutctl" self-update check || echo "SELF_UPDATE_UNAVAILABLE"
 ```
 
-Capture the output. The command prints the installed version, the available version, and whether an update is available (e.g. `up-to-date` or `update-available: <version>`).
+Capture the output. The command prints the installed version, the available version, and whether an update is available (e.g. `up to date (<version>)` or `update available: <installed> -> <available>`). If the command exits non-zero or the output contains `SELF_UPDATE_UNAVAILABLE`, treat the update status as unavailable (network or other error).
 
 Then read `auto_update.enabled` from `~/Scout/scout-config.yaml` (absent ⇒ treat as `false`):
 
@@ -366,7 +366,14 @@ If bin-path validation passes, no extra output — the launchctl table alone is 
 Using the version info and auto-update flag collected in step 3f, display:
 
 ```
-  Plugin:       <installed-version>  (<up-to-date> or <update available: X.Y.Z>)
+  Plugin:       <installed-version>  (up to date (<version>) or update available: <installed> -> <available>)
+  Auto-update:  on  /  off
+```
+
+If the update check was unavailable (network error or non-zero exit), display:
+
+```
+  Plugin:       <installed-version>  (update status: unavailable (couldn't reach marketplace))
   Auto-update:  on  /  off
 ```
 

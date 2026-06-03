@@ -8,6 +8,7 @@ can use it.
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -47,8 +48,11 @@ def _installed_version() -> str:
 
 
 def _available_version() -> str:
-    with urllib.request.urlopen(RAW_MARKETPLACE_URL, timeout=10) as resp:  # noqa: S310
-        raw = resp.read().decode("utf-8")
+    try:
+        with urllib.request.urlopen(RAW_MARKETPLACE_URL, timeout=10) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RuntimeError(f"could not reach marketplace at {RAW_MARKETPLACE_URL}: {e}") from e
     try:
         return json.loads(raw)["plugins"][0]["version"]
     except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:

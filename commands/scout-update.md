@@ -11,14 +11,20 @@ This command is for **existing vaults only**. If no vault exists, refuse and tel
 
 ---
 
-## Locating scoutctl
+## Locating scoutctl — canonical resolver
 
-Use the venv that lives inside the plugin Claude Code loaded — `$CLAUDE_PLUGIN_ROOT/.venv/bin/scoutctl`. That guarantees the upgrade reads templates and engine code from THIS plugin checkout, not from some other clone whose venv happens to be on `$PATH`. Belt-and-suspenders: fall back to `~/scout-plugin/.venv/bin/scoutctl` if `$CLAUDE_PLUGIN_ROOT` is somehow unset.
+Every shell block in this command runs in a **fresh process**, so variables set in one block do not carry into the next. Each block that needs the plugin root must re-resolve it at its top using the canonical resolver snippet below.
+
+**Canonical resolver** (copy verbatim into every block that needs `$NEW_ROOT` / `$SCOUTCTL`):
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}"
-SCOUTCTL="$PLUGIN_ROOT/.venv/bin/scoutctl"
+NEW_ROOT="$HOME/scout-plugin"
+[ -d "$NEW_ROOT/.git" ] || NEW_ROOT="$(claude plugin list --json 2>/dev/null \
+  | python3 -c "import sys,json;print(next(p['installPath'] for m in json.load(sys.stdin).get('plugins',{}).values() for p in m if 'scout-plugin' in p['installPath']))" 2>/dev/null)"
+SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 ```
+
+This prefers the maintainer git checkout (`~/scout-plugin` when a `.git` dir is present) and otherwise falls back to the freshly-installed marketplace cache path. **Do NOT use `${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}` in any block** — after Step 0.5 refreshes the plugin, `$CLAUDE_PLUGIN_ROOT` may still point at the pre-refresh path.
 
 Use `"$SCOUTCTL"` in every subsequent invocation.
 
@@ -43,7 +49,7 @@ fi
 EOF
 ```
 
-Then resolve the plugin root the rest of this upgrade runs from — prefer the maintainer git checkout when it's present; otherwise derive the path from the installed marketplace cache. Re-pin `$SCOUTCTL` to the new root so every subsequent step uses the updated engine:
+Resolve the plugin root that the rest of this upgrade runs from. **Use this resolved `$NEW_ROOT` as the plugin root for every step below.** Because each shell block runs in a fresh process, re-resolve it at the top of each block that needs it using the canonical resolver (do NOT fall back to `$CLAUDE_PLUGIN_ROOT`, which may point at the pre-refresh plugin):
 
 ```bash
 NEW_ROOT="$HOME/scout-plugin"
@@ -54,8 +60,6 @@ echo "Upgrading vault against plugin root: $NEW_ROOT"
 SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 ```
 
-All pre-flight and upgrade steps below use this overridden `"$SCOUTCTL"`.
-
 ---
 
 ## Step 0: Pre-flight (refuse if no vault, no venv, pending sidecars, or mismatched venv)
@@ -65,18 +69,20 @@ Run:
 ```bash
 bash <<'EOF'
 set -e
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/scout-plugin}"
-SCOUTCTL="$PLUGIN_ROOT/.venv/bin/scoutctl"
+NEW_ROOT="$HOME/scout-plugin"
+[ -d "$NEW_ROOT/.git" ] || NEW_ROOT="$(claude plugin list --json 2>/dev/null \
+  | python3 -c "import sys,json;print(next(p['installPath'] for m in json.load(sys.stdin).get('plugins',{}).values() for p in m if 'scout-plugin' in p['installPath']))" 2>/dev/null)"
+SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 
 test -f "$HOME/Scout/scout-config.yaml" || { echo "NO_VAULT"; exit 0; }
 ls "$HOME/Scout/"{SKILL,DREAMING,RESEARCH}.md.proposed-merge 2>/dev/null && { echo "PENDING_SIDECARS"; exit 0; }
-test -x "$SCOUTCTL" || { echo "VENV_MISSING:$PLUGIN_ROOT"; exit 0; }
+test -x "$SCOUTCTL" || { echo "VENV_MISSING:$NEW_ROOT"; exit 0; }
 
 # Verify the venv is editable-installed FROM this plugin checkout.
 # Otherwise we'd run the upgrade against the OTHER tree's templates.
 PYTHON="$(dirname "$SCOUTCTL")/python"
 INSTALLED=$("$PYTHON" -c "import scout, os; print(os.path.realpath(os.path.dirname(os.path.dirname(scout.__file__))))" 2>/dev/null)
-EXPECTED=$(cd "$PLUGIN_ROOT/engine" 2>/dev/null && pwd -P)
+EXPECTED=$(cd "$NEW_ROOT/engine" 2>/dev/null && pwd -P)
 if [ -n "$INSTALLED" ] && [ -n "$EXPECTED" ] && [ "$INSTALLED" != "$EXPECTED" ]; then
     echo "VENV_MISMATCH:$INSTALLED|$EXPECTED"
     exit 0
@@ -89,12 +95,12 @@ EOF
 - `PENDING_SIDECARS`: "Unresolved merge conflicts from a prior `/scout-update`:" — list the sidecar files. Then: "Edit each file to remove conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), then run `mv X.md.proposed-merge X.md` for each. Then re-run `/scout-update`."
 - `VENV_MISSING:<plugin-root>`: "Engine venv missing at `<plugin-root>/.venv/`. Install it with:" then show:
   ```
-  bash "$CLAUDE_PLUGIN_ROOT/scripts/install-venv.sh"
+  bash "$NEW_ROOT/scripts/install-venv.sh"
   ```
-  (or substitute the actual plugin root if `$CLAUDE_PLUGIN_ROOT` isn't set in the user's shell). Then re-run `/scout-update`.
-- `VENV_MISMATCH:<installed>|<expected>`: "The venv at `$PLUGIN_ROOT/.venv/` is editable-installed from `<installed>`, but this plugin is loaded from `<expected>`. Running the upgrade now would apply the OTHER tree's templates, not the ones in this checkout. Re-install the venv pinned to this plugin source:" then show:
+  Then re-run `/scout-update`.
+- `VENV_MISMATCH:<installed>|<expected>`: "The venv at `$NEW_ROOT/.venv/` is editable-installed from `<installed>`, but this plugin is loaded from `<expected>`. Running the upgrade now would apply the OTHER tree's templates, not the ones in this checkout. Re-install the venv pinned to this plugin source:" then show:
   ```
-  bash "$CLAUDE_PLUGIN_ROOT/scripts/install-venv.sh"
+  bash "$NEW_ROOT/scripts/install-venv.sh"
   ```
   Then re-run `/scout-update`.
 - `READY`: continue.
@@ -106,8 +112,12 @@ EOF
 Read the current and target plugin versions:
 
 ```bash
+NEW_ROOT="$HOME/scout-plugin"
+[ -d "$NEW_ROOT/.git" ] || NEW_ROOT="$(claude plugin list --json 2>/dev/null \
+  | python3 -c "import sys,json;print(next(p['installPath'] for m in json.load(sys.stdin).get('plugins',{}).values() for p in m if 'scout-plugin' in p['installPath']))" 2>/dev/null)"
+SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 "$SCOUTCTL" version
-python3 -c "import json; print(json.load(open('${CLAUDE_PLUGIN_ROOT}/plugin.json'))['version'])"
+python3 -c "import json; print(json.load(open('$NEW_ROOT/plugin.json'))['version'])"
 grep version_at_last_update ~/Scout/scout-config.yaml || true
 ```
 

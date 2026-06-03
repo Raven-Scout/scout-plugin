@@ -33,3 +33,16 @@ def test_check_uses_injected_fetchers():
 )
 def test_semver_tuple_parsing(raw, expected):
     assert self_update._semver_tuple(raw) == expected
+
+
+def test_check_propagates_runtime_error_from_available_fetcher():
+    """check() must surface RuntimeError from available_fetcher (e.g. network failure)."""
+
+    def failing_fetcher() -> str:
+        raise RuntimeError("could not reach marketplace at https://example.com: <urlopen error ...>")
+
+    with pytest.raises(RuntimeError, match="could not reach marketplace"):
+        self_update.check(
+            installed_fetcher=lambda: "0.5.0",
+            available_fetcher=failing_fetcher,
+        )
