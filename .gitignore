@@ -15,3 +15,8 @@ venv/
 
 # scoutctl manifest build output (per-machine artifact)
 engine/manifest.json
+
+# Local per-checkout artifacts (not part of the plugin)
+.claude/
+.scoutctl-py-cache
+PLAN-8-RESUME.md
