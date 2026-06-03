@@ -12,11 +12,28 @@
 #                                     venv lives in marketplaces/
 #   4. system python3               — last resort; expects scout-engine on
 #                                     the global site-packages
+#
+# Per #81: once a candidate resolves, we cache the path at
+# ${PLUGIN_ROOT}/.scoutctl-py-cache so the next invocation can `[ -x ]`
+# exactly one path instead of probing the whole list again. The cache lives
+# inside the plugin so different plugin installs don't share state. The
+# cached path is verified executable on read; if it isn't, we fall through
+# to the full probe.
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ENGINE_DIR="${DIR%/bin}"
 PLUGIN_ROOT="${ENGINE_DIR%/engine}"
+
+CACHE_FILE="${PLUGIN_ROOT}/.scoutctl-py-cache"
+
+# Fast path: a previously-resolved interpreter is still executable.
+if [ -r "$CACHE_FILE" ]; then
+    CACHED_PY="$(cat "$CACHE_FILE" 2>/dev/null || true)"
+    if [ -n "$CACHED_PY" ] && [ -x "$CACHED_PY" ]; then
+        exec "$CACHED_PY" -m scout.cli "$@"
+    fi
+fi
 
 candidates=(
     "${PLUGIN_ROOT}/.venv/bin/python"
@@ -39,6 +56,10 @@ fi
 
 for VENV_PY in "${candidates[@]}"; do
     if [ -x "$VENV_PY" ]; then
+        # Best-effort write to the cache so the next call skips the probe.
+        # Failures (read-only plugin root in Claude Code's cache copy, no
+        # write perms, etc.) are silently ignored.
+        printf '%s\n' "$VENV_PY" >"$CACHE_FILE" 2>/dev/null || true
         exec "$VENV_PY" -m scout.cli "$@"
     fi
 done

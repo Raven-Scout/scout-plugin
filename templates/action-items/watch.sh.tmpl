@@ -7,13 +7,22 @@
 #   ./action-items/watch.sh                 # today's file (in configured timezone)
 #   ./action-items/watch.sh 2026-04-17      # specific date
 #   ./action-items/watch.sh path/to/file.md # explicit path
+#   ./action-items/watch.sh --poll [...]    # force a 2s polling fallback
 #
-# Uses fswatch if available (efficient), polling every 2s as a fallback.
+# Per #83: this script used to silently fall back to a 2s polling loop when
+# fswatch wasn't installed — a permanent low-grade CPU drain if the user left
+# it running. It now refuses to poll by default and requires --poll explicitly.
 
 set -euo pipefail
 
 SCOUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCOUT_DIR"
+
+USE_POLLING="no"
+if [[ "${1:-}" == "--poll" ]]; then
+  USE_POLLING="yes"
+  shift
+fi
 
 ARG="${1:-}"
 if [[ -z "$ARG" ]]; then
@@ -52,8 +61,8 @@ render
 if command -v fswatch >/dev/null 2>&1; then
   echo "Watching $MD with fswatch… (Ctrl-C to stop)"
   fswatch -o "$MD" | while read -r _; do render; done
-else
-  echo "fswatch not installed; polling $MD every 2s. For efficiency: brew install fswatch"
+elif [[ "$USE_POLLING" == "yes" ]]; then
+  echo "fswatch not installed — polling $MD every 2s (forced via --poll). Ctrl-C to stop."
   LAST="$(stat -f %m "$MD" 2>/dev/null || stat -c %Y "$MD")"
   while :; do
     sleep 2
@@ -63,4 +72,17 @@ else
       render
     fi
   done
+else
+  cat >&2 <<MSG
+fswatch is not installed. The polling fallback used to run silently here and
+burn ~30 stat syscalls per minute forever (see issue #83).
+
+To watch the file efficiently:
+  brew install fswatch     # macOS
+  apt install fswatch      # Debian/Ubuntu
+
+Or, if you really want the polling fallback, re-run with --poll:
+  ./action-items/watch.sh --poll ${ARG:+$ARG}
+MSG
+  exit 1
 fi
