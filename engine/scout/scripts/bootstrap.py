@@ -420,6 +420,22 @@ def _stage_jobs_install(cfg: BootstrapConfig) -> None:
         install_cron(home=Path.home())
 
 
+def _stage_install_scoutctl_shim(cfg: BootstrapConfig) -> None:
+    """Put `scoutctl` on the interactive PATH via a ~/.local/bin wrapper.
+
+    This is what makes the bare `scoutctl` calls in the SKILL.md-driven
+    session resolve (#99). Gated by `skip_jobs` alongside the other
+    system-level install side-effects (LaunchAgents/cron) so headless/CI
+    installs don't touch the real `~/.local/bin`. Best-effort regardless —
+    it never fails the install.
+    """
+    if cfg.skip_jobs:
+        return
+    from scout.scripts.install_scoutctl_shim import install_scoutctl_shim
+
+    install_scoutctl_shim(home=Path.home())
+
+
 def _stage_seed_schedule(cfg: BootstrapConfig) -> None:
     """Seed .scout-state/schedule.yaml from plugin defaults (install only)."""
     src = cfg.plugin_root / "engine" / "scout" / "defaults" / "schedule.yaml"
@@ -525,6 +541,7 @@ def install(cfg: BootstrapConfig) -> InstallResult:
         _stage_cat4_install(cfg)
         _stage_merge_files_install(cfg)
         _stage_jobs_install(cfg)
+        _stage_install_scoutctl_shim(cfg)
         _stage_version_stamp(cfg, is_upgrade=False)
     finally:
         release_lock(lock)
@@ -567,6 +584,7 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         conflicts = _stage_cat4_upgrade(cfg)
         conflicts += _stage_merge_files_upgrade(cfg)
         _stage_jobs_install(cfg)
+        _stage_install_scoutctl_shim(cfg)
         _stage_version_stamp(cfg, is_upgrade=True)
     finally:
         release_lock(lock)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import platform
 import plistlib
+import re
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -155,6 +156,38 @@ def _check_scheduler_bin_path(*, home: Path) -> tuple[list[str], list[str]]:
     return [], []
 
 
+def _check_scoutctl_shim(*, home: Path) -> tuple[list[str], list[str]]:
+    """Warn (never error) if the managed scoutctl shim is dangling.
+
+    The SKILL.md-driven session relies on the ~/.local/bin shim to resolve
+    bare `scoutctl` (#99). The realistic post-install failure is a shim left
+    pointing at a plugin venv that a later update removed. We flag only that
+    dangling case — deterministically, from the shim's own contents — rather
+    than guessing reachability from the ambient PATH (which differs between
+    the doctor process and the session, and would make the result
+    environment-dependent). A missing shim isn't flagged: install and upgrade
+    always (re)write it, so absence resolves itself on the next run.
+    """
+    from scout.scripts.install_scoutctl_shim import SHIM_MARKER
+
+    warnings: list[str] = []
+    shim = home / ".local" / "bin" / "scoutctl"
+    if not shim.is_file():
+        return [], []
+    try:
+        body = shim.read_text(encoding="utf-8")
+    except OSError:
+        return [], []
+    if SHIM_MARKER in body:
+        m = re.search(r'exec "([^"]+)"', body)
+        if m and not Path(m.group(1)).exists():
+            warnings.append(
+                f"scoutctl shim at {shim} points at a missing target ({m.group(1)}) — "
+                f"re-run `scoutctl bootstrap upgrade`."
+            )
+    return [], warnings
+
+
 def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None) -> DoctorReport:
     """Run all doctor checks against ``vault``. Pure read."""
     errors: list[str] = []
@@ -245,6 +278,9 @@ def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None
         bin_errors, bin_warnings = _check_scheduler_bin_path(home=home)
         errors.extend(bin_errors)
         warnings.extend(bin_warnings)
+        # Interactive/session scoutctl reachability (separate from the plist).
+        _, shim_warnings = _check_scoutctl_shim(home=home)
+        warnings.extend(shim_warnings)
 
     if errors:
         return DoctorReport(severity=Severity.RED, errors=errors, warnings=warnings)
