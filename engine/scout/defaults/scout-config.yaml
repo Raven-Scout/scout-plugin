@@ -21,3 +21,7 @@ features:
   tui: true
   connector_health: true
   dreaming: true
+
+auto_update:
+  enabled: false
+  channel: stable

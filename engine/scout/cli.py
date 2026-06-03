@@ -1010,6 +1010,30 @@ def _register_bootstrap() -> None:
 _register_bootstrap()
 
 
+self_update_app = typer.Typer(help="Plugin self-update (check only in v0.4).")
+app.add_typer(self_update_app, name="self-update")
+
+
+@self_update_app.command("check")
+def self_update_check(json_out: bool = typer.Option(False, "--json")) -> None:
+    """Report installed-vs-available plugin version (read-only)."""
+    import dataclasses as _dc
+    import json as _json
+
+    from scout.scripts.self_update import check as _check
+
+    status = _check()
+    if json_out:
+        typer.echo(_json.dumps(_dc.asdict(status)))
+    else:
+        msg = (
+            f"update available: {status.installed} -> {status.available}"
+            if status.update_available
+            else f"up to date ({status.installed})"
+        )
+        typer.echo(msg)
+
+
 @app.command()
 def tui() -> None:
     """Launch the Textual action-items TUI."""
