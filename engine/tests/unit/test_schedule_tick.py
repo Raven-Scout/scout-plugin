@@ -513,6 +513,7 @@ def test_load_or_default_invalidates_cache_on_mtime_change(tmp_path, monkeypatch
 
     # Rewrite with a bumped mtime → cache miss → re-parse.
     import os
+
     new_ts = sched_path.stat().st_mtime_ns + 1_000_000_000
     sched_path.write_text(sched_path.read_text())  # touch contents
     os.utime(sched_path, ns=(new_ts, new_ts))
