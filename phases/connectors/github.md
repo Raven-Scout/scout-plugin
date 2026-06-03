@@ -63,11 +63,12 @@ Check for GitHub activity directed at {{USER_NAME}} — review requests, assignm
 gh search prs --review-requested @me --state open --json number,title,url,repository,author
 ```
 
-Each open review request is a potential action item. Note:
-- Who requested the review
-- Which repo/project it's for
-- How long it's been waiting (prioritize older requests)
-- PR size if available (helps {{USER_NAME}} estimate effort)
+⚠️ **`--review-requested @me` expands team membership**, so this list mixes genuine review asks with {{USER_NAME}}'s *own delegated work* (a Linear issue delegated to an agent like Devin → the agent opens the PR and requests {{USER_NAME}}'s *team*). Classify each PR before treating it as a review item — see the three-bucket rule under **PRs Requesting {{USER_NAME}}'s Review** in the briefing query slot:
+1. **Own delegated work** (`devin/` branch or bot author implementing {{USER_NAME}}'s own issue, or linked issue assigned to {{USER_NAME}}) → track-to-merge, **not** review.
+2. **Requested by name** (`{{GITHUB_USERNAME}}` is a `User` in `reviewRequests`) → real review action item.
+3. **Requested via team only** → shared queue, any teammate can satisfy.
+
+Pull `gh pr view N --repo R --json author,headRefName,reviewRequests,isDraft` to classify. For buckets 2–3, note who requested it, which repo, how long it's waited (prioritize older), and PR size if available.
 
 ### New Issues Assigned
 
