@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from html import escape
 from pathlib import Path
 
 PLIST_NAME = "com.scout.heartbeat.plist"
@@ -28,7 +29,10 @@ def install_plist(
     target = agents_dir / PLIST_NAME
     if target.exists() and not force:
         raise FileExistsError(target)
-    rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", str(home))
+    # XML-escape __USER_HOME__: it lands inside <string> elements, and a path
+    # with `&`, `<`, `>`, `"` (legal on macOS) would otherwise produce
+    # malformed XML that launchd silently refuses to load. (#49)
+    rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", escape(str(home), quote=True))
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
         # `launchctl bootstrap gui/$UID <plist>` loads the job. Best-effort.

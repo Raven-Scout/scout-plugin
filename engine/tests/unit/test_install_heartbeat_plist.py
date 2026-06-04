@@ -51,3 +51,24 @@ def test_uninstall_plist_silent_when_missing(tmp_path):
     target_dir = tmp_path / "LaunchAgents"
     target_dir.mkdir()
     uninstall_plist(agents_dir=target_dir)  # no exception
+
+
+def test_install_heartbeat_plist_escapes_xml_metacharacters(tmp_path):
+    """Home path with XML metacharacters → well-formed, loadable plist (#49)."""
+    import plistlib
+
+    from scout.scripts.install_heartbeat_plist import install_plist
+
+    home = tmp_path / 'R&D <lab> "x"'
+    home.mkdir()
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    target = install_plist(home=home, agents_dir=agents)
+
+    raw = target.read_text(encoding="utf-8")
+    assert "&amp;" in raw
+    assert "R&D <lab>" not in raw
+
+    with target.open("rb") as f:
+        data = plistlib.load(f)
+    assert data["EnvironmentVariables"]["HOME"] == str(home)
