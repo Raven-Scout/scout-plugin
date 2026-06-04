@@ -759,3 +759,24 @@ def test_main_prints_traceback_to_stderr_when_run_raises(capsys):
     captured = capsys.readouterr()
     assert "synthetic failure for visibility test" in captured.err
     assert "Traceback" in captured.err
+
+
+# Event-log filename / ts agreement (#37). The UTC date in the file name must
+# come from the same instant as the event ts — a second clock read could land
+# on the far side of UTC midnight and file the event into the wrong day's log.
+
+
+def test_emit_event_filename_matches_ts_date_across_midnight(tmp_path, monkeypatch):
+    from scout.scripts import schedule_tick as st
+
+    # ts is stamped at 23:59 on day N; a second (stale) clock read would be
+    # day N+1. The filename must follow ts (day N), not the second read.
+    monkeypatch.setattr(st, "now_iso", lambda: "2026-03-14T23:59:59.999Z")
+    monkeypatch.setattr(st, "_now", lambda: datetime(2026, 3, 15, 0, 0, 1, tzinfo=ZoneInfo("UTC")))
+
+    ev = st._emit_event(tmp_path, kind="slot.fired", source="test", payload={})
+
+    logs = list(tmp_path.glob("schedule-events-*.jsonl"))
+    assert len(logs) == 1
+    assert logs[0].name == "schedule-events-2026-03-14.jsonl"
+    assert ev.ts[:10] == "2026-03-14"
