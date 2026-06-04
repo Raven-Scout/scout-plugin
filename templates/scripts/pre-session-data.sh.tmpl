@@ -6,60 +6,26 @@
 # Usage: Called by {{INSTANCE_NAME}} runner scripts before invoking Claude.
 #   ./scripts/pre-session-data.sh [session-type]
 #   session-type: briefing | consolidation | dreaming | research
+#
+# This is a thin wrapper around `scoutctl pre-session data`. The bash version
+# ran a 4-subprocess pipeline (head | grep | head | sed | sed) per KB markdown
+# file plus two python3 -c calls just to JSON-encode stdin. Folded into one
+# Python process here with an mtime cache for the KB date extraction (#74 + #76).
 
 set -eu
 
 SESSION_TYPE="${1:-unknown}"
-SCOUT_DIR="${SCOUT_DIR:-{{SCOUT_DIR}}}"
-CACHE_DIR="$SCOUT_DIR/.scout-cache"
-OUTPUT="$CACHE_DIR/session-context.json"
-mkdir -p "$CACHE_DIR"
-
-NOW_LOCAL=$(TZ={{TIMEZONE}} date '+%Y-%m-%dT%H:%M:%S')
-
-# --- Git recent activity (last 12 hours) ---
-GIT_LOG=$(cd "$SCOUT_DIR" && git log --oneline --since="12 hours ago" 2>/dev/null || echo "")
-
-# --- KB file staleness (Last updated dates from first 5 lines) ---
-KB_STALENESS=""
-while IFS= read -r f; do
-  rel="${f#$SCOUT_DIR/}"
-  updated=$(head -5 "$f" 2>/dev/null | grep -i 'last updated\|last verified' | head -1 | sed 's/.*: *//' | sed 's/ *$//' || true)
-  if [ -n "$updated" ]; then
-    KB_STALENESS="${KB_STALENESS}    \"${rel}\": \"${updated}\",\n"
-  fi
-done < <(find "$SCOUT_DIR/knowledge-base" -name '*.md' -not -path '*/ontology/*' -not -path '*archive*' 2>/dev/null)
-
-# --- PR statuses (only if gh CLI is available and authenticated) ---
-PR_AUTHORED="[]"
-PR_REVIEW="[]"
-if command -v gh &>/dev/null; then
-  PR_AUTHORED=$(gh pr list --author @me --state open --json number,title,repository,reviewDecision,updatedAt --limit 10 2>/dev/null || echo "[]")
-  PR_REVIEW=$(gh search prs --review-requested @me --state open --json number,title,repository --limit 10 2>/dev/null || echo "[]")
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "pre-session-data.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 1
+    fi
 fi
 
-# --- Active personal tasks (only if ontology parser is set up) ---
-TASKS=""
-if [ -f "$SCOUT_DIR/knowledge-base/ontology/parser.py" ]; then
-  TASKS=$(cd "$SCOUT_DIR" && python3 knowledge-base/ontology/parser.py query --type task 2>/dev/null || echo "")
-fi
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
 
-# --- Write JSON ---
-GIT_JSON=$(echo "$GIT_LOG" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
-TASKS_JSON=$(echo "$TASKS" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '""')
-
-cat > "$OUTPUT" <<ENDJSON
-{
-  "generated_at": "$NOW_LOCAL",
-  "session_type": "$SESSION_TYPE",
-  "git_recent": $GIT_JSON,
-  "kb_file_dates": {
-$(echo -e "$KB_STALENESS" | sed '$ s/,$//')
-  },
-  "pr_authored": $PR_AUTHORED,
-  "pr_review_requested": $PR_REVIEW,
-  "personal_tasks": $TASKS_JSON
-}
-ENDJSON
-
-echo "Pre-session data written to $OUTPUT ($SESSION_TYPE at $NOW_LOCAL)"
+exec "$SCOUTCTL_BIN" pre-session data "$SESSION_TYPE"
