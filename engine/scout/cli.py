@@ -176,6 +176,24 @@ def session_cc_cache_cmd(
     raise typer.Exit(cc_main(hours=hours, instance_name=instance_name, tz_name=timezone))
 
 
+# `scoutctl heartbeat run` replaces ~/Scout/scripts/heartbeat.sh (#74 + #79).
+# The bash version paid 3 python3 cold starts every 30 min just to walk the
+# same tracker for three different "time since" values. Folded into one pass
+# here.
+heartbeat_app = typer.Typer(help="Heartbeat — fires every 30 min to maybe launch a session.")
+app.add_typer(heartbeat_app, name="heartbeat")
+
+
+@heartbeat_app.command("run")
+def heartbeat_run_cmd(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Decide and log but do not launch the runner."),
+) -> None:
+    """Apply the heartbeat gating policy and optionally launch a runner."""
+    from scout.scripts.heartbeat import main as heartbeat_main
+
+    raise typer.Exit(heartbeat_main(dry_run=dry_run))
+
+
 def _register_connectors() -> None:
     """scoutctl connectors {list,show,reload} — read-only roster ops in v0.4."""
     connectors_app = typer.Typer(help="Connector roster operations (read-only in v0.4).")
