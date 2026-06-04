@@ -133,22 +133,54 @@ def _now() -> _dt.datetime:
     return _dt.datetime.now(tz=tz)
 
 
-def _local_tz_name() -> str:
-    """Best-effort read of the system's local IANA zone.
+def _local_tz_name(localtime: Path | None = None) -> str:
+    """Best-effort resolution of the system's local IANA zone.
 
-    Reads the ``/etc/localtime`` symlink target (the convention on macOS and
-    most Linux distros). Falls back to ``UTC`` if the symlink is missing or
-    points somewhere unrecognized.
+    Priority: ``$TZ`` (if it names a loadable zone) → the ``/etc/localtime``
+    symlink target → ``UTC``. A wrong timezone here silently shifts every
+    ``fires_at_local``, so each fallback that can't produce a *validated* zone
+    logs a warning to stderr (captured in the scheduled-run logs) rather than
+    returning ``"UTC"`` silently. (#50)
+
+    ``localtime`` defaults to ``Path("/etc/localtime")``; it's a parameter so
+    tests can point it at a fixture symlink.
     """
-    localtime = Path("/etc/localtime")
+    # 1. Explicit TZ wins when it names a zone ZoneInfo can load.
+    env_tz = os.environ.get("TZ")
+    if env_tz:
+        try:
+            ZoneInfo(env_tz)
+            return env_tz
+        except (ZoneInfoNotFoundError, ValueError):
+            print(f"schedule_tick: $TZ={env_tz!r} is not a valid IANA zone; ignoring it", file=sys.stderr)
+
+    # 2. /etc/localtime symlink target. resolve() handles relative targets
+    #    (valid POSIX) and multi-hop links, which os.readlink alone would not.
+    localtime = localtime or Path("/etc/localtime")
     if localtime.is_symlink():
-        target = os.readlink(localtime)
-        # Typical: /var/db/timezone/zoneinfo/America/New_York or
-        # /usr/share/zoneinfo/America/New_York. Take the trailing
-        # area/zone segments.
+        target = str(localtime.resolve())
         marker = "zoneinfo/"
         if marker in target:
-            return target.split(marker, 1)[1]
+            name = target.split(marker, 1)[1]
+            try:
+                ZoneInfo(name)
+                return name
+            except (ZoneInfoNotFoundError, ValueError):
+                print(
+                    f"schedule_tick: zone {name!r} derived from /etc/localtime is not loadable; falling back to UTC",
+                    file=sys.stderr,
+                )
+        else:
+            print(
+                "schedule_tick: /etc/localtime target has no 'zoneinfo/' component "
+                f"({target!r}); falling back to UTC — set $TZ to your IANA zone",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            "schedule_tick: /etc/localtime is not a symlink; falling back to UTC — set $TZ to your IANA zone",
+            file=sys.stderr,
+        )
     return "UTC"
 
 

@@ -780,3 +780,53 @@ def test_emit_event_filename_matches_ts_date_across_midnight(tmp_path, monkeypat
     assert len(logs) == 1
     assert logs[0].name == "schedule-events-2026-03-14.jsonl"
     assert ev.ts[:10] == "2026-03-14"
+
+
+# Timezone resolution (#50): $TZ > /etc/localtime symlink > UTC, with a stderr
+# warning on every fallback that can't produce a validated zone (a wrong tz
+# silently shifts every fires_at_local).
+
+
+def test_local_tz_name_env_tz_valid_wins(monkeypatch):
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.setenv("TZ", "America/New_York")
+    assert st._local_tz_name() == "America/New_York"
+
+
+def test_local_tz_name_env_tz_invalid_is_ignored_and_warns(monkeypatch, tmp_path, capsys):
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.setenv("TZ", "Totally/Bogus")
+    not_a_link = tmp_path / "localtime"  # regular file → forces UTC
+    not_a_link.write_text("x")
+    assert st._local_tz_name(localtime=not_a_link) == "UTC"
+    assert "not a valid IANA zone" in capsys.readouterr().err
+
+
+def test_local_tz_name_resolves_symlink_zone(monkeypatch, tmp_path):
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.delenv("TZ", raising=False)
+    link = tmp_path / "localtime"
+    link.symlink_to("/usr/share/zoneinfo/America/New_York")
+    assert st._local_tz_name(localtime=link) == "America/New_York"
+
+
+def test_local_tz_name_resolves_relative_symlink(monkeypatch, tmp_path):
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.delenv("TZ", raising=False)
+    link = tmp_path / "localtime"
+    link.symlink_to("zoneinfo/Europe/Paris")  # relative target — resolve() handles it
+    assert st._local_tz_name(localtime=link) == "Europe/Paris"
+
+
+def test_local_tz_name_not_symlink_warns_and_falls_back_to_utc(monkeypatch, tmp_path, capsys):
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.delenv("TZ", raising=False)
+    regular = tmp_path / "localtime"
+    regular.write_text("not a symlink")
+    assert st._local_tz_name(localtime=regular) == "UTC"
+    assert "not a symlink" in capsys.readouterr().err
