@@ -9,6 +9,8 @@ banner) to use features the engine cannot provide.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -73,7 +75,26 @@ def build_manifest() -> EngineManifest:
 
 
 def write_manifest(path: Path | None = None) -> Path:
-    """Write the manifest to disk. Returns the path written."""
+    """Write the manifest to disk atomically. Returns the path written.
+
+    scout-app reads manifest.json at launch to gate feature flags, so a
+    torn/truncated file (crash or full disk mid-write) would block all engine
+    ops until manually deleted. Use the same tempfile + fsync + os.replace
+    pattern as IdMap.save so a reader always sees a complete file (#44).
+    """
     target = path or (ENGINE_DIR / "manifest.json")
-    target.write_text(build_manifest().to_json() + "\n")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = build_manifest().to_json() + "\n"
+    fd, tmp = tempfile.mkstemp(prefix=".manifest.", suffix=".json.tmp", dir=str(target.parent))
+    tmp_path = Path(tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, target)
+    except BaseException:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
     return target
