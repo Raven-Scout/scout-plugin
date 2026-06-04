@@ -21,7 +21,6 @@ from scout.scripts.pre_session_data import (
     write_context,
 )
 
-
 # ----- last-updated extraction --------------------------------------------
 
 
@@ -45,9 +44,7 @@ def test_extract_last_updated_returns_empty_when_absent(tmp_path: Path) -> None:
 
 def test_extract_last_updated_only_scans_first_five_lines(tmp_path: Path) -> None:
     md = tmp_path / "doc.md"
-    md.write_text(
-        "line1\nline2\nline3\nline4\nline5\nLast updated: should be ignored\n"
-    )
+    md.write_text("line1\nline2\nline3\nline4\nline5\nLast updated: should be ignored\n")
     assert extract_last_updated(md) == ""
 
 
@@ -156,9 +153,7 @@ def test_gather_kb_file_dates_opens_each_file_once(tmp_path: Path, monkeypatch: 
 # ----- gh / git helpers --------------------------------------------------
 
 
-def test_gather_returns_empty_when_no_git_no_gh(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_gather_returns_empty_when_no_git_no_gh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scout.scripts import pre_session_data as psd
 
     scout_dir = tmp_path / "vault"
@@ -182,9 +177,7 @@ def test_gather_calls_gh_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     scout_dir = tmp_path / "vault"
     (scout_dir / "knowledge-base").mkdir(parents=True)
     monkeypatch.setattr(psd, "get_pr_authored", lambda: [{"number": 42, "title": "x"}])
-    monkeypatch.setattr(
-        psd, "get_pr_review_requested", lambda: [{"number": 43, "title": "y"}]
-    )
+    monkeypatch.setattr(psd, "get_pr_review_requested", lambda: [{"number": 43, "title": "y"}])
 
     ctx = gather("research", scout_dir=scout_dir)
     assert ctx.pr_authored == [{"number": 42, "title": "x"}]
