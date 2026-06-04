@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -25,7 +25,6 @@ from scout.scripts.cc_session_cache import (
     render_markdown,
     run,
 )
-
 
 # ----- helpers ------------------------------------------------------------
 
@@ -45,7 +44,7 @@ def _make_cc_project(
 ) -> Path:
     jsonl = cc_projects / dirname / f"{session_id}.jsonl"
     _write_jsonl(jsonl, rows)
-    target_ts = (datetime.now(tz=timezone.utc) - timedelta(hours=mtime_ago_hours)).timestamp()
+    target_ts = (datetime.now(tz=UTC) - timedelta(hours=mtime_ago_hours)).timestamp()
     os.utime(jsonl, (target_ts, target_ts))
     return jsonl
 
@@ -69,17 +68,21 @@ def test_iter_session_jsonls_excludes_scout_dirs(tmp_path: Path) -> None:
     _make_cc_project(cc, "-Users-foo-Scout", "s1", [{"type": "user", "message": {"content": "hi"}}])
     _make_cc_project(cc, "-Users-foo-other", "s2", [{"type": "user", "message": {"content": "ok"}}])
 
-    cutoff_ts = (datetime.now(tz=timezone.utc) - timedelta(hours=24)).timestamp()
-    found = [p.parent.name for p, _ in iter_session_jsonls(cc, cutoff_ts=cutoff_ts, exclude_suffixes=("-Scout", "-scout"))]
+    cutoff_ts = (datetime.now(tz=UTC) - timedelta(hours=24)).timestamp()
+    found = [
+        p.parent.name for p, _ in iter_session_jsonls(cc, cutoff_ts=cutoff_ts, exclude_suffixes=("-Scout", "-scout"))
+    ]
     assert found == ["-Users-foo-other"]
 
 
 def test_iter_session_jsonls_skips_stale_files(tmp_path: Path) -> None:
     cc = tmp_path / "projects"
     _make_cc_project(cc, "-Users-foo-bar", "fresh", [{"type": "user", "message": {"content": "hi"}}], mtime_ago_hours=1)
-    _make_cc_project(cc, "-Users-foo-bar", "stale", [{"type": "user", "message": {"content": "old"}}], mtime_ago_hours=48)
+    _make_cc_project(
+        cc, "-Users-foo-bar", "stale", [{"type": "user", "message": {"content": "old"}}], mtime_ago_hours=48
+    )
 
-    cutoff_ts = (datetime.now(tz=timezone.utc) - timedelta(hours=24)).timestamp()
+    cutoff_ts = (datetime.now(tz=UTC) - timedelta(hours=24)).timestamp()
     ids = sorted(p.stem for p, _ in iter_session_jsonls(cc, cutoff_ts=cutoff_ts, exclude_suffixes=()))
     assert ids == ["fresh"]
 
@@ -117,9 +120,7 @@ def test_extract_first_message_falls_back_when_no_match(tmp_path: Path) -> None:
 def test_extract_first_message_handles_malformed_lines(tmp_path: Path) -> None:
     jsonl = tmp_path / "s.jsonl"
     jsonl.write_text(
-        "not json\n"
-        + json.dumps({"type": "user", "message": {"content": "found it"}})
-        + "\n",
+        "not json\n" + json.dumps({"type": "user", "message": {"content": "found it"}}) + "\n",
         encoding="utf-8",
     )
     assert extract_first_message(jsonl) == "found it"
@@ -203,7 +204,7 @@ def test_run_re_extracts_when_mtime_bumps(tmp_path: Path, monkeypatch: pytest.Mo
 
     # Rewrite with new content AND a fresher mtime.
     _write_jsonl(jsonl, [{"type": "user", "message": {"content": "second version"}}])
-    fresh_ts = datetime.now(tz=timezone.utc).timestamp()
+    fresh_ts = datetime.now(tz=UTC).timestamp()
     os.utime(jsonl, (fresh_ts, fresh_ts))
 
     out, _ = run(cc_projects_dir=cc, instance_name="Scout")

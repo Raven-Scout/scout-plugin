@@ -24,7 +24,7 @@ import os
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -272,7 +272,7 @@ def render_markdown(
     tz: ZoneInfo,
 ) -> str:
     """Build the cc-sessions.md content the SCOUT skill consumes."""
-    sessions_label = "non-{name} sessions only".format(name=instance_name)
+    sessions_label = f"non-{instance_name} sessions only"
     out: list[str] = [
         f"# Claude Code Sessions — Last {hours}h",
         f"**Generated:** {now_local_str}",
@@ -283,18 +283,13 @@ def render_markdown(
         local_dt = datetime.fromtimestamp(entry.mtime_ns / 1_000_000_000, tz=tz)
         session_time = local_dt.strftime("%Y-%m-%d %H:%M %Z")
         size_kb = entry.size_bytes // 1024
-        files_block = (
-            "\n".join(f"- {p}" for p in entry.files_touched)
-            if entry.files_touched
-            else "- (none detected)"
-        )
+        files_block = "\n".join(f"- {p}" for p in entry.files_touched) if entry.files_touched else "- (none detected)"
         out.extend(
             [
                 "---",
                 "",
                 f"## Session {idx}: {entry.project_path}",
-                f"**Last active:** {session_time} | **Size:** {size_kb} KB "
-                f"| **ID:** `{entry.session_id}`",
+                f"**Last active:** {session_time} | **Size:** {size_kb} KB | **ID:** `{entry.session_id}`",
                 "",
                 "**First message/context:**",
                 f"> {entry.first_msg}",
@@ -341,18 +336,14 @@ def run(
 
     instance_suffix = f"-{instance_name}"
     instance_suffix_lower = f"-{instance_name.lower()}"
-    exclude = _excluded_suffixes(
-        (instance_suffix, instance_suffix_lower, *extra_exclude_suffixes)
-    )
+    exclude = _excluded_suffixes((instance_suffix, instance_suffix_lower, *extra_exclude_suffixes))
 
     cache_path = cache_dir / CACHE_FILENAME
     cached = _load_cache(cache_path)
     next_cache: dict[str, SessionEntry] = {}
     entries: list[SessionEntry] = []
 
-    for jsonl, st in iter_session_jsonls(
-        cc_projects, cutoff_ts=cutoff_ts, exclude_suffixes=exclude
-    ):
+    for jsonl, st in iter_session_jsonls(cc_projects, cutoff_ts=cutoff_ts, exclude_suffixes=exclude):
         key = str(jsonl)
         prior = cached.get(key)
         if prior is not None and prior.mtime_ns == st.st_mtime_ns:
@@ -393,15 +384,10 @@ def main(
     """CLI entry — never raises. Prints the summary path so runner logs show
     where the cache landed."""
     try:
-        output_path, count = run(
-            hours=hours, instance_name=instance_name, tz_name=tz_name
-        )
+        output_path, count = run(hours=hours, instance_name=instance_name, tz_name=tz_name)
     except Exception:
         return 0  # match bash: never break the pre-session phase
-    print(
-        f"CC session cache written to {output_path} "
-        f"({count} sessions, {hours}h lookback)"
-    )
+    print(f"CC session cache written to {output_path} ({count} sessions, {hours}h lookback)")
     return 0
 
 
@@ -423,4 +409,4 @@ __all__ = [
 
 # UTC re-export so tests that import this module can grab it for assertions
 # without re-importing zoneinfo themselves.
-UTC = timezone.utc
+UTC = UTC
