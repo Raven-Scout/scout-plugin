@@ -149,3 +149,41 @@ def test_parse_file_reads_with_explicit_utf8_encoding(tmp_path: Path, monkeypatc
 
     assert "utf-8" in captured, f"read_text was called without encoding=utf-8: {captured}"
     assert any(i.priority == "🔴" for i in items)
+
+
+# Fenced code blocks must not be parsed as action items (#40). Otherwise doc
+# files showing the format get example lines treated as real tasks — backfill
+# then writes [#XXXX] into the code block and mark-done/snooze act on examples.
+
+
+def test_parse_skips_fenced_code_blocks(tmp_path):
+    from scout.action_items.parser import parse_action_items
+
+    md = tmp_path / "ai.md"
+    md.write_text(
+        "## To Do\n\n"
+        "- [ ] real task\n\n"
+        "```\n"
+        "- [ ] example inside a fence, not a task\n"
+        "## Not A Heading Either\n"
+        "```\n"
+        "- [ ] another real task\n",
+        encoding="utf-8",
+    )
+    titles = [i.title for i in parse_action_items(md)]
+    assert "real task" in titles
+    assert "another real task" in titles
+    assert not any("example inside a fence" in t for t in titles)
+    assert len(titles) == 2
+
+
+def test_parse_skips_tilde_fenced_blocks(tmp_path):
+    from scout.action_items.parser import parse_action_items
+
+    md = tmp_path / "ai.md"
+    md.write_text(
+        "## To Do\n~~~text\n- [ ] fenced example\n~~~\n- [ ] real\n",
+        encoding="utf-8",
+    )
+    titles = [i.title for i in parse_action_items(md)]
+    assert titles == ["real"]

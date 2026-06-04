@@ -89,8 +89,22 @@ def parse_action_items(filepath: Path) -> list[ActionItem]:
     current_section = ""
     current_subsection = ""
     current_item: ActionItem | None = None
+    in_fence = False
 
     for i, line in enumerate(lines, start=1):
+        # Fenced code blocks are not content: a ``` / ~~~ line toggles the
+        # fence and everything inside is skipped. Without this, example task
+        # lines in docs (README, format guides) get parsed as real items —
+        # backfill then inserts `[#XXXX]` into the code block and mark-done/
+        # snooze operate on documentation examples (#40). Checked first so a
+        # `## Heading` or `- [ ] ...` *inside* a fence isn't misread.
+        fence = line.lstrip()
+        if fence.startswith("```") or fence.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
         # Track section headers
         h2_match = SECTION_H2.match(line)
         if h2_match:
