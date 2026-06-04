@@ -25,6 +25,20 @@ from scout import paths
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
+try:
+    import fcntl
+except ImportError:  # non-POSIX (Windows) — advisory locks unavailable.
+    fcntl = None  # type: ignore[assignment]
+
+
+def _lock_exclusive(f: IO[str]) -> None:
+    """Take an exclusive advisory lock; no-op where fcntl is unavailable.
+
+    Released implicitly when the file is closed.
+    """
+    if fcntl is not None:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+
 
 def classify(tool_name: str, tool_input: dict[str, Any]) -> str:
     """Map a Claude Code tool_name + tool_input to a connector key.
@@ -101,11 +115,20 @@ def run(*, stdin: IO[str] | None = None) -> Event | None:
     log_dir = paths.data_dir() / ".scout-logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     out_path = log_dir / f"connector-calls-{et_date}.jsonl"
+    line = json.dumps(record) + "\n"
     try:
         with out_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
-    except Exception:
-        pass
+            # Hooks fire concurrently for parallel tool calls. O_APPEND only
+            # guarantees atomicity up to PIPE_BUF (~512B on some macOS FS), so
+            # large tool-response rows can interleave. An exclusive advisory
+            # lock serializes the append; the lock releases on close. (#38)
+            _lock_exclusive(f)
+            f.write(line)
+    except Exception as exc:
+        # Never break the session on a log-write failure — but don't swallow
+        # it silently either; a dropped row is an unsignalled gap in the
+        # audit log. Surface to stderr (the hook's output is captured). (#38)
+        print(f"connector-log: failed to append row: {exc!r}", file=sys.stderr)
 
     return Event(
         id=new_ulid(),
