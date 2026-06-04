@@ -22,17 +22,32 @@ from scout.ids import short_prefix_pattern
 _CHECKBOX_LINE_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>- \[[ xX]\] )")
 
 
-def atomic_write_lines(target: Path, lines: list[str]) -> None:
-    """Replace `target`'s contents with `lines` (one per line, trailing newline)."""
+def atomic_write_lines(
+    target: Path,
+    lines: list[str],
+    *,
+    newline: str = "\n",
+    trailing_newline: bool = True,
+) -> None:
+    """Replace `target`'s contents with `lines`, one per line.
+
+    ``newline`` is the line separator written between lines (and as the
+    final terminator); ``trailing_newline`` controls whether the file ends
+    with one. Both default to the historical behavior (LF, trailing newline)
+    but mutators pass the values detected from the original file so a CRLF
+    file or a file without a final newline round-trips byte-for-byte instead
+    of being silently reflowed (#34). Opened with ``newline=""`` so the
+    explicit separators are written verbatim (no platform translation).
+    """
     parent = target.parent
     parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=str(parent))
     tmp = Path(tmp_path)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
-            if lines:
-                f.write("\n")
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(newline.join(lines))
+            if lines and trailing_newline:
+                f.write(newline)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, target)
@@ -43,13 +58,24 @@ def atomic_write_lines(target: Path, lines: list[str]) -> None:
         raise
 
 
-def _read_lines(target: Path) -> list[str]:
-    return target.read_text(encoding="utf-8").splitlines()
+def _read_lines_with_style(target: Path) -> tuple[list[str], str, bool]:
+    """Read `target` as ``(lines, newline, trailing_newline)``.
+
+    Decodes the raw bytes (not text mode, whose universal-newline translation
+    would erase the original ending) so CRLF is detectable, then splits on
+    both endings. ``newline`` is ``"\\r\\n"`` if the file uses CRLF anywhere,
+    else ``"\\n"``; ``trailing_newline`` is whether the file ends with a
+    newline. Threaded into atomic_write_lines so edits preserve both (#34).
+    """
+    text = target.read_bytes().decode("utf-8")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    trailing_newline = text.endswith("\n")
+    return text.splitlines(), newline, trailing_newline
 
 
 def flip_checkbox(target: Path, *, line_number: int, to_done: bool) -> None:
     """Toggle `[ ]` ⇄ `[x]` on the 1-indexed line. Preserves all other bytes."""
-    lines = _read_lines(target)
+    lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"flip_checkbox: line {line_number} out of range (1..{len(lines)})")
@@ -58,37 +84,37 @@ def flip_checkbox(target: Path, *, line_number: int, to_done: bool) -> None:
     if old not in lines[idx]:
         raise ActionItemError(f"flip_checkbox: line {line_number} does not contain `{old}`")
     lines[idx] = lines[idx].replace(old, new, 1)
-    atomic_write_lines(target, lines)
+    atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)
 
 
 def insert_below(target: Path, *, line_number: int, text: str) -> None:
     """Insert `text` as a new line directly below the 1-indexed line."""
-    lines = _read_lines(target)
+    lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"insert_below: line {line_number} out of range (1..{len(lines)})")
     lines.insert(idx + 1, text)
-    atomic_write_lines(target, lines)
+    atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)
 
 
 def replace_line(target: Path, *, line_number: int, text: str) -> None:
     """Replace the 1-indexed line wholesale with `text`."""
-    lines = _read_lines(target)
+    lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"replace_line: line {line_number} out of range (1..{len(lines)})")
     lines[idx] = text
-    atomic_write_lines(target, lines)
+    atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)
 
 
 def delete_line(target: Path, *, line_number: int) -> None:
     """Remove the 1-indexed line entirely."""
-    lines = _read_lines(target)
+    lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"delete_line: line {line_number} out of range (1..{len(lines)})")
     del lines[idx]
-    atomic_write_lines(target, lines)
+    atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)
 
 
 def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
@@ -101,7 +127,7 @@ def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
     Refuses if the line already carries a `[#XXXX]` prefix — the caller
     should not be asking to add one if scout.id_map already has a record.
     """
-    lines = _read_lines(target)
+    lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"add_prefix_to_line: line {line_number} out of range (1..{len(lines)})")
@@ -113,4 +139,4 @@ def add_prefix_to_line(target: Path, *, line_number: int, prefix: str) -> None:
         raise ActionItemError(f"add_prefix_to_line: line {line_number} doesn't start with a checkbox marker")
     head_end = m.end()
     lines[idx] = line[:head_end] + f"[#{prefix}] " + line[head_end:]
-    atomic_write_lines(target, lines)
+    atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)

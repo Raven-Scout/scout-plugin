@@ -204,3 +204,38 @@ def test_backfill_prefixes_handles_indented_checkbox_end_to_end(
     # Both lines must now carry a prefix, and the indent on line 3 must be preserved.
     assert " - [ ] [#" in out, f"indent of indented line not preserved: {out!r}"
     assert "\n- [ ] [#" in out, f"non-indented line not prefixed: {out!r}"
+
+
+# Line-ending / trailing-newline preservation across the edit round-trip (#34).
+
+
+def test_flip_checkbox_preserves_crlf(tmp_path):
+    from scout.action_items.writer import flip_checkbox
+
+    target = tmp_path / "ai.md"
+    target.write_bytes(b"## To Do\r\n- [ ] task one\r\n- [ ] task two\r\n")
+    flip_checkbox(target, line_number=2, to_done=True)
+    data = target.read_bytes()
+    assert data == b"## To Do\r\n- [x] task one\r\n- [ ] task two\r\n"
+    # No lone LF introduced.
+    assert b"\n" not in data.replace(b"\r\n", b"")
+
+
+def test_insert_below_preserves_absent_trailing_newline(tmp_path):
+    from scout.action_items.writer import insert_below
+
+    target = tmp_path / "ai.md"
+    target.write_bytes(b"## To Do\n- [ ] task")  # no final newline
+    insert_below(target, line_number=2, text="  - note")
+    data = target.read_bytes()
+    assert data == b"## To Do\n- [ ] task\n  - note"
+    assert not data.endswith(b"\n")
+
+
+def test_lf_file_round_trips_unchanged(tmp_path):
+    from scout.action_items.writer import replace_line
+
+    target = tmp_path / "ai.md"
+    target.write_bytes(b"## To Do\n- [ ] a\n- [ ] b\n")
+    replace_line(target, line_number=2, text="- [ ] a edited")
+    assert target.read_bytes() == b"## To Do\n- [ ] a edited\n- [ ] b\n"
