@@ -558,14 +558,20 @@ def fire_macos_notification(alerts: list[Alert]) -> None:
     summary = "; ".join(a.name for a in alerts[:3])
     if len(alerts) > 3:
         summary += f" (+{len(alerts) - 3} more)"
-    body = summary.replace('"', "'")
+    # Pass the title and body as argv to an `on run argv` handler and read the
+    # script from stdin. Connector names and reasons come from user-controlled
+    # YAML and the JSONL log; interpolating them into the AppleScript *source*
+    # (the old `display notification "{body}"`) allowed a name containing
+    # quotes/backslashes/newlines to break the script or inject arbitrary
+    # AppleScript. As argv they are pure data — never parsed as code. (#51)
+    script = (
+        'on run argv\n    display notification (item 2 of argv) with title (item 1 of argv) sound name "Basso"\nend run'
+    )
     try:
         subprocess.run(
-            [
-                "osascript",
-                "-e",
-                f'display notification "{body}" with title "Scout: connector degradation" sound name "Basso"',
-            ],
+            ["osascript", "-", "Scout: connector degradation", summary],
+            input=script,
+            text=True,
             check=False,
             timeout=5,
         )

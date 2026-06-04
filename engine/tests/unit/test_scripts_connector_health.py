@@ -635,3 +635,47 @@ def test_outbound_only_connectors_excluded_from_warnings(fake_data_dir, monkeypa
     alerts = event.payload["alerts"]
     tg_alerts = [a for a in alerts if a["connector_key"] == "notify:telegram"]
     assert tg_alerts == []
+
+
+# osascript injection hardening (#51). Connector names come from user YAML and
+# the JSONL log; they must reach `display notification` as argv data, never be
+# interpolated into the AppleScript source.
+
+
+def test_fire_macos_notification_passes_data_as_argv_not_source(monkeypatch):
+    import scout.scripts.connector_health_report as chr_mod
+    from scout.scripts.connector_health_report import Alert, fire_macos_notification
+
+    calls = {}
+
+    def fake_run(args, **kwargs):
+        calls["args"] = args
+        calls["input"] = kwargs.get("input")
+
+        class _R:
+            returncode = 0
+
+        return _R()
+
+    monkeypatch.setattr(chr_mod.subprocess, "run", fake_run)
+
+    evil = 'evil" with title "x" \n do shell script "touch /tmp/pwned'
+    fire_macos_notification([Alert("CRITICAL", evil, "down", "slack", "")])
+
+    # The malicious name is a discrete argv element, verbatim — not escaped
+    # into and not present in the script source read from stdin.
+    assert evil in calls["args"]
+    assert "on run argv" in calls["input"]
+    assert evil not in calls["input"]
+    # osascript reads the script from stdin (`-`), data follows as arguments.
+    assert calls["args"][:2] == ["osascript", "-"]
+
+
+def test_fire_macos_notification_noop_on_empty(monkeypatch):
+    import scout.scripts.connector_health_report as chr_mod
+    from scout.scripts.connector_health_report import fire_macos_notification
+
+    called = {"n": 0}
+    monkeypatch.setattr(chr_mod.subprocess, "run", lambda *a, **k: called.__setitem__("n", called["n"] + 1))
+    fire_macos_notification([])
+    assert called["n"] == 0
