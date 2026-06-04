@@ -111,3 +111,29 @@ def test_run_truncates_err_snippet_at_160_chars(tmp_path, monkeypatch):
     event = run(stdin=io.StringIO(payload))
     assert len(event.payload["err"]) == 160
     assert event.payload["err"] == "X" * 160
+
+
+def test_run_surfaces_write_failure_instead_of_swallowing(tmp_path, monkeypatch, capsys):
+    """A JSONL append failure is logged to stderr (not silently dropped), but
+    still never breaks the session — run() returns the Event regardless (#38)."""
+    import pathlib
+
+    monkeypatch.setenv("SCOUT_MODE", "manual")
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+
+    real_open = pathlib.Path.open
+
+    def fail_jsonl_open(self, *args, **kwargs):
+        if "connector-calls-" in self.name:
+            raise OSError("disk full")
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "open", fail_jsonl_open)
+
+    payload = json.dumps({"session_id": "x", "tool_name": "Read", "tool_response": {"isError": False}})
+    event = run(stdin=io.StringIO(payload))
+
+    assert isinstance(event, Event)  # session not broken
+    err = capsys.readouterr().err
+    assert "failed to append row" in err
+    assert "disk full" in err
