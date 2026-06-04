@@ -1,134 +1,38 @@
 #!/usr/bin/env bash
 # cc-session-cache.sh — Pre-fetch Claude Code session summaries for {{INSTANCE_NAME}}.
+#
 # Scans {{USER_NAME}}'s CC session files, extracts recent session metadata,
-# and writes a summary to .scout-cache/cc-sessions.md.
+# and writes a summary to .scout-cache/cc-sessions.md so the SCOUT skill can
+# read it instead of re-discovering and parsing JSONL files from inside the
+# session.
 #
-# {{INSTANCE_NAME}} reads the cache file instead of discovering and parsing JSONL files
-# from inside the session — saves tool calls and tokens.
-#
-# Usage: Called by {{INSTANCE_NAME}} runner scripts before invoking Claude.
-#   ./scripts/cc-session-cache.sh [hours-lookback]
+# Usage: ./scripts/cc-session-cache.sh [hours-lookback]
 #   hours-lookback: How many hours back to scan (default: 24)
+#
+# This is a thin wrapper around `scoutctl session cc-cache`. The bash version
+# spawned a fresh python3 cold start per JSONL plus a 5-stage subprocess
+# pipeline for files_touched extraction — order of dozens of Python starts
+# per session-start. The Python module does it all in one process and adds
+# a mtime-keyed cache so unchanged files from the previous run skip parsing
+# entirely (see issues #74 + #75).
 
 set -eu
 
 HOURS="${1:-24}"
-SCOUT_DIR="${SCOUT_DIR:-{{SCOUT_DIR}}}"
-CC_PROJECTS="$HOME/.claude/projects"
-CACHE_DIR="$SCOUT_DIR/.scout-cache"
-OUTPUT="$CACHE_DIR/cc-sessions.md"
-mkdir -p "$CACHE_DIR"
-
-NOW_LOCAL=$(TZ={{TIMEZONE}} date '+%Y-%m-%d %H:%M %Z')
-
-# Find JSONL session files modified within the lookback window, excluding {{INSTANCE_NAME}}'s own sessions
-CUTOFF=$(date -v-${HOURS}H '+%s' 2>/dev/null || date -d "${HOURS} hours ago" '+%s' 2>/dev/null || echo "0")
-
-cat > "$OUTPUT" <<HEADER
-# Claude Code Sessions — Last ${HOURS}h
-**Generated:** ${NOW_LOCAL}
-**Source:** ~/.claude/projects/ (non-{{INSTANCE_NAME}} sessions only)
-
-HEADER
-
-SESSION_COUNT=0
-
-for projdir in "$CC_PROJECTS"/*/; do
-  [ -d "$projdir" ] || continue
-  dirname=$(basename "$projdir")
-
-  # Skip {{INSTANCE_NAME}}'s own sessions
-  case "$dirname" in
-    *"-{{INSTANCE_NAME}}"|*"-{{INSTANCE_NAME_LOWER}}"|*"-Scout"|*"-scout") continue ;;
-  esac
-
-  while IFS= read -r jsonl; do
-    [ -z "$jsonl" ] && continue
-
-    if [[ "$(uname)" == "Darwin" ]]; then
-      file_mtime=$(stat -f '%m' "$jsonl" 2>/dev/null || echo "0")
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
     else
-      file_mtime=$(stat -c '%Y' "$jsonl" 2>/dev/null || echo "0")
+        echo "cc-session-cache.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 1
     fi
-
-    if [ "$file_mtime" -lt "$CUTOFF" ]; then
-      continue
-    fi
-
-    session_id=$(basename "$jsonl" .jsonl)
-
-    # Derive the project path from the directory name
-    # Format: -Users-username-keboola-repo-name → /Users/username/keboola/repo-name
-    project_path=$(echo "$dirname" | sed 's/^-/\//' | sed 's/-/\//g')
-
-    file_size=$(wc -c < "$jsonl" | tr -d ' ')
-    file_size_kb=$((file_size / 1024))
-
-    # Extract first user message (the initial prompt/context)
-    first_msg=$(head -50 "$jsonl" 2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') in ('user', 'human') or obj.get('role') in ('user', 'human'):
-            msg = obj.get('message', {})
-            content = msg.get('content', '') if isinstance(msg, dict) else obj.get('content', '')
-            if isinstance(content, list):
-                for part in content:
-                    if isinstance(part, dict) and part.get('type') == 'text':
-                        text = part['text'][:500]
-                        print(text)
-                        sys.exit(0)
-            elif isinstance(content, str) and content.strip():
-                print(content[:500])
-                sys.exit(0)
-    except (json.JSONDecodeError, KeyError, TypeError):
-        continue
-print('(could not extract first message)')
-" 2>/dev/null || echo "(parse error)")
-
-    # Extract files touched. Filter out agent-internal noise (tool-results, memory,
-    # plugin caches, node_modules, /private/tmp) so only signal reaches the LLM.
-    files_touched=$(grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' "$jsonl" 2>/dev/null \
-      | sed 's/"file_path"[[:space:]]*:[[:space:]]*"//' | sed 's/"$//' \
-      | grep -Ev '/\.claude/projects/.*/tool-results/|/\.claude/projects/.*/tasks/|/\.claude/plugins/cache/|/node_modules/|^/private/tmp/claude-|/\.claude/projects/.*/memory/' \
-      | sort -u | head -10 \
-      | sed "s|^$HOME/|~/|" \
-      || echo "(none detected)")
-
-    if [[ "$(uname)" == "Darwin" ]]; then
-      session_time=$(TZ={{TIMEZONE}} date -r "$file_mtime" '+%Y-%m-%d %H:%M %Z' 2>/dev/null || echo "unknown")
-    else
-      session_time=$(TZ={{TIMEZONE}} date -d "@$file_mtime" '+%Y-%m-%d %H:%M %Z' 2>/dev/null || echo "unknown")
-    fi
-
-    SESSION_COUNT=$((SESSION_COUNT + 1))
-
-    cat >> "$OUTPUT" <<SESSION
----
-
-## Session ${SESSION_COUNT}: ${project_path}
-**Last active:** ${session_time} | **Size:** ${file_size_kb} KB | **ID:** \`${session_id}\`
-
-**First message/context:**
-> ${first_msg}
-
-**Files touched:**
-$(echo "$files_touched" | sed 's/^/- /')
-
-SESSION
-
-  done < <(find "$projdir" -name '*.jsonl' -type f 2>/dev/null)
-done
-
-if [ "$SESSION_COUNT" -eq 0 ]; then
-  echo "*No non-{{INSTANCE_NAME}} CC sessions found in the last ${HOURS} hours.*" >> "$OUTPUT"
 fi
 
-echo "" >> "$OUTPUT"
-echo "**Total:** ${SESSION_COUNT} session(s) found." >> "$OUTPUT"
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
 
-echo "CC session cache written to $OUTPUT ($SESSION_COUNT sessions, ${HOURS}h lookback, at $NOW_LOCAL)"
+exec "$SCOUTCTL_BIN" session cc-cache \
+    --hours "$HOURS" \
+    --instance-name "{{INSTANCE_NAME}}" \
+    --timezone "{{TIMEZONE}}"

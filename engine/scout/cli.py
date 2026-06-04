@@ -142,6 +142,40 @@ def budget_check_cmd(
     raise typer.Exit(budget_run(verbose=verbose))
 
 
+# `scoutctl session cc-cache` replaces ~/Scout/scripts/cc-session-cache.sh
+# (#74 + #75). The bash version spawned one python3 cold start per JSONL file
+# in ~/.claude/projects/* plus a 5-stage subprocess pipeline per file — often
+# dozens of starts per Scout session-start. This is one process and reuses
+# unchanged-mtime entries from a JSON cache.
+session_app = typer.Typer(help="Pre-session data caches for scheduled Scout runs.")
+app.add_typer(session_app, name="session")
+
+
+@session_app.command("cc-cache")
+def session_cc_cache_cmd(
+    hours: int = typer.Option(
+        24,
+        "--hours",
+        "-h",
+        help="Lookback window for CC session JSONLs (default 24h).",
+    ),
+    instance_name: str = typer.Option(
+        "Scout",
+        "--instance-name",
+        help="Instance name suffix to exclude (skip Scout's own sessions).",
+    ),
+    timezone: str = typer.Option(
+        "America/New_York",
+        "--timezone",
+        help="IANA zone for the rendered timestamps.",
+    ),
+) -> None:
+    """Refresh .scout-cache/cc-sessions.md with metadata from recent CC sessions."""
+    from scout.scripts.cc_session_cache import main as cc_main
+
+    raise typer.Exit(cc_main(hours=hours, instance_name=instance_name, tz_name=timezone))
+
+
 def _register_connectors() -> None:
     """scoutctl connectors {list,show,reload} — read-only roster ops in v0.4."""
     connectors_app = typer.Typer(help="Connector roster operations (read-only in v0.4).")
