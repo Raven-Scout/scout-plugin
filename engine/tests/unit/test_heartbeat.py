@@ -7,18 +7,14 @@ all gates into a pure decide() function for testability.
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from scout.scripts.heartbeat import (
-    DEFAULT_MIN_GAP_MINUTES,
     DEFAULT_OFF_PEAK_END,
-    DEFAULT_OFF_PEAK_MIN_GAP_MINUTES,
     DEFAULT_OFF_PEAK_START,
-    Decision,
     HeartbeatConfig,
     TrackerStats,
     decide,
@@ -27,7 +23,6 @@ from scout.scripts.heartbeat import (
     read_tracker_stats,
     research_queue_has_unchecked,
 )
-
 
 # ----- helpers ------------------------------------------------------------
 

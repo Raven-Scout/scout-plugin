@@ -167,15 +167,9 @@ def read_tracker_stats(tracker_path: Path, *, now: datetime | None = None) -> Tr
     except OSError:
         return TrackerStats.empty()
     return TrackerStats(
-        minutes_since_last_session=(
-            int((n - last_any).total_seconds() / 60) if last_any else 9999
-        ),
-        hours_since_dreaming=(
-            int((n - last_dreaming).total_seconds() / 3600) if last_dreaming else 99
-        ),
-        hours_since_research=(
-            int((n - last_research).total_seconds() / 3600) if last_research else 999
-        ),
+        minutes_since_last_session=(int((n - last_any).total_seconds() / 60) if last_any else 9999),
+        hours_since_dreaming=(int((n - last_dreaming).total_seconds() / 3600) if last_dreaming else 99),
+        hours_since_research=(int((n - last_research).total_seconds() / 3600) if last_research else 999),
     )
 
 
@@ -291,10 +285,7 @@ def decide(
     if stats.minutes_since_last_session < config.min_gap_minutes:
         return Decision(
             "skip",
-            reason=(
-                f"last_session_{stats.minutes_since_last_session}m_ago_"
-                f"need_{config.min_gap_minutes}m"
-            ),
+            reason=(f"last_session_{stats.minutes_since_last_session}m_ago_need_{config.min_gap_minutes}m"),
         )
 
     off_peak = in_off_peak(now_hour, config)
@@ -302,15 +293,11 @@ def decide(
         return Decision(
             "skip",
             reason=(
-                f"off_peak_conservatism_{stats.minutes_since_last_session}m_ago_"
-                f"need_{config.off_peak_min_gap_minutes}m"
+                f"off_peak_conservatism_{stats.minutes_since_last_session}m_ago_need_{config.off_peak_min_gap_minutes}m"
             ),
         )
 
-    has_work = (
-        stats.hours_since_dreaming >= config.dreaming_signal_hours
-        or uncommitted_vault_changes
-    )
+    has_work = stats.hours_since_dreaming >= config.dreaming_signal_hours or uncommitted_vault_changes
     if not has_work:
         return Decision("skip", reason="no_pending_work_signals")
 
@@ -326,8 +313,7 @@ def decide(
             runner=research_runner,
             session_type="research",
             reason=(
-                f"research_{stats.hours_since_research}h_since_last_"
-                f"dreaming_{stats.hours_since_dreaming}h_since_last"
+                f"research_{stats.hours_since_research}h_since_last_dreaming_{stats.hours_since_dreaming}h_since_last"
             ),
         )
 

@@ -186,9 +186,7 @@ app.add_typer(heartbeat_app, name="heartbeat")
 
 @heartbeat_app.command("run")
 def heartbeat_run_cmd(
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Decide and log but do not launch the runner."
-    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Decide and log but do not launch the runner."),
 ) -> None:
     """Apply the heartbeat gating policy and optionally launch a runner."""
     from scout.scripts.heartbeat import main as heartbeat_main
