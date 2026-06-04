@@ -535,9 +535,11 @@ def _emit_event(
     The file name is ``schedule-events-<UTC-date>.jsonl`` — UTC-dated
     intentionally (event timestamps are UTC; the file name follows).
 
-    The UTC date is derived from ``_now()`` (not ``datetime.now``) so that
-    a single ``patch("scout.scripts.schedule_tick._now", ...)`` in tests
-    sets both the event clock and the file name consistently.
+    The UTC date is sliced from ``ev.ts`` (the already-formatted event
+    timestamp) rather than read from a second clock. ``ts`` and the file
+    name must agree: a separate ``_now()`` read could land on the far side
+    of UTC midnight from ``now_iso()``, filing a day-N event into the
+    day-(N+1) log and breaking replays/filters keyed on the file name (#37).
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     ev = Event(
@@ -547,7 +549,9 @@ def _emit_event(
         source=source,
         payload=payload,
     )
-    utc_date = _now().astimezone(_dt.UTC).date().isoformat()
+    # now_iso() is "YYYY-MM-DDTHH:MM:SS.mmmZ" in UTC, so the first 10 chars
+    # are the UTC date — the same instant the ts records, by construction.
+    utc_date = ev.ts[:10]
     log_path = log_dir / f"{EVENT_LOG_PREFIX}{utc_date}.jsonl"
     row = {
         "id": ev.id,
