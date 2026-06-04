@@ -54,6 +54,26 @@ def test_write_manifest_round_trip(tmp_path: Path) -> None:
     assert written == target
     decoded = json.loads(target.read_text())
     assert decoded["version"] == __version__
+    # Atomic write leaves no stray tempfile behind (#44).
+    assert not list(tmp_path.glob(".manifest.*"))
+
+
+def test_write_manifest_atomic_failure_preserves_existing(tmp_path: Path, monkeypatch) -> None:
+    """A crash during the rename must not corrupt an existing manifest, and
+    must clean up the tempfile rather than leave a torn .tmp around (#44)."""
+    import scout.manifest as m
+
+    target = tmp_path / "manifest.json"
+    target.write_text('{"version": "prior-good"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(m.os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+
+    with pytest.raises(OSError, match="disk full"):
+        write_manifest(target)
+
+    # Original file is untouched (rename never happened) and no tempfile left.
+    assert json.loads(target.read_text())["version"] == "prior-good"
+    assert not list(tmp_path.glob(".manifest.*"))
 
 
 def test_build_manifest_enumerates_subcommands_from_typer_app(
