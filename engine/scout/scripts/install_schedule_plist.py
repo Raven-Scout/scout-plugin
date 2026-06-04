@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from html import escape
 from pathlib import Path
 
 PLIST_NAME = "com.scout.schedule-tick.plist"
@@ -51,10 +52,14 @@ def install_plist(
     target = agents_dir / PLIST_NAME
     if target.exists() and not force:
         raise FileExistsError(target)
+    # XML-escape substituted values: they land inside <string> elements, and a
+    # path with `&`, `<`, `>`, `"` (all legal on macOS, e.g. ~/R&D) would
+    # otherwise produce malformed XML that launchd silently refuses to load,
+    # stopping every scheduled run with no error. (#49)
     rendered = (
         TEMPLATE.read_text(encoding="utf-8")
-        .replace("__USER_HOME__", str(home))
-        .replace("__SCOUTCTL_BIN__", str(resolve_scoutctl_bin()))
+        .replace("__USER_HOME__", escape(str(home), quote=True))
+        .replace("__SCOUTCTL_BIN__", escape(str(resolve_scoutctl_bin()), quote=True))
     )
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:

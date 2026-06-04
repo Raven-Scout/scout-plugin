@@ -78,3 +78,24 @@ def test_uninstall_plist_silent_when_missing(tmp_path):
     target_dir.mkdir()
     # No exception when target plist doesn't exist.
     uninstall_plist(agents_dir=target_dir)
+
+
+def test_install_plist_escapes_xml_metacharacters(tmp_path):
+    """A home path with XML metacharacters (legal on macOS) must produce a
+    well-formed plist launchd can load, not malformed XML (#49)."""
+    import plistlib
+
+    home = tmp_path / 'R&D <lab> "x"'
+    home.mkdir()
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    target = install_plist(home=home, agents_dir=agents)
+
+    raw = target.read_text(encoding="utf-8")
+    assert "&amp;" in raw  # the bare & was escaped
+    assert "R&D <lab>" not in raw  # not left as raw, XML-breaking text
+
+    # Critically: the plist parses, and values round-trip to the real path.
+    with target.open("rb") as f:
+        data = plistlib.load(f)
+    assert data["EnvironmentVariables"]["HOME"] == str(home)
