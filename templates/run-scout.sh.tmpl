@@ -115,6 +115,14 @@ if [ $EXIT_CODE -ne 0 ]; then
     fi
 fi
 
+# Post-session: guarantee stable [#XXXX] prefixes on today's action items so
+# scout-app's --by-id write path always has a key (issue #10 / stable-id
+# contract). Deterministic — does not depend on the session prompt complying.
+POST_BACKFILL="$SCOUT_DIR/scripts/post-session-backfill.sh"
+if [ -x "$POST_BACKFILL" ]; then
+    "$POST_BACKFILL" >> "$LOG_FILE" 2>&1 || true
+fi
+
 # Track session cost (skill self-reports actual cost from inside the session via the
 # same script; this runner call is a fallback so failed/crashed runs still leave a row).
 COST_TRACKER="$SCOUT_DIR/scripts/write-session-cost.sh"

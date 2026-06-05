@@ -1,0 +1,73 @@
+{
+  "_doc": "Cross-language parser contract. Each entry is a raw action-item task line; both the Swift (scout-app) and Python (scout-plugin) parsers MUST reproduce expected exactly. Seeded with scout-app #10 failure modes. Canonical copy lives here. The same corpus will be asserted by scout-app's Swift ParserContractTests; the copies are kept byte-identical by a checksum guard added in M3.4. Field contract (matches scout-app/Scout/ActionItems/ActionItemsParser.swift, the reference parser): short_prefix = bare 4-char Crockford [#XXXX] code extracted+removed from the line, else null; subject = leading title with bold/strike/wikilink markup RETAINED but with the [#XXXX] prefix removed; plain_subject = subject with markdown tokens stripped (the form the --subject substring matcher compares against); body = remainder after the first ' — '/' – '/' - ' separator found OUTSIDE bold/strike/code/wikilink/link tokens (else ''). Note: italic _(...)_ is NOT a separator, so trailing _(...)_ parentheticals stay in subject.",
+  "entries": [
+    {
+      "name": "prefixed-emoji-bold",
+      "line": "- [ ] [#AB30] **🔴 Validate kai-agent LangSmith tracing — [[AI-3026]]** _(carries 6/2→6/4)_ — overnight progress",
+      "expected": {
+        "short_prefix": "AB30",
+        "subject": "**🔴 Validate kai-agent LangSmith tracing — [[AI-3026]]** _(carries 6/2→6/4)_",
+        "plain_subject": "🔴 Validate kai-agent LangSmith tracing — AI-3026 _(carries 6/2→6/4)_",
+        "body": "overnight progress"
+      },
+      "_note": "Prefix changed from draft [#AI30] to [#AB30]: 'AI30' contains 'I', which is NOT in the Crockford alphabet (I/L/O/U excluded), so it could never parse as a short_prefix. subject retains '**' bold markers per the Swift reference contract; the inner ' — ' before [[AI-3026]] is inside the bold span so the split lands at the LAST top-level ' — ' (before 'overnight progress'); the italic _(carries ...)_ is not a separator so it stays in subject. Python render.py xfails this case: it does not strip the [#AB30] prefix from subject/plain_subject (no short_prefix extraction in render.py) — see test _note."
+    },
+    {
+      "name": "unprefixed-the-issue10-line",
+      "line": "- [ ] **🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers** _(net-new from Kai's pricing meeting)_",
+      "expected": {
+        "short_prefix": null,
+        "subject": "**🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers** _(net-new from Kai's pricing meeting)_",
+        "plain_subject": "🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers _(net-new from Kai's pricing meeting)_",
+        "body": ""
+      },
+      "_note": "No separator outside tokens, so body is empty and the whole line (bold span + trailing italic) is the subject. subject retains '**'; plain_subject strips it. Draft omitted the bold markers from subject (corrected, case a)."
+    },
+    {
+      "name": "title-case-scout-no-separator",
+      "line": "- [ ] [#SC01] Review Scout backlog",
+      "expected": { "short_prefix": "SC01", "subject": "Review Scout backlog", "plain_subject": "Review Scout backlog", "body": "" }
+    },
+    {
+      "name": "done-with-github-pr-link",
+      "line": "- [x] [#PR99] **Merge the fix** — see https://github.com/keboola/keboola_com/pull/301",
+      "expected": {
+        "short_prefix": "PR99",
+        "subject": "**Merge the fix**",
+        "plain_subject": "Merge the fix",
+        "body": "see https://github.com/keboola/keboola_com/pull/301"
+      }
+    },
+    {
+      "name": "snooze-suffix",
+      "line": "- [ ] [#SNZ1] **Ping Devin** — nudge — 🛌 Snoozed until 2026-06-10",
+      "expected": {
+        "short_prefix": "SNZ1",
+        "subject": "**Ping Devin**",
+        "plain_subject": "Ping Devin",
+        "body": "nudge — 🛌 Snoozed until 2026-06-10"
+      }
+    },
+    {
+      "name": "carry-in-was-kind",
+      "line": "- [ ] [#CRY2] **Reschedule Groupon** _(carried in from 2026-06-03, was urgent)_",
+      "expected": {
+        "short_prefix": "CRY2",
+        "subject": "**Reschedule Groupon** _(carried in from 2026-06-03, was urgent)_",
+        "plain_subject": "Reschedule Groupon _(carried in from 2026-06-03, was urgent)_",
+        "body": ""
+      },
+      "_note": "No separator outside tokens (the italic _(...)_ is not a separator), so body is empty and the parenthetical stays in subject. Draft put the parenthetical in body (corrected, case a)."
+    },
+    {
+      "name": "wikilink-alias-and-code",
+      "line": "- [ ] [#WK01] **Check [[AI-2619|the cost ruling]]** — run `scoutctl status`",
+      "expected": {
+        "short_prefix": "WK01",
+        "subject": "**Check [[AI-2619|the cost ruling]]**",
+        "plain_subject": "Check AI-2619",
+        "body": "run `scoutctl status`"
+      }
+    }
+  ]
+}
