@@ -34,6 +34,7 @@ Parser API note (discovered during M3.2):
   practical fallout: the click-to-copy `--subject` needle render.py emits
   carries the prefix and can miss the stripped substring comparison the CLIs do.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,7 +52,11 @@ CORPUS = Path(__file__).resolve().parents[1] / "fixtures" / "contract" / "parser
 # (case b) tracked against the intended contract, NOT corpus errors — the corpus
 # keeps the correct (prefix-stripped) expectation and we xfail only these two
 # field assertions for these entries. `short_prefix` and `body` still pass.
-_PREFIX_STRIP_BUG = "scout-plugin render.parse() does not strip the [#XXXX] short prefix from subject/plain_subject (no prefix extraction in render.py); Swift reference parser does. See module docstring + scout-app #10."
+_PREFIX_STRIP_BUG = (
+    "scout-plugin render.parse() does not strip the [#XXXX] short prefix from "
+    "subject/plain_subject (no prefix extraction in render.py); Swift reference "
+    "parser does. See module docstring + scout-app #10."
+)
 
 
 def _load() -> list[dict]:

@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,9 +22,7 @@ TEMPLATE = REPO_ROOT / "templates" / "scripts" / "post-session-backfill.sh.tmpl"
 
 
 def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    ).stdout
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
 
 
 def _render(tmpl: Path, scout_dir: Path, scoutctl_bin: str) -> Path:
@@ -57,8 +56,10 @@ def vault(tmp_path: Path) -> Path:
 
 
 def test_backfill_adds_prefix_and_commits_once(vault: Path) -> None:
-    scoutctl = shutil.which("scoutctl")
-    assert scoutctl, "scoutctl must be on PATH for this integration test"
+    candidate = Path(sys.executable).with_name("scoutctl")
+    scoutctl = str(candidate) if candidate.exists() else shutil.which("scoutctl")
+    if not scoutctl:
+        pytest.skip("scoutctl console script not found (looked next to sys.executable and on PATH)")
     script = _render(TEMPLATE, vault, scoutctl)
 
     # The wrapper defaults (no arg) to ET-local "today"; the seeded daily file is
