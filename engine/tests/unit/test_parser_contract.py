@@ -1,8 +1,9 @@
 """Cross-language parser contract — Python side.
 
 Asserts scout-plugin's parser reproduces parser-corpus.json exactly. The same
-corpus is asserted by scout-app's Swift ParserContractTests; the two corpus
-copies are checksum-guarded so they cannot drift. See scout-app issue #10.
+corpus will be asserted by scout-app's Swift ParserContractTests; the two corpus
+copies are kept byte-identical by a checksum guard (added in M3.4) so they
+cannot drift. See scout-app issue #10.
 
 Parser API note (discovered during M3.2):
   scout-plugin has TWO parsers, and the four contract fields are split across
@@ -93,6 +94,7 @@ def test_body(entry: dict, tmp_path: Path) -> None:
 @pytest.mark.parametrize("entry", _ENTRIES, ids=lambda e: e["name"])
 def test_subject(entry: dict, request: pytest.FixtureRequest, tmp_path: Path) -> None:
     """subject (markdown-retaining title) comes from render.parse."""
+    # prefixed entries: render.py leaves the [#XXXX] prefix glued on — see _PREFIX_STRIP_BUG
     if entry["expected"]["short_prefix"] is not None:
         request.node.add_marker(pytest.mark.xfail(reason=_PREFIX_STRIP_BUG, strict=True))
     task = _only_task(_write(tmp_path, entry["line"]))
@@ -102,6 +104,7 @@ def test_subject(entry: dict, request: pytest.FixtureRequest, tmp_path: Path) ->
 @pytest.mark.parametrize("entry", _ENTRIES, ids=lambda e: e["name"])
 def test_plain_subject(entry: dict, request: pytest.FixtureRequest, tmp_path: Path) -> None:
     """plain_subject = render._plain_subject(subject); the --subject match form."""
+    # prefixed entries: render.py leaves the [#XXXX] prefix glued on — see _PREFIX_STRIP_BUG
     if entry["expected"]["short_prefix"] is not None:
         request.node.add_marker(pytest.mark.xfail(reason=_PREFIX_STRIP_BUG, strict=True))
     task = _only_task(_write(tmp_path, entry["line"]))
