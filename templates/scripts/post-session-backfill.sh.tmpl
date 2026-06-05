@@ -1,0 +1,44 @@
+#!/bin/bash
+# Post-session backfill — guarantees every open action-item task line carries a
+# stable [#XXXX] prefix, deterministically, regardless of whether the session
+# prompt minted them. Runs AFTER the Claude session (which makes its own
+# commits) and lands any newly-minted prefixes in a dedicated commit, so
+# scout-app's `--by-id` write path always has a structural key to match on.
+#
+# Idempotent: a file already fully prefixed produces no diff and no commit.
+# Background: scout-app issue #10 + docs spec 2026-06-04-stable-id-contract.
+#
+# Usage: post-session-backfill.sh [DAILY_FILE]
+#   With no argument the CLI targets the ET-local "today" file (production).
+#   An explicit path may be passed as $1 to override the target (used by tests).
+set -euo pipefail
+
+SCOUT_DIR="{{SCOUT_DIR}}"
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "post-session-backfill.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 0   # never fail the run over a missing backfill
+    fi
+fi
+
+export SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-$SCOUT_DIR}"
+
+# Backfill today's action-items file (or an explicit path passed as $1, used by
+# tests). With no argument the CLI targets the ET-local "today" file.
+"$SCOUTCTL_BIN" action-items backfill-prefixes ${1:+"$1"} || true
+
+# Commit only the changes the backfill introduced. The session already
+# committed its own work, so a non-empty diff under action-items/ (plus the
+# id-map registration) is the prefix edits.
+cd "$SCOUT_DIR"
+PATHS_TO_COMMIT=(action-items)
+if [ -f .scout-state/id-map.json ] && ! git check-ignore -q .scout-state/id-map.json; then
+    PATHS_TO_COMMIT+=(.scout-state/id-map.json)
+fi
+if ! git diff --quiet -- "${PATHS_TO_COMMIT[@]}" 2>/dev/null; then
+    git add "${PATHS_TO_COMMIT[@]}"
+    git commit -m "chore(action-items): backfill stable [#XXXX] prefixes" >/dev/null
+fi
