@@ -9,6 +9,7 @@ behind scout-app issue #10.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -71,7 +72,6 @@ def test_backfill_adds_prefix_and_commits_once(vault: Path) -> None:
     assert r1.returncode == 0, r1.stderr
 
     daily = (vault / "action-items" / "action-items-2026-06-04.md").read_text()
-    import re
 
     assert re.search(r"- \[ \] \[#[0-9A-HJKMNP-TV-Z]{4}\] \*\*Unprefixed urgent task\*\*", daily)
     assert "[#AB12]" in daily

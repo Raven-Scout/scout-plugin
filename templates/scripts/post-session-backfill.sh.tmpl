@@ -26,19 +26,20 @@ fi
 
 export SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-$SCOUT_DIR}"
 
-# Backfill today's action-items file (or an explicit path passed as $1, used by
-# tests). With no argument the CLI targets the ET-local "today" file.
 "$SCOUTCTL_BIN" action-items backfill-prefixes ${1:+"$1"} || true
 
 # Commit only the changes the backfill introduced. The session already
 # committed its own work, so a non-empty diff under action-items/ (plus the
 # id-map registration) is the prefix edits.
-cd "$SCOUT_DIR"
+cd "$SCOUT_DIR" || { echo "post-session-backfill.sh: SCOUT_DIR not found ($SCOUT_DIR)" >&2; exit 0; }
 PATHS_TO_COMMIT=(action-items)
 if [ -f .scout-state/id-map.json ] && ! git check-ignore -q .scout-state/id-map.json; then
     PATHS_TO_COMMIT+=(.scout-state/id-map.json)
 fi
-if ! git diff --quiet -- "${PATHS_TO_COMMIT[@]}" 2>/dev/null; then
+# Use porcelain rather than `git diff --quiet` so newly-created (untracked)
+# files such as a first-time id-map.json are also detected. No `2>/dev/null`:
+# a genuine git error should surface, not be swallowed.
+if [ -n "$(git status --porcelain -- "${PATHS_TO_COMMIT[@]}")" ]; then
     git add "${PATHS_TO_COMMIT[@]}"
     git commit -m "chore(action-items): backfill stable [#XXXX] prefixes" >/dev/null
 fi
