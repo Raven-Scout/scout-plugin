@@ -187,3 +187,41 @@ def test_parse_skips_tilde_fenced_blocks(tmp_path):
     )
     titles = [i.title for i in parse_action_items(md)]
     assert titles == ["real"]
+
+
+def test_parser_extracts_semantic_tag(tmp_path: Path) -> None:
+    f = tmp_path / "action-items-2026-06-06.md"
+    f.write_text(
+        "# T\n\n## 🔴 Urgent\n\n- [ ] [#AI3026] **Validate tracing** — overnight\n",
+        encoding="utf-8",
+    )
+    items = parse_file(f)
+    assert len(items) == 1
+    assert items[0].short_prefix == "AI3026"
+    assert "[#AI3026]" not in items[0].title  # stripped from the title
+
+
+def test_parser_does_not_extract_midbody_or_numeric_tag(tmp_path: Path) -> None:
+    f = tmp_path / "action-items-2026-06-06.md"
+    # A GitHub-ref-shaped token mid-title and a pure-numeric token must NOT be
+    # mistaken for the leading stable-ID prefix.
+    f.write_text(
+        "# T\n\n## 🔴 Urgent\n\n- [ ] **Review [#555] in acme/api** — body\n",
+        encoding="utf-8",
+    )
+    items = parse_file(f)
+    assert len(items) == 1
+    assert items[0].short_prefix is None
+
+
+def test_parser_does_not_extract_midtitle_tag(tmp_path: Path) -> None:
+    f = tmp_path / "action-items-2026-06-06.md"
+    # No leading id; a [#TAG]-shaped token (with a letter) appears mid-title.
+    # Unanchored .search() would wrongly extract it; anchored .match() must not.
+    f.write_text(
+        "# T\n\n## 🔴 Urgent\n\n- [ ] Discuss [#AI3026] rollout with team\n",
+        encoding="utf-8",
+    )
+    items = parse_file(f)
+    assert len(items) == 1
+    assert items[0].short_prefix is None

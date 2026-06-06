@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from scout.ids import short_prefix_pattern
+from scout.ids import leading_prefix_pattern
 
 
 @dataclass
@@ -197,7 +197,7 @@ def _parse_item_line(
     # Extract `[#XXXX]` short prefix (if present) and strip from title.
     # raw_line is preserved untouched so substring matching still works.
     _short_prefix: str | None = None
-    _prefix_match = short_prefix_pattern().search(title)
+    _prefix_match = leading_prefix_pattern().match(title)
     if _prefix_match is not None:
         _short_prefix = _prefix_match.group(1)
         # Remove the bracketed prefix from the title.
