@@ -32,6 +32,15 @@ def test_new_short_prefix_is_4_crockford_chars() -> None:
     assert all(c in CROCKFORD_ALPHABET for c in p)
 
 
+def test_new_short_prefix_always_recognizable() -> None:
+    """Every minted prefix must satisfy the recognition grammar (>=1 letter)."""
+    rx = short_prefix_pattern()
+    for _ in range(200):
+        p = new_short_prefix()
+        assert any(c.isalpha() for c in p), p
+        assert rx.fullmatch(f"[#{p}]"), p
+
+
 def test_new_short_prefix_excludes_ambiguous_chars() -> None:
     # Crockford base32 excludes I, L, O, U to avoid 0/O and 1/I/L visual collisions.
     for c in "ILOU":
@@ -47,6 +56,8 @@ def test_short_prefix_pattern_matches_well_formed_prefix() -> None:
     assert rx.fullmatch("[#MIRO]")  # contains I and O
     assert rx.fullmatch("[#AI3026]")  # 6 chars, contains I
     assert rx.fullmatch("[#5864M]")  # digit-led, 5 chars
+    assert rx.fullmatch("[#AB]")  # length 2 lower bound
+    assert rx.fullmatch("[#ABCDEFGH]")  # length 8 upper bound
     # Rejections.
     assert not rx.fullmatch("[#a3f7]")  # lowercase
     assert not rx.fullmatch("[#A-37]")  # hyphen
