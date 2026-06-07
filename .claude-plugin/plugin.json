@@ -1,6 +1,6 @@
 {
   "name": "scout",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Autonomous knowledge management and daily briefing system. Monitors your work tools (Slack, Calendar, Linear, GitHub, etc.), synthesizes findings into a persistent knowledge base with a formal ontology, and delivers daily action items — all running unattended via scheduled Claude Code sessions. Six session types: Morning Briefing, Consolidation, Dreaming, Research, interactive Work sessions, and Meta Review. Pre-session hooks pre-compute KB staleness, recent git activity, PR state, and Claude Code session summaries before each run, trading a few seconds of shell work for large token savings inside the session.",
   "author": {
     "name": "Jordan Burger"
