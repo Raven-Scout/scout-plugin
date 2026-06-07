@@ -6,6 +6,17 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-07
+
+### Added
+- **Variable-length `[#TAG]` action-item IDs** — the recognition grammar now accepts 2–8 `[A-Z0-9]` tags containing at least one letter (e.g. `[#NAHSEND]`, `[#AI3026]`, `[#RSM]`), not just 4-char Crockford. Pure-numeric `[#123]` stays reserved for GitHub issue refs. The generation prompt now encourages meaningful mnemonics, with `action-items new-prefix` as the random fallback. Fixes the real-vault gap where scout-app fell back to brittle `--subject` matching on the most-referenced lines (scout-app#10, #117).
+- **Deterministic post-session prefix backfill** — briefing/consolidation runners run `action-items backfill-prefixes` at session end, so every open task carries a stable `[#TAG]` independent of prompt compliance (#113).
+- **Cross-language parser contract test** — a golden corpus + SHA-256 checksum guard proving the Python (scout-plugin) and Swift (scout-app) parsers agree, seeded with the historically-broken lines (#113, #117).
+
+### Changed
+- **`action-items --by-id` is ambiguity-aware** — errors when a tag is shared by multiple open tasks instead of silently acting on the first (reusable semantic tags can collide; #117).
+- **`new_short_prefix` guarantees a letter** — minted Crockford-4 prefixes always contain at least one letter, so every mint is recognized by the widened grammar (#117).
+
 ## [0.5.0] - 2026-06-03
 
 
