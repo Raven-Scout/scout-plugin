@@ -119,7 +119,13 @@ def resolve_target(
 
     if by_id is not None:
         entry = id_map.lookup_by_prefix(by_id)
-        match = next((i for i in items if i.short_prefix == by_id), None)
+        candidates = [i for i in items if i.short_prefix == by_id]
+        if len(candidates) > 1:
+            raise ActionItemError(
+                f"ambiguous id [#{by_id}]; matched {len(candidates)} tasks:\n"
+                + "\n".join(f"  - {c.title}" for c in candidates)
+            )
+        match = candidates[0] if candidates else None
         if entry is None:
             # The briefing / consolidation skill can write a fresh `[#XXXX]`
             # line straight into the markdown without calling

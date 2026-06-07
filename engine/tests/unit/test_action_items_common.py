@@ -207,3 +207,36 @@ def test_resolve_target_by_subject_matches_title_substring(fake_data_dir: Path) 
     target, _, via = resolve_target(items=items, data_dir=fake_data_dir, by_id=None, by_subject="task x")
     assert target.title == "task X"
     assert via == "subject"
+
+
+def test_resolve_target_ambiguous_id_raises(fake_data_dir: Path) -> None:
+    """Two open tasks sharing a [#TAG] is ambiguous for --by-id; raise rather
+    than silently acting on the first (reusable human tags can collide)."""
+    items = [
+        ActionItem(
+            priority="🔴",
+            title="Miro 1:1 follow-through",
+            status="open",
+            section="To Do",
+            context_links=[],
+            notes=[],
+            details=[],
+            raw_line="- [ ] [#MIRO] Miro 1:1 follow-through",
+            line_number=5,
+            short_prefix="MIRO",
+        ),
+        ActionItem(
+            priority="🟡",
+            title="Miro design doc review",
+            status="open",
+            section="To Do",
+            context_links=[],
+            notes=[],
+            details=[],
+            raw_line="- [ ] [#MIRO] Miro design doc review",
+            line_number=9,
+            short_prefix="MIRO",
+        ),
+    ]
+    with pytest.raises(ActionItemError, match="ambiguous id"):
+        resolve_target(items=items, data_dir=fake_data_dir, by_id="MIRO", by_subject=None)

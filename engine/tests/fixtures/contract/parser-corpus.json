@@ -1,5 +1,5 @@
 {
-  "_doc": "Cross-language parser contract. Each entry is a raw action-item task line; both the Swift (scout-app) and Python (scout-plugin) parsers MUST reproduce expected exactly. Seeded with scout-app #10 failure modes. Canonical copy lives here. The same corpus will be asserted by scout-app's Swift ParserContractTests; the copies are kept byte-identical by a checksum guard added in M3.4. Field contract (matches scout-app/Scout/ActionItems/ActionItemsParser.swift, the reference parser): short_prefix = bare 4-char Crockford [#XXXX] code extracted+removed from the line, else null; subject = leading title with bold/strike/wikilink markup RETAINED but with the [#XXXX] prefix removed; plain_subject = subject with markdown tokens stripped (the form the --subject substring matcher compares against); body = remainder after the first ' — '/' – '/' - ' separator found OUTSIDE bold/strike/code/wikilink/link tokens (else ''). Note: italic _(...)_ is NOT a separator, so trailing _(...)_ parentheticals stay in subject.",
+  "_doc": "Cross-language parser contract. Each entry is a raw action-item task line; both the Swift (scout-app) and Python (scout-plugin) parsers MUST reproduce expected exactly. Seeded with scout-app #10 failure modes. Canonical copy lives here. The same corpus will be asserted by scout-app's Swift ParserContractTests; the copies are kept byte-identical by a checksum guard added in M3.4. Field contract (matches scout-app/Scout/ActionItems/ActionItemsParser.swift, the reference parser): short_prefix = bare 2-8 char [A-Z0-9] tag (>=1 letter) extracted+removed from the line, else null; subject = leading title with bold/strike/wikilink markup RETAINED but with the [#XXXX] prefix removed; plain_subject = subject with markdown tokens stripped (the form the --subject substring matcher compares against); body = remainder after the first ' — '/' – '/' - ' separator found OUTSIDE bold/strike/code/wikilink/link tokens (else ''). Note: italic _(...)_ is NOT a separator, so trailing _(...)_ parentheticals stay in subject.",
   "entries": [
     {
       "name": "prefixed-emoji-bold",
@@ -68,6 +68,50 @@
         "plain_subject": "Check AI-2619",
         "body": "run `scoutctl status`"
       }
+    },
+    {
+      "name": "semantic-tag-4char-non-crockford",
+      "line": "- [ ] [#MIRO] **Miro 1:1 follow-through** — 3 quick sends",
+      "expected": {
+        "short_prefix": "MIRO",
+        "subject": "**Miro 1:1 follow-through**",
+        "plain_subject": "Miro 1:1 follow-through",
+        "body": "3 quick sends"
+      },
+      "_note": "4-char tag containing I and O (NOT Crockford). Exercises the widened recognition grammar (#117). subject/plain_subject xfail on Python (render.py prefix-strip #114)."
+    },
+    {
+      "name": "semantic-tag-6char",
+      "line": "- [ ] [#AI3026] **Validate kai-agent tracing**",
+      "expected": {
+        "short_prefix": "AI3026",
+        "subject": "**Validate kai-agent tracing**",
+        "plain_subject": "Validate kai-agent tracing",
+        "body": ""
+      },
+      "_note": "6-char tag containing I. Length > the old 4-char limit."
+    },
+    {
+      "name": "semantic-tag-3char",
+      "line": "- [ ] [#RSM] Rossum SL tester",
+      "expected": {
+        "short_prefix": "RSM",
+        "subject": "Rossum SL tester",
+        "plain_subject": "Rossum SL tester",
+        "body": ""
+      },
+      "_note": "3-char tag, no bold, no separator."
+    },
+    {
+      "name": "semantic-tag-digit-led",
+      "line": "- [ ] [#5864M] **Merge ui PR** — APPROVED",
+      "expected": {
+        "short_prefix": "5864M",
+        "subject": "**Merge ui PR**",
+        "plain_subject": "Merge ui PR",
+        "body": "APPROVED"
+      },
+      "_note": "Digit-led 5-char tag with one trailing letter — accepted (has a letter); pure-digit would be rejected as a GitHub ref."
     }
   ]
 }

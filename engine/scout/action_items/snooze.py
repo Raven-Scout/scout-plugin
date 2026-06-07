@@ -45,7 +45,7 @@ def snooze(
     Callers may want to pre-validate `until > today` themselves.
 
     Exactly one of `by_id` or `by_subject` must be provided. `by_id` is
-    a 4-char Crockford prefix; `by_subject` is a case-insensitive
+    a stable `[#TAG]` id (2-8 [A-Z0-9], >=1 letter); `by_subject` is a case-insensitive
     substring match against open-status raw lines (legacy fallback for
     lines that haven't been prefixed yet).
     """

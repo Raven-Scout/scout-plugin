@@ -32,6 +32,15 @@ def test_new_short_prefix_is_4_crockford_chars() -> None:
     assert all(c in CROCKFORD_ALPHABET for c in p)
 
 
+def test_new_short_prefix_always_recognizable() -> None:
+    """Every minted prefix must satisfy the recognition grammar (>=1 letter)."""
+    rx = short_prefix_pattern()
+    for _ in range(200):
+        p = new_short_prefix()
+        assert any(c.isalpha() for c in p), p
+        assert rx.fullmatch(f"[#{p}]"), p
+
+
 def test_new_short_prefix_excludes_ambiguous_chars() -> None:
     # Crockford base32 excludes I, L, O, U to avoid 0/O and 1/I/L visual collisions.
     for c in "ILOU":
@@ -40,14 +49,33 @@ def test_new_short_prefix_excludes_ambiguous_chars() -> None:
 
 def test_short_prefix_pattern_matches_well_formed_prefix() -> None:
     rx = short_prefix_pattern()
+    # 4-char Crockford (minted) still valid.
     assert rx.fullmatch("[#A3F7]")
-    assert rx.fullmatch("[#0000]")
-    # Hyphens and lowercase are not allowed.
-    assert not rx.fullmatch("[#a3f7]")
-    assert not rx.fullmatch("[#A-37]")
-    # Wrong length.
-    assert not rx.fullmatch("[#A3F]")
-    assert not rx.fullmatch("[#A3F7E]")
+    # Variable length 2–8, semantic tags (incl. non-Crockford I/L/O/U).
+    assert rx.fullmatch("[#RSM]")  # 3 chars
+    assert rx.fullmatch("[#MIRO]")  # contains I and O
+    assert rx.fullmatch("[#AI3026]")  # 6 chars, contains I
+    assert rx.fullmatch("[#5864M]")  # digit-led, 5 chars
+    assert rx.fullmatch("[#AB]")  # length 2 lower bound
+    assert rx.fullmatch("[#ABCDEFGH]")  # length 8 upper bound
+    # Rejections.
+    assert not rx.fullmatch("[#a3f7]")  # lowercase
+    assert not rx.fullmatch("[#A-37]")  # hyphen
+    assert not rx.fullmatch("[#A]")  # too short (<2)
+    assert not rx.fullmatch("[#ABCDEFGHI]")  # too long (>8)
+    assert not rx.fullmatch("[#555]")  # pure digits → GitHub issue ref, not a tag
+    assert not rx.fullmatch("[#0000]")  # pure digits
+
+
+def test_leading_prefix_pattern_anchors_at_start() -> None:
+    from scout.ids import leading_prefix_pattern
+
+    rx = leading_prefix_pattern()
+    m = rx.match("[#MIRO] **Miro 1:1**")
+    assert m is not None and m.group(1) == "MIRO"
+    # Does NOT match a tag that isn't at the very start (e.g. a body GitHub ref).
+    assert rx.match("see [#AI3026] in body") is None
+    assert rx.match("[#555] pure digits") is None
 
 
 def test_short_prefix_pattern_finds_prefix_in_line() -> None:

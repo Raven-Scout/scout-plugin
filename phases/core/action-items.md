@@ -82,43 +82,39 @@ _Always the LAST section of the file — run metadata is a footer for review, ne
 
 All action items files must include `[[wikilinks]]` to any KB files referenced by action items.
 
-### Hard Rule — Every Task Line Has a Stable `[#XXXX]` Prefix
+### Hard Rule — Every Task Line Has a Stable `[#TAG]`
 
-**Every new task line you write MUST start with a fresh `[#XXXX]` 4-char Crockford prefix.** The prefix is the structural identifier scout-app uses to mark tasks done, snooze them, and attach comments — without it, the app falls back to brittle markdown-substring matching that fails on emoji, italics, em-dashes, embedded links, or any non-ASCII drift. Issue #10 of scout-app catalogs the failure modes.
+**Every new task line you write MUST start with a stable `[#TAG]` identifier** — 2–8 uppercase letters/digits with at least one letter (e.g. `[#NAHSEND]`, `[#AI3026]`, `[#RSM]`). The tag is the structural identifier scout-app uses to mark tasks done, snooze them, and attach comments — without it, the app falls back to brittle markdown-substring matching that fails on emoji, italics, em-dashes, embedded links, or any non-ASCII drift. Issue #10 of scout-app catalogs the failure modes.
 
-**Canonical task line shape:**
-```
-- [ ] [#XXXX] **<bold subject>** <optional body, links, italic context>
-```
-
-The prefix goes **after** the checkbox marker and **before** the bold subject. Exactly that order — the parser keys off it.
-
-**Mint a fresh prefix per task** by shelling out to scoutctl. The CLI collision-checks against `id-map.json` so two consecutive calls always return different prefixes:
+**Prefer a short, meaningful mnemonic** that hints at the task and is easy to cross-reference from other lines (e.g. `[#NAHSEND]`, `[#MIRO]`, `[#AI3026]`). When nothing meaningful fits, mint a random one:
 
 ```bash
-# Inside your task-writing loop:
-PFX=$(scoutctl action-items new-prefix)
+PFX=$(scoutctl action-items new-prefix)   # random 4-char fallback id
 echo "- [ ] [#${PFX}] **${SUBJECT}** ${BODY}" >> "$DAILY_FILE"
 ```
 
-**Carry-forward keeps the original prefix.** When propagating an item from yesterday's file into today's, copy the `[#XXXX]` verbatim — do NOT mint a new one. The prefix is the task's identity across days; minting a new one breaks the link in scout-app's session↔task store and severs the commit-history trail.
+**Canonical task line shape:**
+```
+- [ ] [#TAG] **<bold subject>** <optional body, links, italic context>
+```
+The tag goes **after** the checkbox marker and **before** the bold subject. Exactly that order — the parser keys off the leading position.
 
-**Existing unprefixed lines (legacy carryover):** when you find a task carried forward from a pre-prefix era that lacks `[#XXXX]`, mint a fresh prefix for it on first touch. Or run the one-shot backfill at the top of the briefing:
+**Tag rules:**
+- 2–8 chars, `[A-Z0-9]`, at least one letter. (Pure-numeric like `[#555]` is reserved for GitHub issue refs and is NOT a valid tag.)
+- **Unique within the file** — never give two open tasks the same tag (scout-app's `--by-id` will refuse an ambiguous tag).
+- **Carry-forward keeps the original tag verbatim.** When propagating an item from yesterday into today, copy its `[#TAG]` exactly — do NOT mint a new one. The tag is the task's identity across days.
 
+**Existing unprefixed lines (legacy carryover):** when you find a task that lacks a `[#TAG]`, give it one on first touch, or run the idempotent one-shot backfill (it leaves already-tagged lines alone):
 ```bash
 scoutctl action-items backfill-prefixes "$DAILY_FILE"
 ```
 
-The backfill is idempotent — already-prefixed lines are left alone — so it's safe to run defensively at the start of every briefing/consolidation step that writes new lines.
-
-**Self-check before commit:** every `- [ ]` and `- [x]` line in the file MUST match the regex `^\s*- \[[ x]\] \[#[0-9A-HJKMNP-TV-Z]{4}\] `. A `grep` sanity check at compose time catches drift:
-
+**Self-check before commit:** every `- [ ]`/`- [x]` line MUST carry a `[#TAG]`. A heuristic grep catches drift:
 ```bash
-grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[0-9A-HJKMNP-TV-Z]{4}\] ' && \
-    echo "ERROR: lines missing [#XXXX] prefix above — fix before commit" >&2
+grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[A-Z0-9]{2,8}\] ' && \
+    echo "ERROR: lines missing [#TAG] prefix above — fix before commit" >&2
 ```
-
-If that grep finds anything, the file is non-compliant and scout-app's writes will silently fall back to fragile subject-matching for those lines.
+If that grep finds anything, the file is non-compliant and scout-app's writes will fall back to fragile subject-matching for those lines.
 
 ### Hard Rule — Trim by Demotion, Never by Omission
 
