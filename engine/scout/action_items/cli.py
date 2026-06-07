@@ -23,7 +23,7 @@ app = typer.Typer(help="Action-items operations.", no_args_is_help=True)
 @app.command("mark-done")
 def cli_mark_done(
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
-    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
     path: Path | None = typer.Argument(
         None,
         help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
@@ -55,7 +55,7 @@ def cli_mark_done(
 def cli_snooze(
     until: str = typer.Option(..., "--until", help="YYYY-MM-DD"),
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
-    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
     from_kind: str | None = typer.Option(
         None,
         "--from-kind",
@@ -106,7 +106,7 @@ def cli_snooze(
 def cli_add_comment(
     comment: str = typer.Option(..., "--comment", help="Comment text to append beneath the task."),
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
-    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
     author: str = typer.Option(
         "scout", "--author", help="Comment attribution (default: scout). GUI passes the signed-in user."
     ),
@@ -139,7 +139,7 @@ def cli_add_comment(
 @app.command("delete-comment")
 def cli_delete_comment(
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
-    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
     index: int | None = typer.Option(None, "--index", help="1-based index of the comment to delete."),
     text: str | None = typer.Option(None, "--text", help="Case-insensitive substring of the comment body."),
     path: Path | None = typer.Argument(
@@ -178,7 +178,7 @@ def cli_delete_comment(
 def cli_edit_comment(
     new_text: str = typer.Option(..., "--new-text", help="Replacement body for the comment."),
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
-    by_id: str | None = typer.Option(None, "--by-id", help="4-char Crockford prefix from `[#XXXX]`."),
+    by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
     index: int | None = typer.Option(None, "--index", help="1-based index of the comment to edit."),
     text: str | None = typer.Option(None, "--text", help="Case-insensitive substring of the comment body."),
     path: Path | None = typer.Argument(
