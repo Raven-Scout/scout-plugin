@@ -1,0 +1,83 @@
+<svg width="1120" height="744" viewBox="0 0 1120 744" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Iowan Old Style', 'Palatino Linotype', Georgia, serif">
+  <defs>
+    <radialGradient id="page" cx="50%" cy="0%" r="120%">
+      <stop offset="0%" stop-color="#F3ECD9"/>
+      <stop offset="100%" stop-color="#E8E0CC"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="26" stdDeviation="34" flood-color="#2A1C0A" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1120" height="744" rx="22" fill="url(#page)"/>
+
+  <!-- briefing card -->
+  <g filter="url(#soft)">
+    <rect x="48" y="40" width="1024" height="664" rx="16" fill="#F4EFE1" stroke="#DDD6C3" stroke-width="1"/>
+  </g>
+
+  <!-- titlebar -->
+  <path d="M48 56 a16 16 0 0 1 16 -16 h992 a16 16 0 0 1 16 16 v30 h-1024 Z" fill="#F8F3E6"/>
+  <line x1="48" y1="86" x2="1072" y2="86" stroke="#DDD6C3" stroke-width="1"/>
+  <circle cx="78" cy="63" r="5.5" fill="#ff5f57"/><circle cx="98" cy="63" r="5.5" fill="#febc2e"/><circle cx="118" cy="63" r="5.5" fill="#28c840"/>
+  <text x="150" y="68" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="13.5" fill="#82858F">Scout</text>
+  <text x="190" y="68" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="13.5" fill="#A6A8AF">›</text>
+  <text x="206" y="68" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="600" fill="#30343F">Today</text>
+  <g>
+    <rect x="864" y="50" width="184" height="26" rx="7" fill="#EEE7D6"/>
+    <text x="956" y="67" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11" fill="#82858F">run 07:02 · 5 tools · 14 items</text>
+  </g>
+
+  <!-- dateline -->
+  <text x="80" y="138" font-size="26" font-weight="600" fill="#30343F">June 12</text>
+  <text x="196" y="138" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="14" fill="#82858F">Friday</text>
+  <text x="1040" y="137" text-anchor="end" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11.5" fill="#A6A8AF"><tspan fill="#5A5E69" font-weight="500">3</tspan> need you · <tspan fill="#5A5E69" font-weight="500">1</tspan> contradiction surfaced</text>
+  <line x1="80" y1="158" x2="1040" y2="158" stroke="#E4DDCB" stroke-width="1"/>
+
+  <!-- item 1 — verified -->
+  <circle cx="92" cy="200" r="9" fill="#F4EFE1" stroke="#E0D9C6"/><circle cx="92" cy="200" r="4.5" fill="#C5503C"/>
+  <text x="120" y="198" font-size="16.5" font-weight="600" fill="#30343F">Reply to Priya on the API deprecation thread — she has asked twice.</text>
+  <text x="120" y="223" font-size="14" fill="#5A5E69">Second nudge landed yesterday at 4:40 pm; the migration doc she needs is already in your drafts.</text>
+  <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11">
+    <rect x="120" y="238" width="74" height="22" rx="6" fill="#EDE6D5"/><circle cx="133" cy="249" r="3.5" fill="#4E9E6E"/><text x="143" y="253" fill="#4E9E6E" font-weight="500">verified</text>
+    <rect x="202" y="238" width="104" height="22" rx="6" fill="#F4EFE1" stroke="#E0D9C6"/><text x="214" y="253" font-family="-apple-system, 'Segoe UI', sans-serif" fill="#5A5E69" font-weight="500">Slack #platform</text>
+    <rect x="314" y="238" width="58" height="22" rx="6" fill="#F4EFE1" stroke="#E0D9C6"/><text x="326" y="253" font-family="-apple-system, 'Segoe UI', sans-serif" fill="#5A5E69" font-weight="500">Gmail</text>
+    <text x="386" y="253" fill="#A6A8AF">confirmed in 2 sources</text>
+  </g>
+  <line x1="80" y1="288" x2="1040" y2="288" stroke="#E4DDCB" stroke-width="1"/>
+
+  <!-- item 2 — single-source -->
+  <circle cx="92" cy="330" r="9" fill="#F4EFE1" stroke="#E0D9C6"/><circle cx="92" cy="330" r="4.5" fill="#C68A35"/>
+  <text x="120" y="328" font-size="16.5" font-weight="600" fill="#30343F">Northwind renewal call may have moved to 3:00.</text>
+  <text x="120" y="353" font-size="14" fill="#5A5E69">Only the calendar says so — no confirmation from Dana by email or Slack. Treat the new time as tentative.</text>
+  <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11">
+    <rect x="120" y="368" width="104" height="22" rx="6" fill="#EDE6D5"/><circle cx="133" cy="379" r="3.5" fill="#C68A35"/><text x="143" y="383" fill="#C68A35" font-weight="500">single-source</text>
+    <rect x="232" y="368" width="74" height="22" rx="6" fill="#F4EFE1" stroke="#E0D9C6"/><text x="244" y="383" font-family="-apple-system, 'Segoe UI', sans-serif" fill="#5A5E69" font-weight="500">Calendar</text>
+    <text x="320" y="383" fill="#A6A8AF">no corroborating source found</text>
+  </g>
+  <line x1="80" y1="418" x2="1040" y2="418" stroke="#E4DDCB" stroke-width="1"/>
+
+  <!-- item 3 — contradicted -->
+  <circle cx="92" cy="460" r="9" fill="#F4EFE1" stroke="#E0D9C6"/><circle cx="92" cy="460" r="4.5" fill="#A6A8AF"/>
+  <text x="120" y="458" font-size="16.5" font-weight="600" fill="#30343F">Did PROJ-214 actually ship?</text>
+  <text x="120" y="483" font-size="14" fill="#5A5E69">Your sources disagree. Scout won't guess — here is what each one says:</text>
+  <!-- conflict sides -->
+  <g>
+    <rect x="120" y="498" width="450" height="74" rx="9" fill="#EFE8D7"/>
+    <text x="138" y="521" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="10" letter-spacing="0.5" fill="#A6A8AF">LINEAR</text>
+    <text x="138" y="546" font-size="13.5" fill="#5A5E69">Ticket moved to <tspan font-weight="700" fill="#30343F">Done</tspan> by Marcus,</text>
+    <text x="138" y="565" font-size="13.5" fill="#5A5E69">yesterday 6:12 pm.</text>
+    <rect x="590" y="498" width="450" height="74" rx="9" fill="#EFE8D7"/>
+    <text x="608" y="521" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="10" letter-spacing="0.5" fill="#A6A8AF">GITHUB</text>
+    <text x="608" y="546" font-size="13.5" fill="#5A5E69">PR <tspan font-weight="700" fill="#30343F">#482 is still open</tspan> — two</text>
+    <text x="608" y="565" font-size="13.5" fill="#5A5E69">reviews requested, none approved.</text>
+  </g>
+  <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11">
+    <rect x="120" y="588" width="98" height="22" rx="6" fill="#EDE6D5"/><circle cx="133" cy="599" r="3.5" fill="#C5503C"/><text x="143" y="603" fill="#C5503C" font-weight="500">contradicted</text>
+    <text x="228" y="603" fill="#A6A8AF">disagreement is the signal — both sides shown</text>
+  </g>
+
+  <!-- footer line -->
+  <line x1="80" y1="650" x2="1040" y2="650" stroke="#E4DDCB" stroke-width="1"/>
+  <text x="80" y="678" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11.5" fill="#A6A8AF">No source is trusted on its own. Every claim is cross-checked, and tagged by how sure Scout is.</text>
+</svg>
