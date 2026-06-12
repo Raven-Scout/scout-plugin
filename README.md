@@ -1,8 +1,25 @@
 # Scout
 
-Autonomous knowledge management and daily briefing system for Claude Code. Scout monitors your work tools — Slack, Calendar, Gmail, Linear, GitHub, meeting transcripts, and more — synthesizes findings into a persistent, interlinked knowledge base with a formal ontology, and delivers daily action items. It runs unattended as scheduled Claude Code sessions, multiple times per day.
+> **The autonomous daily briefing that cross-checks all your work tools — so nothing falls through the cracks, and you can trust what it surfaces.**
 
-You shouldn't have to manually track what happened across seven different tools yesterday, what's still pending from last week, or what changed while you were in meetings. Scout does that automatically. It reads your tools, cross-checks findings against each other, writes a coherent knowledge base, and surfaces only what matters. The knowledge base is browsable in Obsidian as an interlinked graph of projects, people, channels, and action items.
+<p align="center">
+  <img src="docs/assets/scout-demo.svg" alt="A Scout morning briefing: action items cross-checked across Gmail, Slack, Calendar, GitHub and Linear, each tagged by confidence — with a source contradiction surfaced for the user instead of guessed" width="100%">
+</p>
+
+Scout runs unattended as scheduled [Claude Code](https://claude.com/claude-code) sessions. It reads Slack, Calendar, Gmail, Linear, GitHub, and meeting transcripts; cross-checks every finding against the others; and each morning hands you a short list of what actually needs you — every item tagged by how many sources confirm it. What you get is a persistent, interlinked knowledge base you can browse in Obsidian, and a daily action list you can trust *because you can see its work*.
+
+You shouldn't have to manually reconcile what happened across seven tools yesterday, what's still pending from last week, or what changed while you were in meetings. Scout does it — and when your tools disagree, it flags the contradiction instead of quietly picking a side.
+
+## Why Scout is different
+
+Readable-markdown memory, scheduled runs, and a self-improvement loop are table stakes now — every serious agent has them. Scout's difference is what it does *before* it tells you anything:
+
+- **It cross-checks.** No single tool is treated as the truth. A calendar invite is verified against the transcript; a Linear ticket against the PR; an email against Slack. Claims only one source supports are flagged, not asserted.
+- **It shows its confidence.** Every entry is tagged — `verified` (2+ sources), `single-source`, `unverified`, `stale`, or `contradicted`. You always know how much weight to give it.
+- **It's structured, not just stored.** A formal knowledge graph — typed people, projects, tasks, and relationships you can actually query — not a flat pile of notes.
+- **It surfaces disagreement.** When your sources conflict, that contradiction *is* the signal. Scout shows you both sides instead of guessing which is right.
+
+Most assistants summarize. Scout corroborates — and that's the difference between output you skim and output you act on.
 
 ## Install
 
