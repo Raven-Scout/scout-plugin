@@ -540,3 +540,114 @@ html.theme-dark .briefing { box-shadow: 0 60px 120px -30px rgba(0,0,0,0.6), var(
   .compound-grid { grid-template-columns: 1fr; }
   .assurances { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   STICKY NAV FIX — iOS Safari needs -webkit-sticky, and the
+   paper-grain overlay (z-50) was painting on top of the nav.
+   ============================================================ */
+.nav {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 55;
+}
+
+/* ============================================================
+   INTERACTION LAYER — scroll reveals, progress, active nav.
+   Progressive enhancement: content is fully visible without JS.
+   ============================================================ */
+html.js .reveal { opacity: 0; transform: translateY(24px); will-change: opacity, transform; }
+html.js .reveal.is-in {
+  opacity: 1; transform: none;
+  transition: opacity 0.72s cubic-bezier(0.2,0.7,0.2,1), transform 0.72s cubic-bezier(0.2,0.7,0.2,1);
+  transition-delay: var(--d, 0s);
+}
+html.js .reveal-l { opacity: 0; transform: translateX(-22px); }
+html.js .reveal-l.is-in { opacity: 1; transform: none; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2,0.7,0.2,1); transition-delay: var(--d, 0s); }
+@media (prefers-reduced-motion: reduce) {
+  html.js .reveal, html.js .reveal.is-in,
+  html.js .reveal-l, html.js .reveal-l.is-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+
+.scroll-progress {
+  position: fixed; top: 0; left: 0; height: 2.5px; width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-ink));
+  z-index: 60; transition: width 0.08s linear; pointer-events: none;
+}
+.nav-links a.plain.active { color: var(--accent-ink); box-shadow: var(--nm-pressed-sm); }
+
+/* alternating section band (full-bleed) */
+.band { background: var(--paper-sunk); border-top: 0.5px solid var(--rule); border-bottom: 0.5px solid var(--rule); }
+.band + .band { border-top: none; }
+.band > .section { padding-bottom: 84px; }
+.band > .section:first-child { padding-top: 84px; }
+
+/* ---------- STATS STRIP ---------- */
+.stats-band { padding: 54px 0; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; max-width: 940px; margin: 0 auto; }
+.stat { text-align: center; padding: 8px 14px; }
+.stat .n { font: 500 clamp(40px, 6vw, 60px)/1 var(--serif); letter-spacing: -0.025em; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.stat .l { margin: 12px auto 0; font: 400 13.5px/1.55 var(--sans); color: var(--ink-3); max-width: 25ch; }
+@media (max-width: 720px){ .stats { grid-template-columns: 1fr; gap: 4px; } .stat { padding: 16px; } }
+
+/* ---------- OUTCOMES (the payoff) ---------- */
+.outcomes { margin-top: 46px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.outcome {
+  padding: 28px 28px 26px; border-radius: 16px;
+  background: var(--paper); box-shadow: var(--nm-raised);
+  transition: transform 0.2s ease;
+}
+.outcome:hover { transform: translateY(-3px); }
+.outcome .o-k { font: 500 10.5px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
+.outcome h3 { margin: 13px 0 9px; font: 500 21px/1.25 var(--serif); letter-spacing: -0.01em; color: var(--ink); }
+.outcome p { margin: 0; font: 400 14.5px/1.66 var(--serif); color: var(--ink-2); text-wrap: pretty; }
+.outcome .o-ba { margin-top: 16px; padding-top: 14px; border-top: 0.5px solid var(--rule-soft); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font: 400 12.5px/1.5 var(--sans); }
+.outcome .o-ba s { color: var(--ink-4); text-decoration-color: var(--err); }
+.outcome .o-ba .arr { color: var(--ink-4); }
+.outcome .o-ba b { color: var(--ok); font-weight: 600; }
+@media (max-width: 880px){ .outcomes { grid-template-columns: 1fr; } }
+
+/* confidence tag tooltip (interactive legend) */
+.tag-rack .tag { position: relative; cursor: default; }
+.tag-rack .tag[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  white-space: nowrap; z-index: 5;
+  padding: 7px 11px; border-radius: 8px;
+  background: var(--ink); color: var(--paper);
+  font: 400 11.5px/1 var(--sans); letter-spacing: 0;
+  box-shadow: 0 8px 20px -6px rgba(0,0,0,0.4);
+}
+.tag-rack .tag[data-tip]:hover::before {
+  content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--ink); z-index: 5;
+}
+
+/* timeline line draws in on scroll */
+.timeline::before { transform-origin: top; }
+html.js .timeline.is-in::before { animation: drawline 0.9s ease 0.1s both; }
+@keyframes drawline { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce){ html.js .timeline.is-in::before { animation: none; } }
+
+/* ---------- "define your own" timeline node ---------- */
+.t-row.t-add .node { color: oklch(0.99 0.005 85); background: var(--accent); box-shadow: var(--nm-raised-sm), inset 0 1px 0 rgba(255,255,255,0.25); }
+.t-row.t-add h3 { color: var(--accent-ink); }
+.t-row.t-add .when { color: var(--accent-ink); }
+.t-row.t-add p { color: var(--ink-2); }
+
+/* ---------- infinite/extensible accents ---------- */
+.lim { color: var(--accent-ink); font-style: italic; }
+
+/* ---------- HORIZON ---------- */
+.horizon-note { margin: 20px 0 0; font: 400 16.5px/1.66 var(--serif); color: var(--ink-2); max-width: 64ch; text-wrap: pretty; }
+.horizon-note b { color: var(--ink); font-weight: 600; }
+.h-chips { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; }
+.h-chips .chip {
+  font: 500 12px/1 var(--mono); color: var(--ink-2);
+  padding: 10px 14px; border-radius: 9px;
+  background: var(--paper); box-shadow: var(--nm-raised-sm);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.h-chips .chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.h-chips .chip.soon { color: var(--ink-3); }
+.h-chips .chip.soon::before { background: var(--ink-4); }

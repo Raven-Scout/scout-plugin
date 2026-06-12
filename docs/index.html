@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Scout — the daily briefing that cross-checks your tools</title>
+<title>Scout — the autonomous agent that watches everything you connect</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Scout is an autonomous daily briefing for Claude Code. It cross-checks Slack, Gmail, Calendar, Linear and GitHub before it tells you anything — and tags every item by how sure it is." />
+<meta name="description" content="Scout is an autonomous agent for Claude Code. It watches everything you connect — endless tools — on routines you or it define, cross-checks every claim, and brings you only what matters. Nothing falls through the cracks." />
 
 <!-- Open Graph / social -->
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Scout — nothing falls through the cracks, and you can trust what it surfaces" />
-<meta property="og:description" content="An autonomous daily briefing for Claude Code that cross-checks all your work tools, tags every item by confidence, and surfaces contradictions instead of guessing." />
+<meta property="og:description" content="An autonomous agent that watches everything you connect, on routines you or it define, and brings you only what matters — every claim cross-checked, every contradiction shown." />
 <meta property="og:url" content="https://jordanrburger.github.io/scout-plugin/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/docs/assets/scout-icon.svg" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -24,6 +24,8 @@
 </head>
 <body>
 
+<div class="scroll-progress" aria-hidden="true"></div>
+
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="wordmark" href="#">
@@ -31,11 +33,11 @@
       <span class="name">Scout</span>
     </a>
     <nav class="nav-links">
+      <a class="plain" href="#payoff">The payoff</a>
       <a class="plain" href="#corroborates">Why Scout</a>
-      <a class="plain" href="#how">How it works</a>
-      <a class="plain" href="#private">Your data</a>
+      <a class="plain" href="#autonomy">Autonomy</a>
+      <a class="plain" href="#how">Routines</a>
       <a class="plain" href="#install">Install</a>
-      <a class="plain" href="#app">Mac app</a>
       <a class="nm-btn" href="https://github.com/jordanrburger/scout-plugin">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
         GitHub
@@ -47,9 +49,9 @@
 <main>
   <!-- HERO -->
   <section class="hero wrap">
-    <span class="eyebrow"><span class="dot"></span>A Claude Code plugin</span>
+    <span class="eyebrow"><span class="dot"></span>An autonomous agent on Claude Code</span>
     <h1>Nothing falls through the cracks — and you can <em>trust</em> what it surfaces.</h1>
-    <p class="lede">Scout is an autonomous daily briefing that cross-checks Slack, Gmail, Calendar, Linear and GitHub before it tells you anything. Every item is tagged by <b>how sure it is</b> — and when your tools disagree, it shows you both sides.</p>
+    <p class="lede">Scout is an autonomous agent that watches everything you connect, on routines you — or it — define, and brings you only what matters. Every claim is cross-checked across your tools, every contradiction shown, <b>nothing guessed</b>.</p>
     <div class="hero-ctas">
       <a class="btn-accent" href="#install">Install Scout</a>
       <a class="btn-quiet" href="https://github.com/jordanrburger/scout-plugin">View on GitHub</a>
@@ -59,11 +61,11 @@
 
   <!-- BRIEFING DEMO -->
   <section class="demo wrap" id="demo">
-    <div class="briefing" role="img" aria-label="A Scout morning briefing with items tagged by confidence">
+    <div class="briefing reveal" role="img" aria-label="A Scout briefing with items tagged by confidence">
       <div class="titlebar">
         <div class="traffic"><span class="tdot c1"></span><span class="tdot c2"></span><span class="tdot c3"></span></div>
         <span class="crumbs">Scout<span class="chev">&rsaquo;</span><b>Today</b></span>
-        <span class="run-chip">run 07:02 &middot; 5 tools &middot; 14 items</span>
+        <span class="run-chip">cross-checked &middot; confidence-tagged</span>
       </div>
       <div class="briefing-body">
         <div class="dateline">
@@ -118,81 +120,184 @@
     </div>
   </section>
 
+  <!-- PRINCIPLES STRIP -->
+  <div class="band">
+  <section class="section wrap" id="principles">
+    <p class="section-kicker reveal">No fixed list of anything</p>
+    <h2 class="big reveal">Scout's shape isn't hard-coded.</h2>
+    <p class="sub reveal">What it watches, how often it runs, and what it does are all open-ended — not a menu you pick from.</p>
+
+    <div class="compound-grid stagger">
+      <div class="compound reveal">
+        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.4 5.2a2.8 2.8 0 1 0 0 5.6c2 0 2.6-2.8 3.6-2.8s1.6 2.8 3.6 2.8a2.8 2.8 0 1 0 0-5.6c-2 0-2.6 2.8-3.6 2.8s-1.6-2.8-3.6-2.8Z"></path></svg></span>
+        <h3>Endless connectors</h3>
+        <p>Anything you've connected to Claude — Slack, Gmail, Linear, GitHub, Granola, an MCP you wrote yourself, one the community shared — Scout auto-discovers and puts to work. The list is <span class="lim">never closed</span>.</p>
+      </div>
+      <div class="compound reveal">
+        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.6V8l2.4 1.6"></path></svg></span>
+        <h3>Routines without limits</h3>
+        <p>Run the defaults, retime them, invent your own session types, or let Scout propose its own — fired on a schedule, on real-world events, or on Scout's <span class="lim">own judgment</span>.</p>
+      </div>
+      <div class="compound reveal">
+        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v3.5c0 3.2-2.1 5.2-5 6.5-2.9-1.3-5-3.3-5-6.5V3.8l5-2Z"></path><path d="M5.8 8l1.5 1.6L10.4 6.6"></path></svg></span>
+        <h3>Trust by construction</h3>
+        <p>No source is taken at its word. Every claim is corroborated across your tools before it reaches you — or it's <span class="lim">clearly flagged</span>.</p>
+      </div>
+    </div>
+  </section>
+  </div>
+
   <!-- THE PROBLEM -->
   <section class="section wrap" id="problem">
-    <p class="section-kicker">The problem</p>
-    <h2 class="big">You get more signal than you can possibly track.</h2>
-    <p class="sub">Every Slack DM, calendar invite, PR review and offhand decision is real and time-sensitive — and it arrives faster than anyone can read. So you cope one of two ways, and both quietly fail.</p>
+    <p class="section-kicker reveal">The problem</p>
+    <h2 class="big reveal">You generate more signal than any human can track.</h2>
+    <p class="sub reveal">Every Slack DM, calendar invite, PR review and offhand decision is real and time-sensitive — and it arrives faster than anyone can read. So you cope one of two ways, and both quietly cost you.</p>
 
-    <div class="fail-grid">
-      <div class="fail">
+    <div class="fail-grid stagger">
+      <div class="fail reveal">
         <span class="fail-tag">The completionist</span>
         <h3>Read everything, burn out</h3>
-        <p>You try to keep up with every channel and inbox. Your attention degrades, and the one message that actually mattered drowns in the eleven that didn't.</p>
+        <p>You try to keep up with every channel and inbox. Your attention degrades, the important thing drowns in the noise, and you still end the day unsure you caught it all.</p>
       </div>
-      <div class="fail">
+      <div class="fail reveal">
         <span class="fail-tag">The triager</span>
         <h3>Skim the top, miss the rest</h3>
-        <p>You give up and read only what's loud. The quiet, critical signal — the buried contract clause, the blocked teammate — slips straight through.</p>
+        <p>You give up and read only what's loud. The quiet, critical signal — the buried contract clause, the blocked teammate — slips straight through, and resurfaces later as a fire.</p>
       </div>
     </div>
 
-    <p class="problem-resolve">Scout is the third option. <b>Delegate everything that doesn't need your judgment</b> to an agent that reads all of it, cross-checks it against itself, and reaches back into your day only when something <em>genuinely</em> needs you. You stay the authority on what only you can know; it handles the rest.</p>
+    <p class="problem-resolve reveal">Scout is the third option. <b>Delegate everything that doesn't need your judgment</b> to an agent that reads all of it, cross-checks it against itself, and reaches into your day only when something <em>genuinely</em> needs you. You stay the authority on what only you can know; it handles the rest — and it can read far more in a day than you ever could. That's the point, not a limitation.</p>
   </section>
+
+  <!-- THE PAYOFF -->
+  <div class="band">
+  <section class="section wrap" id="payoff">
+    <p class="section-kicker reveal">The payoff</p>
+    <h2 class="big reveal">What changes when Scout has your back.</h2>
+    <p class="sub reveal">It isn't one more dashboard to check. It's the opposite — the thing that finally lets you <em>stop</em> checking.</p>
+
+    <div class="outcomes stagger">
+      <div class="outcome reveal">
+        <span class="o-k">Your mornings</span>
+        <h3>Begin the day oriented, not buried</h3>
+        <p>The hour you'd spend reconstructing what happened across a dozen tools is just gone. Scout did it overnight, cross-checked it, and left a short list of what actually moved.</p>
+        <div class="o-ba"><s>scrape every app, hope you didn't miss anything</s><span class="arr">&rarr;</span><b>read one trustworthy list</b></div>
+      </div>
+      <div class="outcome reveal">
+        <span class="o-k">Your blind spots</span>
+        <h3>Never get quietly blindsided</h3>
+        <p>The buried contract clause. The teammate blocked on your review for two days. The thread that went cold. Scout surfaces the quiet, critical signal that never shouts loudly enough to get noticed.</p>
+        <div class="o-ba"><s>&ldquo;wait — when did that become urgent?&rdquo;</s><span class="arr">&rarr;</span><b>you saw it three days early</b></div>
+      </div>
+      <div class="outcome reveal">
+        <span class="o-k">Your attention</span>
+        <h3>Close the tabs without the dread</h3>
+        <p>Because the list is complete and every item shows its evidence, you can finally trust it enough to stop doom-refreshing. The calm comes from the cross-check — not from hoping you didn't miss something.</p>
+        <div class="o-ba"><s>refreshing Slack &ldquo;just in case&rdquo; all day</s><span class="arr">&rarr;</span><b>the list is the list</b></div>
+      </div>
+      <div class="outcome reveal">
+        <span class="o-k">Your reputation</span>
+        <h3>Look prepared — because you are</h3>
+        <p>Walk into the renewal call already knowing the notes contradict the calendar. Reply to the right person before the second nudge lands. Become the one who never seems to drop anything.</p>
+        <div class="o-ba"><s>caught flat-footed in the meeting</s><span class="arr">&rarr;</span><b>three steps ahead</b></div>
+      </div>
+    </div>
+  </section>
+  </div>
 
   <!-- WHY -->
   <section class="section wrap" id="corroborates">
-    <p class="section-kicker">Why it's different</p>
-    <h2 class="big">Most assistants summarize. Scout corroborates.</h2>
-    <p class="sub">Markdown memory, scheduled runs and self-improvement loops are table stakes now. Scout's difference is what it does <em>before</em> it tells you anything.</p>
+    <p class="section-kicker reveal">Why it's different</p>
+    <h2 class="big reveal">Most assistants summarize. Scout corroborates.</h2>
+    <p class="sub reveal">Markdown memory, scheduled runs and self-improvement loops are table stakes now. Scout's difference is what it does <em>before</em> it tells you anything.</p>
 
-    <div class="points">
-      <div class="point">
+    <div class="points stagger">
+      <div class="point reveal">
         <span class="num">01</span>
         <div>
           <h3>Cross-checked, not collected</h3>
-          <p>No single tool is treated as the truth. A calendar invite is verified against the transcript, a Linear ticket against its PR, an email against Slack. And your own actions outrank everything — what you <em>sent, merged or cancelled</em> beats what a meeting note says you'll do.</p>
+          <p>No single tool is treated as the truth. A calendar invite is verified against the transcript, a Linear ticket against its PR, an email against Slack. And your own actions outrank everything — what you <em>sent, merged or cancelled</em> beats what a meeting note says you'll do. <b>So the list you act on is the reconciled truth — not a dozen apps' worth of half-stories you have to merge in your head.</b></p>
         </div>
       </div>
-      <div class="point">
+      <div class="point reveal">
         <span class="num">02</span>
         <div>
           <h3>Confidence on every line</h3>
-          <p>Every item carries its evidence level, so you always know how much weight to give it. Claims only one source supports are flagged — never silently promoted to fact.</p>
+          <p>Every item carries its evidence level, so you always know how much weight to give it — and a one-source claim is never silently promoted to fact. <b>Hover any tag:</b></p>
           <div class="tag-rack">
-            <span class="tag verified">verified</span>
-            <span class="tag single">single-source</span>
-            <span class="tag unverified">unverified</span>
-            <span class="tag stale">stale</span>
-            <span class="tag contradicted">contradicted</span>
+            <span class="tag verified" data-tip="Confirmed by 2+ independent sources">verified</span>
+            <span class="tag single" data-tip="Only one source says so — treat as tentative">single-source</span>
+            <span class="tag unverified" data-tip="Mentioned, but not yet corroborated">unverified</span>
+            <span class="tag stale" data-tip="Was true once; not reconfirmed recently">stale</span>
+            <span class="tag contradicted" data-tip="Sources disagree — both sides shown, no guess">contradicted</span>
           </div>
         </div>
       </div>
-      <div class="point">
+      <div class="point reveal">
         <span class="num">03</span>
         <div>
           <h3>Disagreement is the signal</h3>
-          <p>When your sources conflict, Scout doesn't pick a winner. It surfaces the contradiction with both sides laid out — because that conflict is usually the most important thing in your day.</p>
+          <p>When your sources conflict, Scout doesn't pick a winner. It surfaces the contradiction with both sides laid out — because that conflict is usually the single most important thing in your day, and the thing every other tool hides.</p>
         </div>
       </div>
-      <div class="point">
+      <div class="point reveal">
         <span class="num">04</span>
         <div>
           <h3>A real knowledge graph</h3>
-          <p>Typed people, projects, tasks and relationships you can query — not a flat pile of notes. A formal ontology underneath, browsable in Obsidian as an interlinked graph above.</p>
+          <p>Typed people, projects, tasks and relationships you can query — not a flat pile of notes. <b>So Scout actually understands how your world connects</b> and gets the context right instead of guessing. Browsable in Obsidian as an interlinked graph.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- HOW -->
+  <!-- AUTONOMY -->
+  <div class="band">
+  <section class="section wrap" id="autonomy">
+    <p class="section-kicker reveal">On its own terms</p>
+    <h2 class="big reveal">It runs itself — and reaches you only when it's worth it.</h2>
+    <p class="sub reveal">Scout isn't something you operate. It works in the background on its own clock, doing more in a day than you could read — and stays out of your way until it genuinely needs you.</p>
+
+    <div class="points stagger">
+      <div class="point reveal">
+        <span class="num">01</span>
+        <div>
+          <h3>Works while you don't</h3>
+          <p>Scout runs unattended, around the clock, accruing knowledge faster than you can read it. You stay the authority on the things only you know; it handles everything else, autonomously.</p>
+        </div>
+      </div>
+      <div class="point reveal">
+        <span class="num">02</span>
+        <div>
+          <h3>Asks only when it matters</h3>
+          <p>When Scout needs your judgment it messages you and moves on — picking up your reply on its next run. Conversations are slow, parallel, and never block your day. No notification firehose, no babysitting.</p>
+        </div>
+      </div>
+      <div class="point reveal">
+        <span class="num">03</span>
+        <div>
+          <h3>Extends and rewrites itself</h3>
+          <p>It proposes new routines when it spots a pattern, reads its own mistakes, and edits its own instructions to stop repeating them — every change a labelled, reversible git commit you can read and undo.</p>
+        </div>
+      </div>
+      <div class="point reveal">
+        <span class="num">04</span>
+        <div>
+          <h3>Forgets on purpose</h3>
+          <p>Every evening it lets a few things that no longer matter fall away. An agent that only ever accumulates becomes a worse partner over time; deliberate decay keeps the signal sharp and the briefing honest.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- HOW / ROUTINES -->
   <section class="section wrap" id="how">
-    <p class="section-kicker">How it works</p>
-    <h2 class="big">Six sessions, one job each.</h2>
-    <p class="sub">Scout runs as scheduled Claude Code sessions on your own machine and subscription — nothing leaves your computer that doesn't already.</p>
+    <p class="section-kicker reveal">Routines</p>
+    <h2 class="big reveal">Sessions that run themselves — and ones you invent.</h2>
+    <p class="sub reveal">Out of the box, Scout runs the sessions below. They're starting points, not limits — retime them, add your own, or trigger them on real-world events instead of a clock.</p>
 
     <div class="timeline">
-      <div class="t-row">
+      <div class="t-row reveal-l">
         <span class="when">07:00</span>
         <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"></path></svg></span>
         <div>
@@ -200,15 +305,15 @@
           <p>Full cold start: reads the whole knowledge base, queries every tool, cross-checks, and hands you today's action items.</p>
         </div>
       </div>
-      <div class="t-row">
+      <div class="t-row reveal-l">
         <span class="when">12:30</span>
         <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3"></path></svg></span>
         <div>
-          <h3>Consolidation<span class="freq">2&times; daily</span></h3>
-          <p>Lightweight delta scans through the day — what changed, what's newly done, what needs reconciling.</p>
+          <h3>Consolidation<span class="freq">through the day</span></h3>
+          <p>Lightweight delta scans — what changed, what's newly done, what needs reconciling since the last run.</p>
         </div>
       </div>
-      <div class="t-row">
+      <div class="t-row reveal-l">
         <span class="when">15:00</span>
         <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg></span>
         <div>
@@ -216,7 +321,7 @@
           <p>Goes outward — expands what Scout knows about the people, projects and topics in your knowledge base.</p>
         </div>
       </div>
-      <div class="t-row">
+      <div class="t-row reveal-l">
         <span class="when">anytime</span>
         <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
         <div>
@@ -224,95 +329,72 @@
           <p>Walks today's items one at a time, each with a drafted action you approve, skip, or edit. You stay the editor.</p>
         </div>
       </div>
-      <div class="t-row">
+      <div class="t-row reveal-l">
         <span class="when">21:30</span>
         <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a4.8 4.8 0 0 0 7 7Z"></path></svg></span>
         <div>
           <h3>Dreaming<span class="freq">nightly</span></h3>
-          <p>Evening self-improvement: processes your feedback, deepens the knowledge base, and learns from its own mistakes.</p>
+          <p>Self-improvement: processes your feedback, deepens the knowledge base, and learns from its own mistakes.</p>
         </div>
       </div>
-      <div class="t-row">
-        <span class="when">Sundays</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5v-4M8 13.5v-8M13.5 13.5v-11"></path></svg></span>
+      <div class="t-row reveal-l t-add">
+        <span class="when">your call</span>
+        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"></path></svg></span>
         <div>
-          <h3>Meta Review<span class="freq">weekly</span></h3>
-          <p>A system-level audit — is Scout actually running well, and is it getting better over time?</p>
+          <h3>Define your own<span class="freq">unlimited</span></h3>
+          <p>Describe any routine you want — <em>&ldquo;scan investor updates every Monday,&rdquo; &ldquo;watch for contract mentions,&rdquo; &ldquo;ping me if a PR sits unreviewed&rdquo;</em> — or let Scout propose one when it spots a pattern. Fire it on a schedule, on an event, or on Scout's own judgment.</p>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- IT COMPOUNDS -->
-  <section class="section wrap" id="compounds">
-    <p class="section-kicker">It gets better</p>
-    <h2 class="big">Most tools are no smarter on day 100 than day 1. Scout is.</h2>
-    <p class="sub">Every night it reviews its own work. The knowledge base deepens, the mistakes get rarer, and the entire history stays in git — so the longer it runs, the more it's worth, and the harder it is to give up.</p>
-
-    <div class="compound-grid">
-      <div class="compound">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.5h5a1.5 1.5 0 0 1 1.5 1.5v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1.5 1.5 0 0 1 1.5-1.5Z"></path><path d="M6 7.4l1.3 1.3L10 6"></path></svg></span>
-        <h3>It keeps a record of its own mistakes</h3>
-        <p>When Scout gets something wrong, the pattern goes into a mistake audit — root cause and fix encoded back into its own instructions, so the same error gets harder to repeat. It grows monotonically more reliable.</p>
-      </div>
-      <div class="compound">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a4.8 4.8 0 0 0 7 7Z"></path></svg></span>
-        <h3>It forgets on purpose</h3>
-        <p>Every evening it lets a few things that no longer matter fall away. An agent that only ever accumulates becomes a worse partner over time; deliberate decay keeps the signal sharp and the briefing honest.</p>
-      </div>
-      <div class="compound">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="3.2" r="2"></circle><circle cx="8" cy="12.8" r="2"></circle><path d="M8 5.2v5.6"></path></svg></span>
-        <h3>Every change is in git</h3>
-        <p>Scout's memory is a git repository. Every edit is a commit with a reason — so you can see exactly what changed, when, and why, and revert anything you disagree with. The history is the system's memory of itself.</p>
       </div>
     </div>
   </section>
 
   <!-- YOUR DATA -->
+  <div class="band">
   <section class="section wrap" id="private">
-    <p class="section-kicker">Yours, end to end</p>
-    <h2 class="big">Runs on your machine. On your subscription. In plain files you own.</h2>
-    <p class="sub">Scout isn't a service you upload your life to. It's a plugin that runs locally and writes to a folder on your own disk — there is no Scout cloud.</p>
+    <p class="section-kicker reveal">Yours, end to end</p>
+    <h2 class="big reveal">Runs on your machine. In plain files you own. Tied to no one tool.</h2>
+    <p class="sub reveal">Scout isn't a service you upload your life to. It's an agent that runs locally and writes to a folder on your own disk — there is no Scout cloud.</p>
 
-    <div class="assurances">
-      <div class="assure">
+    <div class="assurances stagger">
+      <div class="assure reveal">
         <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
         <div>
           <h4>Nothing new leaves your computer</h4>
-          <p>Scout reads the tools you've already connected to Claude Code and writes to local files. No Scout server ever sees your data — there isn't one to see it.</p>
+          <p>Scout reads the tools you've already connected to Claude and writes to local files. No Scout server ever sees your data — there isn't one to see it.</p>
         </div>
       </div>
-      <div class="assure">
+      <div class="assure reveal">
         <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
         <div>
           <h4>Your memory is plain markdown</h4>
           <p>The whole knowledge base is human-readable <code>.md</code> files with <code>[[wikilinks]]</code>. Open it in Obsidian, grep it, edit it, or walk away with it — markdown is canonical, everything else is just a view.</p>
         </div>
       </div>
-      <div class="assure">
+      <div class="assure reveal">
         <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
         <div>
           <h4>You can audit and undo anything</h4>
-          <p>Because it's all in git, every change Scout makes is a commit you can read and <code>git revert</code>. Nothing about the agent's memory is opaque to you.</p>
+          <p>Because it's all in git, every change Scout makes is a commit you can read and <code>git revert</code> — including the changes it makes to <em>itself</em>. Nothing about the agent's mind is opaque to you.</p>
         </div>
       </div>
-      <div class="assure">
+      <div class="assure reveal">
         <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
         <div>
-          <h4>You stay in control of the agent</h4>
-          <p>When Scout improves its own behaviour, the change lands as a separate, labelled commit — loud and reversible, never a silent edit you can't trace.</p>
+          <h4>Not locked to one tool or model</h4>
+          <p>Scout runs on Claude Code today, but the harness is a transport — not a cage. Markdown, git and your own connectors mean the agent's mind isn't trapped in any one product; the plumbing can change, your knowledge stays.</p>
         </div>
       </div>
     </div>
   </section>
+  </div>
 
   <!-- INSTALL -->
   <section class="section wrap" id="install">
-    <p class="section-kicker">Get started</p>
-    <h2 class="big">Installed in under five minutes.</h2>
+    <p class="section-kicker reveal">Get started</p>
+    <h2 class="big reveal">Installed in under five minutes.</h2>
 
     <div class="install-grid">
-      <div class="term">
+      <div class="term reveal">
         <div class="term-head">claude</div>
         <pre><code><span class="cm"># In Claude Code:</span>
 <span class="cmd">/plugin</span> marketplace add jordanrburger/scout-plugin
@@ -321,20 +403,20 @@
 <span class="cm"># then create your vault:</span>
 <span class="cmd">/scout-setup</span></code></pre>
       </div>
-      <div class="install-aside">
+      <div class="install-aside reveal">
         <div class="step">
           <span class="n">1</span>
           <div><h4>Add the plugin</h4><p>Two commands inside Claude Code — no separate install.</p></div>
         </div>
         <div class="step">
           <span class="n">2</span>
-          <div><h4>Run setup</h4><p><code>/scout-setup</code> detects your connected tools and scaffolds your vault.</p></div>
+          <div><h4>Run setup</h4><p><code>/scout-setup</code> auto-detects every tool you've connected and scaffolds your vault.</p></div>
         </div>
         <div class="step">
           <span class="n">3</span>
-          <div><h4>Wake up briefed</h4><p>Tomorrow's briefing arrives cross-checked and confidence-tagged.</p></div>
+          <div><h4>Let it run</h4><p>Scout starts watching, cross-checking, and surfacing — and gets sharper every night.</p></div>
         </div>
-        <p class="install-note"><b>Works with any subset of connectors.</b> Even a Calendar-only Scout is useful — more tools just mean richer cross-checking.</p>
+        <p class="install-note"><b>Works with whatever you've got connected.</b> Even a single connector is useful — every tool you add deepens the cross-checking.</p>
       </div>
     </div>
   </section>
@@ -342,17 +424,17 @@
   <!-- MAC APP -->
   <section class="section wrap" id="app">
     <div class="app-grid">
-      <div class="app-icon-col">
+      <div class="app-icon-col reveal">
         <img class="app-icon" src="assets/scout-icon.svg" alt="Scout.app icon — a sail under a morning sun" width="168" height="168" />
       </div>
       <div>
-        <p class="section-kicker">Companion app</p>
-        <h2 class="big">Scout.app — a native window onto everything Scout writes.</h2>
-        <p class="sub">The plugin does the work; the free macOS app gives you a live interface on top of it.</p>
-        <div class="app-feats">
-          <div class="feat"><h4>Control Center</h4><p>Session activity, upcoming runs, cost per run, and a usage heatmap.</p></div>
-          <div class="feat"><h4>Action Items</h4><p>Today's briefing as a live list — inline comments, deep links to Linear, PRs and Slack.</p></div>
-          <div class="feat"><h4>Schedules</h4><p>Edit every scheduled session — times, weekdays, on-miss policy — with validated saves.</p></div>
+        <p class="section-kicker reveal">Companion app</p>
+        <h2 class="big reveal">Scout.app — a native window onto everything Scout writes.</h2>
+        <p class="sub reveal">The agent does the work; the free macOS app gives you a live interface on top of it — one of several surfaces, with phone and ambient capture on the way.</p>
+        <div class="app-feats stagger">
+          <div class="feat reveal"><h4>Control Center</h4><p>Session activity, upcoming runs, cost per run, and a usage heatmap.</p></div>
+          <div class="feat reveal"><h4>Action Items</h4><p>The current briefing as a live list — inline comments, deep links to Linear, PRs and Slack.</p></div>
+          <div class="feat reveal"><h4>Schedules</h4><p>Edit every routine — times, weekdays, on-miss policy — with validated saves.</p></div>
         </div>
         <div class="hero-ctas" style="justify-content: flex-start;">
           <a class="btn-accent" href="https://github.com/jordanrburger/Scout/releases">Download for macOS</a>
@@ -363,14 +445,19 @@
   </section>
 
   <!-- FAQ -->
+  <div class="band">
   <section class="section wrap" id="faq">
-    <p class="section-kicker">Questions</p>
-    <h2 class="big">Good questions, honest answers.</h2>
+    <p class="section-kicker reveal">Questions</p>
+    <h2 class="big reveal">Good questions, honest answers.</h2>
 
-    <div class="faq-list">
+    <div class="faq-list reveal">
       <details class="qa">
         <summary>Do I need Claude Code?<span class="pm">+</span></summary>
-        <p class="ans">Yes. Scout is a Claude Code plugin and runs as scheduled Claude Code sessions on your own machine. If you already use Claude Code, you're most of the way there.</p>
+        <p class="ans">Today, yes — Scout runs as scheduled Claude Code sessions on your own machine. But it's deliberately built so the harness is replaceable: markdown memory, git history and your own connectors mean Scout isn't permanently wedded to one tool.</p>
+      </details>
+      <details class="qa">
+        <summary>How many tools and routines can it have?<span class="pm">+</span></summary>
+        <p class="ans">There's no fixed number of either. Scout uses <b>any</b> connector you've added to Claude — built-in, custom, or community — and runs <b>any</b> routine you define, on a schedule or triggered by real-world events. It'll even propose new routines of its own when it notices a pattern worth automating.</p>
       </details>
       <details class="qa">
         <summary>What does it cost to run?<span class="pm">+</span></summary>
@@ -379,10 +466,6 @@
       <details class="qa">
         <summary>Do I have to use Obsidian?<span class="pm">+</span></summary>
         <p class="ans">No. The knowledge base is just markdown with <code>[[wikilinks]]</code> — any editor works. Obsidian gives the nicest reading experience, a graph view of how people, projects and channels connect, but it's entirely optional.</p>
-      </details>
-      <details class="qa">
-        <summary>What if I only have one or two tools connected?<span class="pm">+</span></summary>
-        <p class="ans">Still useful. Scout adapts its cross-checking to whatever you have — even a Calendar-only setup helps. More connectors simply mean more verification points behind each item.</p>
       </details>
       <details class="qa">
         <summary>How is this different from giving an AI &ldquo;memory&rdquo;?<span class="pm">+</span></summary>
@@ -394,12 +477,26 @@
       </details>
     </div>
   </section>
+  </div>
+
+  <!-- HORIZON -->
+  <section class="section wrap" id="horizon">
+    <p class="section-kicker reveal">The horizon</p>
+    <h2 class="big reveal">An early instance of something bigger.</h2>
+    <p class="horizon-note reveal">Scout is a deliberate early version of <b>fully autonomous agents</b> — ones that run on your life's timescale, keep their memory in the open, improve themselves, and reach back into your world only when it's worth the interruption. The daily briefing is just where it starts. The same engine is heading somewhere far more ambitious:</p>
+    <div class="h-chips reveal">
+      <span class="chip">event-driven triggers</span>
+      <span class="chip">phone &amp; ambient capture</span>
+      <span class="chip soon">harness-independent &middot; soon</span>
+      <span class="chip soon">agent-to-agent memory &middot; someday</span>
+    </div>
+  </section>
 </main>
 
 <!-- CLOSING CTA -->
 <section class="cta-band">
-  <h2>Wake up tomorrow already <em>briefed</em>.</h2>
-  <p>Install the plugin, run <code>/scout-setup</code>, and let Scout work the night shift. You'll get a short, cross-checked, confidence-tagged list of exactly what needs you.</p>
+  <h2>Let an agent watch the things you <em>can't</em>.</h2>
+  <p>Install the plugin, run <code>/scout-setup</code>, and let Scout start watching, cross-checking, and surfacing — on your machine, on your terms.</p>
   <div class="hero-ctas">
     <a class="btn-accent" href="#install">Install Scout</a>
     <a class="btn-quiet" href="https://github.com/jordanrburger/scout-plugin">View on GitHub</a>
@@ -416,6 +513,8 @@
     <a href="https://code.claude.com/docs/en/discover-plugins">Claude Code plugins</a>
   </div>
 </footer>
+
+<script src="landing.js" defer></script>
 
 </body>
 </html>
