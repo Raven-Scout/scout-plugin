@@ -44,6 +44,7 @@ from scout.action_items.parser import parse_file
 
 CORPUS = Path(__file__).resolve().parents[1] / "fixtures" / "contract" / "parser-corpus.json"
 
+
 def _load() -> list[dict]:
     return json.loads(CORPUS.read_text(encoding="utf-8"))["entries"]
 

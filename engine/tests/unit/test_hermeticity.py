@@ -16,9 +16,7 @@ from pathlib import Path
 
 def test_home_is_isolated() -> None:
     # tmp_path_factory dirs always contain a "pytest-<N>" path segment.
-    assert "pytest-" in str(Path.home()), (
-        f"Path.home() leaked the real home: {Path.home()}"
-    )
+    assert "pytest-" in str(Path.home()), f"Path.home() leaked the real home: {Path.home()}"
 
 
 def test_no_scout_env_leaks() -> None:

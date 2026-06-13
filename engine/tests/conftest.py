@@ -10,9 +10,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _hermetic_env(
-    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _hermetic_env(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
     """Isolate every test from the developer's live vault.
 
     paths.data_dir() falls back to Path.home()/Scout when SCOUT_DATA_DIR is
