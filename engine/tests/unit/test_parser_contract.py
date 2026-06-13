@@ -26,13 +26,10 @@ Parser API note (discovered during M3.2):
   scout-app's reference parser (Scout/ActionItems/ActionItemsParser.swift):
   extract the [#XXXX] prefix FIRST, then split subject/body on what remains.
 
-  KNOWN PYTHON BUG (reported, NOT papered over): render.parse() never extracts
-  the [#XXXX] short prefix, so for prefixed lines it leaves the literal
-  "[#XXXX] " glued to the front of both `subject` and `_plain_subject`. The
-  Swift reference parser strips it. The `subject`/`plain_subject` assertions
-  below are therefore xfail'd for prefixed entries (see _PREFIXED_XFAIL). The
-  practical fallout: the click-to-copy `--subject` needle render.py emits
-  carries the prefix and can miss the stripped substring comparison the CLIs do.
+  Historical note: render.parse() originally did not extract the [#XXXX]
+  prefix, leaving it glued to `subject`/`_plain_subject` (tracked as #114,
+  strict-xfail'd here until fixed). Fixed by stripping the leading prefix
+  before the subject/body split; the full corpus now passes with no xfails.
 """
 
 from __future__ import annotations
@@ -46,18 +43,6 @@ from scout.action_items import render
 from scout.action_items.parser import parse_file
 
 CORPUS = Path(__file__).resolve().parents[1] / "fixtures" / "contract" / "parser-corpus.json"
-
-# Entries whose `subject`/`plain_subject` the Python render.py parser gets WRONG
-# because it does not strip the [#XXXX] prefix. These are genuine parser bugs
-# (case b) tracked against the intended contract, NOT corpus errors — the corpus
-# keeps the correct (prefix-stripped) expectation and we xfail only these two
-# field assertions for these entries. `short_prefix` and `body` still pass.
-_PREFIX_STRIP_BUG = (
-    "scout-plugin render.parse() does not strip the [#XXXX] short prefix from "
-    "subject/plain_subject (no prefix extraction in render.py); Swift reference "
-    "parser does. See module docstring + scout-app #10."
-)
-
 
 def _load() -> list[dict]:
     return json.loads(CORPUS.read_text(encoding="utf-8"))["entries"]
@@ -97,20 +82,14 @@ def test_body(entry: dict, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("entry", _ENTRIES, ids=lambda e: e["name"])
-def test_subject(entry: dict, request: pytest.FixtureRequest, tmp_path: Path) -> None:
+def test_subject(entry: dict, tmp_path: Path) -> None:
     """subject (markdown-retaining title) comes from render.parse."""
-    # prefixed entries: render.py leaves the [#XXXX] prefix glued on — see _PREFIX_STRIP_BUG
-    if entry["expected"]["short_prefix"] is not None:
-        request.node.add_marker(pytest.mark.xfail(reason=_PREFIX_STRIP_BUG, strict=True))
     task = _only_task(_write(tmp_path, entry["line"]))
     assert task.subject == entry["expected"]["subject"], f"{entry['name']}: subject"
 
 
 @pytest.mark.parametrize("entry", _ENTRIES, ids=lambda e: e["name"])
-def test_plain_subject(entry: dict, request: pytest.FixtureRequest, tmp_path: Path) -> None:
+def test_plain_subject(entry: dict, tmp_path: Path) -> None:
     """plain_subject = render._plain_subject(subject); the --subject match form."""
-    # prefixed entries: render.py leaves the [#XXXX] prefix glued on — see _PREFIX_STRIP_BUG
-    if entry["expected"]["short_prefix"] is not None:
-        request.node.add_marker(pytest.mark.xfail(reason=_PREFIX_STRIP_BUG, strict=True))
     task = _only_task(_write(tmp_path, entry["line"]))
     assert render._plain_subject(task.subject) == entry["expected"]["plain_subject"], f"{entry['name']}: plain_subject"
