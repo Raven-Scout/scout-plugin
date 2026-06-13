@@ -63,8 +63,16 @@ def install_plist(
     )
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
-        # `launchctl bootstrap gui/$UID <plist>` loads the job. Best-effort.
         uid = os.getuid()
+        # launchctl bootstrap EIOs (errno 5) when the label is already
+        # loaded and has no --force; bootout first (best-effort, mirrors
+        # uninstall_plist) so re-install replaces the loaded job instead of
+        # erroring with a misleading "Bootstrap failed: 5" (#48, #23).
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{uid}/com.scout.schedule-tick"],
+            check=False,
+            capture_output=True,
+        )
         subprocess.run(
             ["launchctl", "bootstrap", f"gui/{uid}", str(target)],
             check=False,
