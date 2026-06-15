@@ -11,6 +11,7 @@ from scout.connectors import (
     Tier,
     load_registry,
 )
+from scout.errors import ConfigError
 from scout.schedule import SlotType
 
 
@@ -148,3 +149,14 @@ connectors:
     # Overlay overrides only the field it specifies; other fields inherit from seed.
     assert reg["mcp:claude_ai_Slack"].remediation.first_fix == "User-customized fix instructions."
     assert reg["mcp:claude_ai_Slack"].display_name == "Slack"  # inherited
+
+
+def test_load_yaml_unreadable_file_raises_configerror(tmp_path):
+    """An OS-level read failure on a connectors YAML must surface as
+    ConfigError, not a raw OSError traceback (#43)."""
+    from scout.connectors import _load_yaml
+
+    bad = tmp_path / "connectors.yaml"
+    bad.symlink_to(tmp_path / "does-not-exist.yaml")  # dangling symlink → OSError on open
+    with pytest.raises(ConfigError):
+        _load_yaml(bad)

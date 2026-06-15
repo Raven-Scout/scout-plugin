@@ -149,6 +149,8 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
+    except OSError as e:
+        raise ConfigError(f"connectors yaml at {path} could not be read: {e}") from e
     except yaml.YAMLError as e:
         raise ConfigError(f"connectors yaml at {path} is malformed: {e}") from e
     if not isinstance(data, dict):
