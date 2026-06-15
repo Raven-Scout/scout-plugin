@@ -265,6 +265,41 @@ def _register_connectors() -> None:
         load_registry()  # exercise the path; raises ConfigError on bad YAML
         typer.echo("reloaded")
 
+    @connectors_app.command("probe-registry")
+    def cli_connectors_probe_registry(
+        json_out: bool = typer.Option(
+            False, "--json", help="Emit the merged registry as JSON (consumed by /scout-setup)."
+        ),
+    ) -> None:
+        """Print the connector probe registry: shipped union the ~/Scout overlay.
+
+        Merges templates/connector-probes.yaml with an optional
+        ~/Scout/connector-probes.local.yaml (overlay wins on key collision)
+        so custom connector probes survive plugin updates (#97).
+        """
+        import json as _json
+        from typing import Any
+
+        from scout.scripts.connector_probes import ProbeKind, resolve_registry
+
+        reg = resolve_registry()
+        if json_out:
+            out: dict[str, dict[str, Any]] = {}
+            for name in sorted(reg):
+                p = reg[name]
+                entry: dict[str, Any] = {"kind": p.kind.value, "needs_user_input": p.needs_user_input}
+                if p.kind is ProbeKind.BASH:
+                    entry["bash_command"] = p.bash_command
+                else:
+                    entry["tool_chain"] = p.tool_chain
+                out[name] = entry
+            typer.echo(_json.dumps(out, indent=2))
+        else:
+            for name in sorted(reg):
+                p = reg[name]
+                primary = p.bash_command if p.kind is ProbeKind.BASH else (p.tool_chain[0] if p.tool_chain else "")
+                typer.echo(f"{name}\t{p.kind.value}\t{primary}")
+
     @connectors_app.command("snapshot")
     def cli_connectors_snapshot(
         target: Path | None = typer.Option(
