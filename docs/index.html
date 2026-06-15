@@ -8,8 +8,8 @@
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Scout — an autonomous agent that runs and improves itself" />
 <meta property="og:description" content="It reads everything you connect, cross-checks every claim, drives its own roadmap, and improves its own instructions — a memory you can read, on your machine." />
-<meta property="og:url" content="https://jordanrburger.github.io/scout-plugin/" />
-<meta property="og:image" content="https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/docs/assets/scout-icon.svg" />
+<meta property="og:url" content="https://raven-scout.github.io/scout-plugin/" />
+<meta property="og:image" content="https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/docs/assets/scout-icon.svg" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,6 +17,26 @@
 <link rel="stylesheet" href="hybrid.css" />
 <link rel="icon" type="image/svg+xml" href="assets/scout-icon.svg" />
 <style>
+  /* ---- width / responsiveness: use the screen on laptops, scale visuals up ---- */
+  .wrap{max-width:1200px;}
+  .proof > .col{max-width:1140px;}
+  .hero .win{max-width:960px;}
+  @media (min-width:1080px){
+    .vrow{grid-template-columns:0.88fr 1.12fr;gap:68px;padding:56px 0;}
+    .vvis{padding:32px;}
+    .vtext h3{font-size:27px;}
+    .vtext p{font-size:16.5px;max-width:40ch;}
+    .partlabel h2{font-size:clamp(34px,3.2vw,46px);}
+    .pcard .ln, .legend .r, .chk .it, .q .row, .bi h4{font-size:15px;}
+    .win .body{padding:22px 28px 24px;}
+    .kg svg{max-width:480px;margin:0 auto;}
+  }
+  @media (min-width:1440px){
+    .wrap{max-width:1320px;}
+    .proof > .col{max-width:1240px;}
+    .vrow{gap:84px;}
+  }
+
   /* lighter, visual layout */
   .hero .lede2{margin:22px 0 0;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--ink-2);max-width:50ch;}
   .partlabel{text-align:center;padding:70px 0 0;}
@@ -138,7 +158,7 @@
     <p class="lede2" style="margin-left:auto;margin-right:auto;">So I built an agent that keeps up for me — reads everything, checks its own work, and reaches back only when it's worth it.</p>
     <div class="ctas" style="justify-content:center;">
       <a class="btn btn-p" href="#install">Install Scout</a>
-      <a class="btn btn-s" href="https://github.com/jordanrburger/scout-plugin">View on GitHub</a>
+      <a class="btn btn-s" href="https://github.com/Raven-Scout/scout-plugin">View on GitHub</a>
     </div>
 
     <div class="win reveal">
@@ -308,13 +328,13 @@
       <h3 class="sec reveal" style="font-family:var(--sans);font-size:28px;font-weight:800;">Run it yourself in under five minutes.</h3>
       <p class="lead reveal">Two commands in Claude Code, then <code>/scout-setup</code> detects what you've connected and scaffolds your vault.</p>
       <div class="term reveal"><div class="h">claude</div><pre><code><span class="c"># in Claude Code:</span>
-<span class="g">/plugin</span> marketplace add jordanrburger/scout-plugin
+<span class="g">/plugin</span> marketplace add Raven-Scout/scout-plugin
 <span class="g">/plugin</span> install scout@scout-plugin
 
 <span class="c"># then create your vault:</span>
 <span class="g">/scout-setup</span></code></pre></div>
       <div class="ctas reveal" style="margin-top:24px;">
-        <a class="btn btn-p" href="https://github.com/jordanrburger/scout-plugin">Get Scout on GitHub</a>
+        <a class="btn btn-p" href="https://github.com/Raven-Scout/scout-plugin">Get Scout on GitHub</a>
         <a class="btn btn-s" href="https://github.com/jordanrburger/Scout/releases">Download the Mac app</a>
       </div>
     </div>
@@ -323,7 +343,7 @@
 
 <footer><div class="wrap foot">
   <span class="b"><img src="assets/scout-icon.svg" alt=""/>Scout</span><span>· an autonomous agent that runs and improves itself</span><span class="sp"></span>
-  <a href="https://github.com/jordanrburger/scout-plugin">Repository</a>
+  <a href="https://github.com/Raven-Scout/scout-plugin">Repository</a>
   <a href="https://code.claude.com/docs/en/discover-plugins">Claude Code plugins</a>
 </div></footer>
 
