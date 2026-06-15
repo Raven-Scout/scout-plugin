@@ -1022,7 +1022,11 @@ def _register_bootstrap() -> None:
             raise typer.Exit(code=2)
         import yaml as _yaml
 
-        existing = _yaml.safe_load(cfg_path.read_text()) or {}
+        try:
+            existing = _yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        except (_yaml.YAMLError, UnicodeDecodeError) as e:
+            typer.echo(f"scout-config.yaml is malformed: {e}", err=True)
+            raise typer.Exit(code=ConfigError.exit_code) from e
         connectors = set(existing.get("connectors", {}).get("enabled") or [])
         instance = existing.get("instance", {})
         user = existing.get("user", {})
