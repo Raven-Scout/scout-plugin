@@ -19,8 +19,9 @@
 <style>
   /* ---- width / responsiveness: use the screen on laptops, scale visuals up ---- */
   .wrap{max-width:1200px;}
-  .proof > .col{max-width:1140px;}
+  .proof > .col{max-width:1140px;padding-left:24px;padding-right:24px;}
   .hero .win{max-width:960px;}
+  @media (max-width:640px){ .proof > .col{padding-left:20px;padding-right:20px;} .partlabel{padding-top:54px;} }
   @media (min-width:1080px){
     .vrow{grid-template-columns:0.88fr 1.12fr;gap:68px;padding:56px 0;}
     .vvis{padding:32px;}
