@@ -54,7 +54,7 @@ Underneath all of it: **everything is git.** An ontology-validated knowledge gra
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/install.sh | bash
 ```
 
 Then open Claude Code and run `/scout-setup` to create your vault.
@@ -66,7 +66,7 @@ Then open Claude Code and run `/scout-setup` to create your vault.
 Scout is distributed as a Claude Code plugin via a built-in marketplace catalog (`.claude-plugin/marketplace.json`). Install it with:
 
 ```
-/plugin marketplace add jordanrburger/scout-plugin
+/plugin marketplace add Raven-Scout/scout-plugin
 /plugin install scout@scout-plugin
 ```
 
