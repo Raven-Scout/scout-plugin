@@ -23,20 +23,20 @@ class LockBusyError(Exception):
         super().__init__(f"lock {lock_path} held by live PID {pid}")
 
 
-def is_lock_held_by_live_pid(lock_path: Path) -> bool:
-    """Return True iff the lock file exists and its PID is alive.
+def _read_lock_pid(lock_path: Path) -> int | None:
+    """Return the PID written in the lock file, or None if absent/unparseable.
 
-    TOCTOU note: a process could exit between this check and a subsequent
-    operation. That's acceptable for single-user single-machine use; the
-    lock is a coordination signal between scout-app sessions, not a
-    cross-host mutex.
+    None covers the empty file a racing winner leaves between its O_EXCL
+    create and its PID write, as well as a corrupt lock.
     """
-    if not lock_path.exists():
-        return False
     try:
-        pid = int(lock_path.read_text(encoding="utf-8").strip())
+        return int(lock_path.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
-        return False
+        return None
+
+
+def _pid_alive(pid: int) -> bool:
+    """Return True iff `pid` is a live process we should treat as the holder."""
     if pid <= 0:
         # Corrupt lock — refuse to call os.kill(0, 0) (process group) or
         # os.kill(-1, 0) (every process owned by user).
@@ -51,6 +51,22 @@ def is_lock_held_by_live_pid(lock_path: Path) -> bool:
         return True
 
 
+def is_lock_held_by_live_pid(lock_path: Path) -> bool:
+    """Return True iff the lock file exists and its PID is alive.
+
+    TOCTOU note: a process could exit between this check and a subsequent
+    operation. That's acceptable for single-user single-machine use; the
+    lock is a coordination signal between scout-app sessions, not a
+    cross-host mutex.
+    """
+    if not lock_path.exists():
+        return False
+    pid = _read_lock_pid(lock_path)
+    if pid is None:
+        return False
+    return _pid_alive(pid)
+
+
 def acquire_lock(lock_path: Path) -> None:
     """Take the lock by atomically creating the file with our PID.
 
@@ -58,36 +74,42 @@ def acquire_lock(lock_path: Path) -> None:
     they hold the lock — one wins the create, the other gets
     ``FileExistsError`` and we surface it as :class:`LockBusyError`.
 
-    Stale locks (file exists, but its PID is dead) are unlinked before
-    the atomic claim, so a normal warm path is unchanged.
+    Stale recovery happens ONLY in response to that create conflict, and
+    ONLY for a parseable, dead PID (a crashed holder): such a lock is
+    unlinked and the atomic claim retried once. An existing lock whose
+    contents we cannot parse — most importantly the empty file a racing
+    winner leaves in the window between its O_EXCL create and its PID
+    write — is treated as busy and never removed. The previous pre-check
+    unlinked any "not held by a live PID" lock, which classified that
+    empty file as stale and let both racers win; doing stale recovery
+    only on the O_EXCL conflict, and only for a confirmed-dead PID, closes
+    that window (#36).
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # If a stale lock exists, remove it before claiming. The unlink is
-    # racy on its own, but combined with the O_EXCL claim below, at most
-    # one racing process succeeds.
-    if lock_path.exists() and not is_lock_held_by_live_pid(lock_path):
-        with contextlib.suppress(FileNotFoundError):
-            lock_path.unlink()
-
-    try:
-        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError as e:
-        # Either held by a live PID, or another caller raced us to claim.
+    for attempt in range(2):
         try:
-            pid = int(lock_path.read_text(encoding="utf-8").strip())
-        except (ValueError, OSError):
-            pid = -1
-        raise LockBusyError(lock_path, pid) from e
-
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(str(os.getpid()))
-    except Exception:
-        # Roll back the partial claim so the next caller can retry cleanly.
-        with contextlib.suppress(FileNotFoundError):
-            lock_path.unlink()
-        raise
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError as e:
+            pid = _read_lock_pid(lock_path)
+            # Clear and retry once only for a parseable, dead PID. Empty /
+            # unparseable (racing winner mid-write or corrupt) or a live
+            # holder is busy — never unlink it.
+            if pid is not None and not _pid_alive(pid) and attempt == 0:
+                with contextlib.suppress(FileNotFoundError):
+                    lock_path.unlink()
+                continue
+            raise LockBusyError(lock_path, pid if pid is not None else -1) from e
+        else:
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(str(os.getpid()))
+            except Exception:
+                # Roll back the partial claim so the next caller can retry cleanly.
+                with contextlib.suppress(FileNotFoundError):
+                    lock_path.unlink()
+                raise
+            return
 
 
 def release_lock(lock_path: Path) -> None:

@@ -136,6 +136,19 @@ def test_acquire_lock_clears_stale_dead_pid(tmp_path):
 # both write their PID, and both believe they held the lock. Issue #36.
 
 
+def test_acquire_lock_treats_empty_lock_as_busy_not_stale(tmp_path):
+    """An empty lock file is the exact state a racing winner leaves between
+    its O_EXCL create and its PID write. A second caller must NOT treat that
+    empty file as stale and clobber it — that is the residual hole in #36's
+    O_EXCL fix that let two callers both 'win'. Empty/unparseable existing
+    lock → LockBusyError, and the file is left intact."""
+    lock = tmp_path / ".scout-session.lock"
+    lock.write_text("")  # winner created it via O_EXCL, hasn't written PID yet
+    with pytest.raises(LockBusyError):
+        acquire_lock(lock)
+    assert lock.exists()  # must not have been removed
+
+
 def test_acquire_lock_is_atomic_under_concurrent_callers(tmp_path):
     """When two concurrent callers race to acquire the same lock,
     exactly one must succeed and the other must see LockBusyError —

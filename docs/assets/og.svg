@@ -1,0 +1,38 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7f3ea"/><stop offset="1" stop-color="#efe7d8"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="55%" r="55%">
+      <stop offset="0%" stop-color="#F4A73A" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#E89326" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#E89326" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1280" height="8" fill="#b4541f"/>
+
+  <!-- mark -->
+  <g transform="translate(96,236)">
+    <rect x="0" y="0" width="168" height="168" rx="40" fill="#f3ead5"/>
+    <rect x="0" y="0" width="168" height="168" rx="40" fill="url(#sun)"/>
+    <circle cx="84" cy="58" r="16" fill="#2F4A55"/>
+    <path d="M84 78 L132 150 L84 142 L36 150 Z" fill="#2B2F33"/>
+    <path d="M84 86 L84 142 L48 148 Z" fill="#f3ead5"/>
+    <rect x="58" y="150" width="52" height="13" rx="6" fill="#2B2F33"/>
+  </g>
+
+  <!-- text -->
+  <g font-family="'Iowan Old Style','Palatino Linotype',Georgia,serif">
+    <text x="300" y="250" font-size="62" font-weight="500" fill="#1c1814" letter-spacing="-1">Nothing falls through the cracks —</text>
+    <text x="300" y="328" font-size="62" font-weight="500" font-style="italic" fill="#b4541f" letter-spacing="-1">and you can trust what it surfaces.</text>
+  </g>
+  <text x="300" y="392" font-family="-apple-system,'Helvetica Neue',Arial,sans-serif" font-size="27" fill="#534c41">An autonomous agent that cross-checks all your work tools — for Claude Code.</text>
+
+  <g font-family="'JetBrains Mono',ui-monospace,Menlo,monospace" font-size="22" fill="#8a8173">
+    <text x="300" y="556">open source</text>
+    <circle cx="455" cy="549" r="3" fill="#b4541f"/>
+    <text x="476" y="556">raven-scout.github.io/scout-plugin</text>
+  </g>
+</svg>
