@@ -102,12 +102,18 @@ def resolve_target(
     data_dir: Path,
     by_id: str | None,
     by_subject: str | None,
+    status: str = "open",
 ) -> tuple[ActionItem, str, str]:
     """Resolve which `ActionItem` a mutator should act on.
 
     Returns `(target, item_ulid, via)` where `via` is `"id"` or
     `"subject"`. `item_ulid` may be empty string if a `--by-subject` lookup
     matched a legacy unprefixed line and no IdMap entry exists for it.
+
+    `status` constrains the --subject lookup ("open" for mutations of live
+    tasks, "done" for undo/reopen). The --by-id path is status-agnostic:
+    a stable id is unique, so status filtering would only create
+    found-but-wrong-status dead ends.
 
     Raises `ActionItemError` on bad arguments, unknown prefix, no match,
     or ambiguous match.
@@ -160,9 +166,9 @@ def resolve_target(
     # user search for e.g. "A3F7" to silently match the prefix token of an
     # unrelated task. Users wanting to find by prefix should use --by-id.
     needle = by_subject.lower()
-    matches = [i for i in items if i.status == "open" and needle in i.title.lower()]
+    matches = [i for i in items if i.status == status and needle in i.title.lower()]
     if len(matches) == 0:
-        raise ActionItemError(f"no open task matched subject: {by_subject!r}")
+        raise ActionItemError(f"no {status} task matched subject: {by_subject!r}")
     if len(matches) > 1:
         raise ActionItemError(
             f"ambiguous subject {by_subject!r}; matched:\n" + "\n".join(f"  - {m.title}" for m in matches)

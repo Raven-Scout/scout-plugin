@@ -21,6 +21,9 @@ from scout.ids import short_prefix_pattern
 # candidate regex.
 _CHECKBOX_LINE_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>- \[[ xX]\] )")
 
+# Completion marker in either casing; reopen must accept both (#56).
+_DONE_MARK_RE = re.compile(r"\[[xX]\]")
+
 
 def atomic_write_lines(
     target: Path,
@@ -74,16 +77,25 @@ def _read_lines_with_style(target: Path) -> tuple[list[str], str, bool]:
 
 
 def flip_checkbox(target: Path, *, line_number: int, to_done: bool) -> None:
-    """Toggle `[ ]` ⇄ `[x]` on the 1-indexed line. Preserves all other bytes."""
+    """Toggle `[ ]` ⇄ `[x]` on the 1-indexed line. Preserves all other bytes.
+
+    Reopening accepts either completion casing (`[x]` or `[X]`) and always
+    writes back the canonical open marker `[ ]` (#56).
+    """
     lines, newline, trailing = _read_lines_with_style(target)
     idx = line_number - 1
     if not 0 <= idx < len(lines):
         raise ActionItemError(f"flip_checkbox: line {line_number} out of range (1..{len(lines)})")
-    old = "[ ]" if to_done else "[x]"
-    new = "[x]" if to_done else "[ ]"
-    if old not in lines[idx]:
-        raise ActionItemError(f"flip_checkbox: line {line_number} does not contain `{old}`")
-    lines[idx] = lines[idx].replace(old, new, 1)
+    line = lines[idx]
+    if to_done:
+        if "[ ]" not in line:
+            raise ActionItemError(f"flip_checkbox: line {line_number} does not contain `[ ]`")
+        lines[idx] = line.replace("[ ]", "[x]", 1)
+    else:
+        m = _DONE_MARK_RE.search(line)
+        if m is None:
+            raise ActionItemError(f"flip_checkbox: line {line_number} does not contain `[x]`")
+        lines[idx] = line[: m.start()] + "[ ]" + line[m.end() :]
     atomic_write_lines(target, lines, newline=newline, trailing_newline=trailing)
 
 

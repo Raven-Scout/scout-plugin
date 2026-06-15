@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from scout.scripts.three_way_merge import MergeResult, three_way_merge
 
 
@@ -52,3 +54,16 @@ def test_one_side_deletes_content():
     result = three_way_merge(base=base, ours=ours, theirs=theirs)
     assert result.conflicts is False
     assert "beta" not in result.content
+
+
+def test_merge_raises_on_git_timeout(monkeypatch):
+    """A hung `git merge-file` must not block bootstrap forever (#47)."""
+    import subprocess as _subprocess
+
+    def fake_run(argv, **kwargs):
+        assert kwargs.get("timeout") == 30
+        raise _subprocess.TimeoutExpired(cmd=argv, timeout=30)
+
+    monkeypatch.setattr("scout.scripts.three_way_merge.subprocess.run", fake_run)
+    with pytest.raises(RuntimeError, match="timed out"):
+        three_way_merge(base="b\n", ours="a\n", theirs="c\n")

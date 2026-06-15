@@ -215,3 +215,43 @@ def test_mark_done_uses_parser_line_number_even_under_external_edit(fake_data_di
     assert result[0] == "- [ ] target task", (
         f"injected duplicate at line 1 must NOT have been flipped; got: {result[0]!r}"
     )
+
+
+def test_undo_reopens_done_task_by_subject(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    today = dt.date(2026, 4, 15)
+    monkeypatch.setattr("scout.action_items.mark_done._today", lambda: today)
+    f = _seed_daily(
+        fake_data_dir,
+        "- [x] Submit Lever feedback\n- [ ] Other task\n",
+        date=today,
+    )
+    event = mark_done(by_subject="Lever feedback", data_dir=fake_data_dir, undo=True)
+    assert "- [ ] Submit Lever feedback" in f.read_text()
+    assert event.kind == "action_item.reopened"
+
+
+def test_undo_reopens_uppercase_done_task(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """#56: a task completed as `[X]` must still be reopenable."""
+    today = dt.date(2026, 4, 15)
+    monkeypatch.setattr("scout.action_items.mark_done._today", lambda: today)
+    f = _seed_daily(fake_data_dir, "- [X] Shipped thing\n", date=today)
+    mark_done(by_subject="Shipped thing", data_dir=fake_data_dir, undo=True)
+    assert "- [ ] Shipped thing" in f.read_text()
+
+
+def test_undo_by_subject_does_not_match_open_tasks(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    today = dt.date(2026, 4, 15)
+    monkeypatch.setattr("scout.action_items.mark_done._today", lambda: today)
+    _seed_daily(fake_data_dir, "- [ ] Still open task\n", date=today)
+    with pytest.raises(ActionItemError, match="no done task matched"):
+        mark_done(by_subject="Still open", data_dir=fake_data_dir, undo=True)
+
+
+def test_undo_reopens_by_id(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """#116 acceptance: `mark-done --by-id XXXX --undo` reopens a done task."""
+    today = dt.date(2026, 4, 15)
+    monkeypatch.setattr("scout.action_items.mark_done._today", lambda: today)
+    f = _seed_daily(fake_data_dir, "- [x] [#AB30] Ship the fix\n", date=today)
+    event = mark_done(by_id="AB30", data_dir=fake_data_dir, undo=True)
+    assert "- [ ] [#AB30] Ship the fix" in f.read_text()
+    assert event.kind == "action_item.reopened"

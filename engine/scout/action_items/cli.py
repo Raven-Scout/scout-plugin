@@ -24,6 +24,7 @@ app = typer.Typer(help="Action-items operations.", no_args_is_help=True)
 def cli_mark_done(
     subject: str | None = typer.Option(None, "--subject", help="Substring of task title (legacy fallback)."),
     by_id: str | None = typer.Option(None, "--by-id", help="Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."),
+    undo: bool = typer.Option(False, "--undo", help="Reopen a completed task (flip [x]/[X] back to [ ])."),
     path: Path | None = typer.Argument(
         None,
         help="Daily markdown file (default: today). When given, its grandparent is the data dir.",
@@ -48,7 +49,7 @@ def cli_mark_done(
         except ValueError as e:
             raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
 
-    mark_done(by_id=by_id, by_subject=subject, date=date, data_dir=data_dir)
+    mark_done(by_id=by_id, by_subject=subject, date=date, data_dir=data_dir, undo=undo)
 
 
 @app.command("snooze")
