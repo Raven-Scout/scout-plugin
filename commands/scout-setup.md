@@ -73,18 +73,39 @@ Ask each of these in order, waiting for each answer:
 
 ---
 
-## Step 2: Connector inventory (read templates/connector-probes.yaml)
+## Step 2: Connector inventory (merged probe registry)
 
-Read the probe registry:
+Read the merged probe registry (shipped probes unioned with the user's
+`~/Scout/connector-probes.local.yaml` overlay, if present). Use the
+`$SCOUTCTL` resolved in Step 0:
 
 ```bash
-cat ${CLAUDE_PLUGIN_ROOT}/templates/connector-probes.yaml
+"$SCOUTCTL" connectors probe-registry --json
 ```
 
-For each connector entry in the YAML:
-- If `primary: bash`, run the bash command. If exit code is 0, mark connector enabled.
-- Otherwise, attempt to call `primary` as an MCP tool. If it returns data, mark enabled. If not (or tool not found), try each `fallbacks` entry. If all fail, mark disabled.
-- For each enabled connector with `needs_user_input`, ask the user for the listed fields and store the values.
+This emits a JSON object keyed by connector name. Each value has `kind`
+(`mcp_tool` or `bash`), plus `tool_chain` (mcp) or `bash_command` (bash),
+and `needs_user_input`.
+
+For each connector in the JSON:
+- If `kind` is `bash`, run `bash_command`. Exit code 0 → mark connector enabled.
+- If `kind` is `mcp_tool`, try each tool in `tool_chain` in order: call it as an MCP tool; the first that returns data → enabled. If all fail (or the tools aren't present) → disabled.
+- For each enabled connector with a non-empty `needs_user_input`, ask the user for those fields and store the values.
+
+> **Custom connectors:** to make `/scout-setup` detect a connector that isn't
+> shipped, add an entry to `~/Scout/connector-probes.local.yaml`. Author it in
+> the same source schema as `templates/connector-probes.yaml`
+> (`primary`/`fallbacks`/`needs_user_input` — NOT the `--json` output shape
+> shown above); the engine merges and converts it. The overlay lives in your
+> vault and survives plugin updates. Example:
+>
+> ```yaml
+> devin:
+>   primary: mcp__devin__devin_session_search
+>   fallbacks: []
+>   needs_user_input:
+>     - devin_org_token
+> ```
 
 After all probes complete, present the checklist as a tidy summary:
 
