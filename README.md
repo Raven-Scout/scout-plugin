@@ -21,6 +21,36 @@ Readable-markdown memory, scheduled runs, and a self-improvement loop are table 
 
 Most assistants summarize. Scout corroborates — and that's the difference between output you skim and output you act on.
 
+## Scout runs — and improves — itself
+
+Most "AI memory" tools are static: they store what you tell them and answer when asked. Scout is the opposite — a system that operates and improves *on its own*, between your check-ins. This is the part other tools don't have, and it's why Scout gets **more reliable the longer it runs.**
+
+### It keeps a model of its own mistakes
+
+When Scout gets something wrong and you flag it (a 👎 or a one-line correction on its summary), it records a numbered **mistake pattern**: the error type, the root cause, and the fix. Patterns track recurrence — and if one marked "fixed" happens again, it's flagged as a **regression** so it can't quietly rot. The fix is written back into Scout's own instructions, so that whole *class* of error gets rarer over time. (The author's live vault carries 100+ logged patterns.) This isn't a bug tracker; it's a self-model that makes Scout monotonically more reliable.
+
+### It rewrites its own instructions — in the open
+
+Scout doesn't wait for a maintainer to ship an update. Its nightly **Dreaming** session edits its own skill files directly for additive, feedback-aligned fixes, and files an **opt-out proposal** for anything larger (it applies after a few days unless you reject it). Every change is a separate git commit you can read and `git revert` — so the safety model is *transparency + reversibility*, not a checkpoint on every step. (Scout once proposed retiring its own approval gate because it was causing missed-update regressions; the author reviewed the proposal and approved it.)
+
+### It drives its own roadmap
+
+Scout keeps a **Wishlist** of improvements and works it down on its own — picking an item each evening, implementing it, shipping it, marking it done. Features Scout has built *for itself* this way include a native macOS Control Center app, a terminal action-items UI, and the Research session type. You aren't the only one filing feature requests.
+
+### It goes and finds what it's missing
+
+A **research queue** lets Scout expand its own knowledge between briefings — scoring which entities are stale or thin, rotating across your projects so it doesn't fixate on one, then digging via web search, docs, and your tools. Leave a note anywhere in the vault (an inline `//==<< … >>==//` comment) and the next run picks it up and prioritizes it.
+
+### It asks you — sparingly — for what only you know
+
+Scout can't see everything from your tools, so it occasionally surfaces a **targeted, low-stakes question** to fill a gap (always with a link and a one-line gist — never a notification firehose). Your answer is routed into the knowledge graph, and the same question is never asked twice.
+
+### It refuses to guess about people
+
+The most dangerous edit a knowledge system can make is mistaking one person for another. Scout **won't** merge, split, or rename a person on a single source — uncertain claims go to a **review queue** for you to confirm, rather than silently corrupting the graph.
+
+Underneath all of it: **everything is git.** An ontology-validated knowledge graph (≈140 entities and ≈950 relationships in the author's live vault) with one commit per run — `briefing […]`, `consolidation […]`, `dreaming […]`, `research […]` — 800+ committed sessions and counting. The history *is* the system's memory of its own evolution: you can trace exactly what Scout changed, when, and why, and undo any of it.
+
 ## Install
 
 ```bash

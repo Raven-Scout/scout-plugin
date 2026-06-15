@@ -9,7 +9,7 @@
 <meta property="og:title" content="Scout — an autonomous agent that runs and improves itself" />
 <meta property="og:description" content="It reads everything you connect, cross-checks every claim, drives its own roadmap, and improves its own instructions — a memory you can read, on your machine." />
 <meta property="og:url" content="https://raven-scout.github.io/scout-plugin/" />
-<meta property="og:image" content="https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/docs/assets/scout-icon.svg" />
+<meta property="og:image" content="https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/docs/assets/og.png" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -138,6 +138,50 @@
   .kg svg{width:100%;height:auto;display:block;}
   .kgstat{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:center;margin-top:6px;}
   .vcap{font-family:var(--mono);font-size:10px;color:var(--ink-4);text-align:center;margin-top:12px;text-transform:uppercase;letter-spacing:.05em;}
+
+  /* ===== animation layer (scroll-sequenced) ===== */
+  html.js .seq{opacity:0;transform:translateY(10px);}
+  html.js .vvis.in .seq, html.js .win.in .seq{opacity:1;transform:none;transition:opacity .5s cubic-bezier(.2,.7,.2,1),transform .5s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0s);}
+  html.js .occ .d{transform:scale(0);} html.js .vvis.in .occ .d{animation:popdot .3s cubic-bezier(.3,1.4,.5,1) forwards;animation-delay:var(--d,0s);}
+  @keyframes popdot{to{transform:scale(1);}}
+  @media (prefers-reduced-motion: reduce){ html.js .seq, html.js .vvis.in .seq, html.js .win.in .seq, html.js .occ .d{opacity:1!important;transform:none!important;animation:none!important;} }
+
+  /* ===== interactive knowledge graph ===== */
+  .kg2 svg{width:100%;height:auto;display:block;max-width:520px;margin:0 auto;}
+  .kg2 .edge{stroke:#dcd5c5;stroke-width:1.4;transition:stroke .15s,opacity .15s,stroke-width .15s;}
+  .kg2 .node{cursor:pointer;outline:none;}
+  .kg2 .node circle{transition:transform .16s ease,opacity .15s;transform-box:fill-box;transform-origin:center;}
+  .kg2 .node text{transition:opacity .15s;}
+  .kg2.dim .edge{opacity:.14;} .kg2.dim .node{opacity:.3;}
+  .kg2 .node.hot{opacity:1;} .kg2 .node.hot circle{transform:scale(1.4);}
+  .kg2 .node.hot text{font-weight:700;}
+  .kg2 .edge.hot{stroke:var(--acc);opacity:1;stroke-width:2.4;}
+  .kgcap{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:center;margin-top:14px;min-height:32px;line-height:1.5;}
+  .kgcap b{color:var(--acc-2);} .kgcap .nn{color:var(--ink);font-weight:600;}
+
+  /* ===== playable briefing ===== */
+  .playtoggle{display:inline-flex;gap:5px;background:var(--sunk);border:1px solid var(--line);border-radius:11px;padding:4px;margin:26px auto 0;}
+  .pt{font-family:var(--mono);font-size:12.5px;border:none;background:none;color:var(--ink-3);padding:9px 18px;border-radius:8px;cursor:pointer;transition:.15s;}
+  .pt.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(40,30,15,.08);}
+  .playwrap{max-width:760px;margin:18px auto 0;}
+  .playwrap .bi{cursor:pointer;transition:background .15s;border-radius:8px;}
+  .playwrap .bi:hover{background:var(--bg);}
+  .bi h4 .more{font-family:var(--mono);font-size:10px;color:var(--acc);font-weight:500;margin-left:6px;}
+  .bi.open h4 .more{color:var(--ink-3);}
+  .bi .why{display:none;margin-top:9px;border-top:1px dashed var(--line-2);padding-top:9px;font-family:var(--sans);font-size:12.5px;line-height:1.55;color:var(--ink-2);}
+  .bi .why b{color:var(--ink);}
+  .bi.open .why{display:block;}
+  .win .tag[data-tip]{position:relative;cursor:help;}
+  .win .tag[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--ink);color:var(--bg);font-family:var(--sans);font-size:11px;font-weight:400;padding:6px 10px;border-radius:7px;z-index:6;box-shadow:0 8px 20px -6px rgba(0,0,0,.4);}
+  .win .tag[data-tip]:hover::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink);z-index:6;}
+  .chaos{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 28px 60px -32px rgba(60,40,15,.34);}
+  .chaos .capx{font-family:var(--sans);font-size:14px;color:var(--ink-2);text-align:center;margin-bottom:18px;}
+  .chaos .apps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .chaos .app{position:relative;background:var(--bg);border:1px solid var(--line-2);border-radius:11px;padding:17px 10px;text-align:center;}
+  .chaos .app .nm{font-size:13px;color:var(--ink-2);font-weight:500;}
+  .chaos .app .b{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;border-radius:11px;background:var(--red);color:#fff;font-family:var(--mono);font-size:11px;display:grid;place-items:center;padding:0 5px;}
+  .chaos .capx2{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-3);text-align:center;margin-top:20px;}
+  @media(max-width:560px){.chaos .apps{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
 <body>
@@ -161,12 +205,34 @@
       <a class="btn btn-s" href="https://github.com/Raven-Scout/scout-plugin">View on GitHub</a>
     </div>
 
-    <div class="win reveal">
-      <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Scout — Today</span><span class="r">cross-checked · confidence-tagged</span></div>
-      <div class="body">
-        <div class="bi"><span class="p" style="background:var(--red)"></span><div><h4>Reply to Priya — she's asked twice.</h4><p>The migration doc she needs is already in your drafts.</p><div class="r"><span class="tag v">verified</span><span class="src">Slack</span><span class="src">Gmail</span></div></div></div>
-        <div class="bi"><span class="p" style="background:var(--amb)"></span><div><h4>Renewal call may have moved to 3:00.</h4><p>Only the calendar says so — treat as tentative.</p><div class="r"><span class="tag s">single-source</span><span class="src">Calendar</span></div></div></div>
-        <div class="bi"><span class="p" style="background:var(--ink-3)"></span><div><h4>Did PROJ-214 ship? Sources disagree.</h4><div class="conflict"><div class="sd"><span class="l">Linear</span><b>Done</b></div><div class="sd"><span class="l">GitHub</span>PR <b>still open</b></div></div><div class="r"><span class="tag x">contradicted</span></div></div></div>
+    <div class="playtoggle reveal" role="tablist">
+      <button class="pt active" data-view="with">With Scout</button>
+      <button class="pt" data-view="without">Without Scout</button>
+    </div>
+
+    <div class="playwrap reveal">
+      <div class="win" data-view="with">
+        <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Scout — Today</span><span class="r">tap an item to see how it knows</span></div>
+        <div class="body">
+          <div class="bi"><span class="p" style="background:var(--red)"></span><div><h4>Reply to Priya — she's asked twice. <span class="more">why ›</span></h4><p>The migration doc she needs is already in your drafts.</p><div class="r"><span class="tag v" data-tip="Confirmed by 2+ independent sources">verified</span><span class="src">Slack</span><span class="src">Gmail</span></div><div class="why">Scout matched her Slack nudge in #platform to the Gmail thread, saw the second ask landed at 4:40pm, and found the migration doc already in your drafts. Two sources agree → <b>verified</b>.</div></div></div>
+          <div class="bi"><span class="p" style="background:var(--amb)"></span><div><h4>Renewal call may have moved to 3:00. <span class="more">why ›</span></h4><p>Only the calendar says so — treat as tentative.</p><div class="r"><span class="tag s" data-tip="Only one source says so — treat as tentative">single-source</span><span class="src">Calendar</span></div><div class="why">The calendar event shifted, but nothing in email or Slack confirms it. One source only → flagged <b>single-source</b>, not asserted as fact.</div></div></div>
+          <div class="bi"><span class="p" style="background:var(--ink-3)"></span><div><h4>Did PROJ-214 ship? Sources disagree. <span class="more">why ›</span></h4><div class="conflict"><div class="sd"><span class="l">Linear</span><b>Done</b></div><div class="sd"><span class="l">GitHub</span>PR <b>still open</b></div></div><div class="r"><span class="tag x" data-tip="Sources disagree — both sides shown, never guessed">contradicted</span></div><div class="why">Linear says done; the PR is still open with no approvals. Scout won't pick a winner — it surfaces both and holds it for you. This contradiction is usually the most important thing in the day.</div></div></div>
+        </div>
+      </div>
+
+      <div class="chaos" data-view="without" hidden>
+        <div class="capx">Without Scout, the same morning looks like this — somewhere in here is the thing that matters:</div>
+        <div class="apps">
+          <div class="app"><span class="nm">Slack</span><span class="b">47</span></div>
+          <div class="app"><span class="nm">Gmail</span><span class="b">23</span></div>
+          <div class="app"><span class="nm">Linear</span><span class="b">12</span></div>
+          <div class="app"><span class="nm">Calendar</span><span class="b">5</span></div>
+          <div class="app"><span class="nm">GitHub</span><span class="b">8</span></div>
+          <div class="app"><span class="nm">Granola</span><span class="b">3</span></div>
+          <div class="app"><span class="nm">Drive</span><span class="b">9</span></div>
+          <div class="app"><span class="nm">WhatsApp</span><span class="b">6</span></div>
+        </div>
+        <div class="capx2">…and you reconcile it all by hand, hoping you didn't miss anything.</div>
       </div>
     </div>
   </div></section>
@@ -274,20 +340,29 @@
 
     <div class="vrow">
       <div class="vtext reveal"><p class="sysnum">The graph</p><h3>Typed people, projects, tasks — and the links between them.</h3><p>Densely interconnected on purpose: corroboration needs more than one edge to lean on. Validated against a formal ontology on every run.</p></div>
-      <div class="vvis reveal"><div class="kg">
-        <svg viewBox="0 0 360 210" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="9">
-          <line x1="80" y1="60" x2="180" y2="40" stroke="#dcd5c5"/><line x1="180" y1="40" x2="280" y2="70" stroke="#dcd5c5"/>
-          <line x1="180" y1="40" x2="170" y2="130" stroke="#dcd5c5"/><line x1="80" y1="60" x2="170" y2="130" stroke="#dcd5c5"/>
-          <line x1="170" y1="130" x2="280" y2="150" stroke="#dcd5c5"/><line x1="280" y1="70" x2="280" y2="150" stroke="#dcd5c5"/>
-          <line x1="80" y1="60" x2="70" y2="155" stroke="#dcd5c5"/><line x1="170" y1="130" x2="70" y2="155" stroke="#dcd5c5"/>
-          <g><circle cx="80" cy="60" r="8" fill="#2f7d52"/><text x="80" y="46" fill="#534c41" text-anchor="middle">person</text></g>
-          <g><circle cx="180" cy="40" r="8" fill="#b4541f"/><text x="180" y="26" fill="#534c41" text-anchor="middle">project</text></g>
-          <g><circle cx="280" cy="70" r="8" fill="#2f4a55"/><text x="280" y="56" fill="#534c41" text-anchor="middle">org</text></g>
-          <g><circle cx="170" cy="130" r="8" fill="#b07d2c"/><text x="170" y="152" fill="#534c41" text-anchor="middle">task</text></g>
-          <g><circle cx="280" cy="150" r="8" fill="#2f7d52"/><text x="280" y="172" fill="#534c41" text-anchor="middle">person</text></g>
-          <g><circle cx="70" cy="155" r="8" fill="#2f4a55"/><text x="70" y="177" fill="#534c41" text-anchor="middle">tech</text></g>
+      <div class="vvis reveal"><div class="kg2" id="kg2">
+        <svg viewBox="0 0 420 250" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="9.5">
+          <g class="edges">
+            <line class="edge" data-a="you" data-b="proj" x1="95" y1="120" x2="205" y2="72"/>
+            <line class="edge" data-a="you" data-b="org" x1="95" y1="120" x2="345" y2="62"/>
+            <line class="edge" data-a="you" data-b="mate" x1="95" y1="120" x2="330" y2="150"/>
+            <line class="edge" data-a="you" data-b="task" x1="95" y1="120" x2="200" y2="185"/>
+            <line class="edge" data-a="proj" data-b="mate" x1="205" y1="72" x2="330" y2="150"/>
+            <line class="edge" data-a="proj" data-b="tool" x1="205" y1="72" x2="70" y2="46"/>
+            <line class="edge" data-a="proj" data-b="task" x1="205" y1="72" x2="200" y2="185"/>
+            <line class="edge" data-a="proj" data-b="meet" x1="205" y1="72" x2="320" y2="212"/>
+            <line class="edge" data-a="task" data-b="pr" x1="200" y1="185" x2="120" y2="205"/>
+          </g>
+          <g class="node" data-id="you" data-rels="works_on → Project · employed_by → Org · works_with → Teammate · assigned → Task"><circle cx="95" cy="120" r="9" fill="#2f7d52"/><text x="95" y="142" fill="#534c41" text-anchor="middle">You</text></g>
+          <g class="node" data-id="proj" data-rels="worked_on_by → You, Teammate · depends_on → Tool · about ← Task, Meeting"><circle cx="205" cy="72" r="9" fill="#b4541f"/><text x="205" y="58" fill="#534c41" text-anchor="middle">Project</text></g>
+          <g class="node" data-id="org" data-rels="employs → You"><circle cx="345" cy="62" r="9" fill="#2f4a55"/><text x="345" y="48" fill="#534c41" text-anchor="middle">Org</text></g>
+          <g class="node" data-id="mate" data-rels="works_on → Project · works_with → You"><circle cx="330" cy="150" r="9" fill="#2f7d52"/><text x="330" y="170" fill="#534c41" text-anchor="middle">Teammate</text></g>
+          <g class="node" data-id="task" data-rels="assigned_to → You · about → Project · blocked_by → PR"><circle cx="200" cy="185" r="9" fill="#b07d2c"/><text x="200" y="205" fill="#534c41" text-anchor="middle">Task</text></g>
+          <g class="node" data-id="tool" data-rels="used_by → Project"><circle cx="70" cy="46" r="9" fill="#2f4a55"/><text x="70" y="32" fill="#534c41" text-anchor="middle">Tool</text></g>
+          <g class="node" data-id="meet" data-rels="about → Project"><circle cx="320" cy="212" r="9" fill="#b07d2c"/><text x="320" y="232" fill="#534c41" text-anchor="middle">Meeting</text></g>
+          <g class="node" data-id="pr" data-rels="blocks → Task"><circle cx="120" cy="205" r="9" fill="#2f4a55"/><text x="120" y="225" fill="#534c41" text-anchor="middle">PR</text></g>
         </svg>
-        <div class="kgstat">≈140 entities · ≈950 relationships · validated every run</div>
+        <div class="kgcap" id="kgcap">≈140 entities · ≈950 relationships — <b>hover a node</b> to trace its links</div>
       </div></div>
     </div>
 
@@ -347,6 +422,35 @@
   <a href="https://code.claude.com/docs/en/discover-plugins">Claude Code plugins</a>
 </div></footer>
 
-<script>(function(){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.1,rootMargin:'0px 0px -5% 0px'});document.querySelectorAll('.reveal').forEach(function(e){io.observe(e);});})();</script>
+<script>(function(){
+  var root=document.documentElement; root.classList.add('js');
+  var seqSel='.src,.legend .r,.pcard .ln,.chk .it,.q .row,.q .pin,.bi,.commit > div,.conn .c,.bubble,.route,.held .claim,.held .acts,.fstep,.out';
+  document.querySelectorAll('.vvis, .win').forEach(function(v){
+    v.querySelectorAll(seqSel).forEach(function(k,i){ k.classList.add('seq'); k.style.setProperty('--d',(i*0.07).toFixed(2)+'s'); });
+    v.querySelectorAll('.occ .d').forEach(function(d,i){ d.style.setProperty('--d',(0.35+i*0.13).toFixed(2)+'s'); });
+  });
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.16,rootMargin:'0px 0px -7% 0px'});
+  document.querySelectorAll('.reveal, .vvis, .win').forEach(function(e){io.observe(e);});
+
+  /* interactive knowledge graph */
+  var kg=document.getElementById('kg2');
+  if(kg){
+    var cap=document.getElementById('kgcap'), def=cap.innerHTML;
+    var nodes=[].slice.call(kg.querySelectorAll('.node')), edges=[].slice.call(kg.querySelectorAll('.edge'));
+    var clear=function(){kg.classList.remove('dim');nodes.forEach(function(n){n.classList.remove('hot');});edges.forEach(function(e){e.classList.remove('hot');});cap.innerHTML=def;};
+    nodes.forEach(function(n){ n.setAttribute('tabindex','0');
+      var f=function(){ var id=n.getAttribute('data-id'); kg.classList.add('dim'); n.classList.add('hot');
+        edges.forEach(function(e){ var a=e.getAttribute('data-a'),b=e.getAttribute('data-b'); if(a===id||b===id){e.classList.add('hot'); var o=kg.querySelector('.node[data-id="'+(a===id?b:a)+'"]'); if(o)o.classList.add('hot');} });
+        cap.innerHTML='<span class="nn">'+n.querySelector('text').textContent+'</span> — '+n.getAttribute('data-rels'); };
+      n.addEventListener('mouseenter',f); n.addEventListener('focus',f); n.addEventListener('mouseleave',clear); n.addEventListener('blur',clear);
+    });
+    kg.addEventListener('mouseleave',clear);
+  }
+
+  /* playable briefing */
+  document.querySelectorAll('.playwrap .bi').forEach(function(bi){ bi.addEventListener('click',function(e){ if(e.target.closest('.tag'))return; bi.classList.toggle('open'); }); });
+  var btns=[].slice.call(document.querySelectorAll('.pt')), views=[].slice.call(document.querySelectorAll('.playwrap [data-view]'));
+  btns.forEach(function(b){ b.addEventListener('click',function(){ btns.forEach(function(x){x.classList.toggle('active',x===b);}); var v=b.getAttribute('data-view'); views.forEach(function(el){el.hidden=el.getAttribute('data-view')!==v;}); }); });
+})();</script>
 </body>
 </html>
