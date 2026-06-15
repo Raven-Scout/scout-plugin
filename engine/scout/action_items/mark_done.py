@@ -29,13 +29,15 @@ def mark_done(
     by_subject: str | None = None,
     date: dt.date | None = None,
     data_dir: Path | None = None,
+    undo: bool = False,
 ) -> Event:
-    """Mark today's (or `date`'s) action item done.
+    """Mark today's (or `date`'s) action item done — or reopen it with `undo`.
 
     Exactly one of `by_id` or `by_subject` must be provided. `by_id` is
     a stable `[#TAG]` id (2-8 [A-Z0-9], >=1 letter); `by_subject` is a case-insensitive
-    substring match against open-status raw lines (legacy fallback for
-    lines that haven't been prefixed yet).
+    substring match against raw lines (legacy fallback for lines that
+    haven't been prefixed yet) — open tasks normally, done tasks when
+    undoing (#116).
     """
     target_path = paths.action_items_daily_path(data=data_dir, date=date or _today())
 
@@ -49,14 +51,15 @@ def mark_done(
         data_dir=data_dir if data_dir is not None else paths.data_dir(),
         by_id=by_id,
         by_subject=by_subject,
+        status="done" if undo else "open",
     )
 
-    flip_checkbox(target_path, line_number=match.line_number, to_done=True)
+    flip_checkbox(target_path, line_number=match.line_number, to_done=not undo)
 
     return Event(
         id=new_ulid(),
         ts=now_iso(),
-        kind="action_item.completed",
+        kind="action_item.reopened" if undo else "action_item.completed",
         source="cli:mark_done",
         payload={"item_id": item_ulid, "via": via, "title": match.title},
     )

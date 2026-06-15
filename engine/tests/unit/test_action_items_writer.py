@@ -239,3 +239,18 @@ def test_lf_file_round_trips_unchanged(tmp_path):
     target.write_bytes(b"## To Do\n- [ ] a\n- [ ] b\n")
     replace_line(target, line_number=2, text="- [ ] a edited")
     assert target.read_bytes() == b"## To Do\n- [ ] a edited\n- [ ] b\n"
+
+
+def test_flip_checkbox_reopens_uppercase_x(tmp_path: Path) -> None:
+    """Reopen accepts either completion casing and writes `[ ]` back (#56)."""
+    f = tmp_path / "f.md"
+    f.write_text("- [X] Shipped thing\n")
+    flip_checkbox(f, line_number=1, to_done=False)
+    assert f.read_text() == "- [ ] Shipped thing\n"
+
+
+def test_flip_checkbox_reopens_lowercase_x(tmp_path: Path) -> None:
+    f = tmp_path / "f.md"
+    f.write_text("- [x] Shipped thing\n")
+    flip_checkbox(f, line_number=1, to_done=False)
+    assert f.read_text() == "- [ ] Shipped thing\n"

@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from scout.errors import ActionItemError
+from scout.ids import leading_prefix_pattern
 
 if TYPE_CHECKING:
     from scout.action_items.diff import ChangeEvent
@@ -220,8 +221,13 @@ def parse(md_path: Path) -> tuple[str, list[str], list[Section]]:
         if t and current is not None:
             done = t.group("mark").lower() == "x"
             rest = t.group("rest")
-            # Split subject/body: first " — " or " – " after optional bold/strike
-            subject, body = _split_subject(rest)
+            # Strip a leading [#TAG] stable-id BEFORE the subject/body split,
+            # so subject/plain_subject agree with the Swift reference parser
+            # and the --subject needles the CLIs compare against (#114).
+            # `raw` keeps the prefix: it is the round-trip surface, not the
+            # match surface.
+            display = leading_prefix_pattern().sub("", rest, count=1).lstrip()
+            subject, body = _split_subject(display)
             current.tasks.append(Task(done=done, subject=subject, body=body, raw=rest))
             i += 1
             continue

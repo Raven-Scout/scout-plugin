@@ -2,519 +2,456 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Scout — the autonomous agent that watches everything you connect</title>
+<title>Scout — an autonomous agent that runs and improves itself</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Scout is an autonomous agent for Claude Code. It watches everything you connect — endless tools — on routines you or it define, cross-checks every claim, and brings you only what matters. Nothing falls through the cracks." />
-
-<!-- Open Graph / social -->
+<meta name="description" content="An autonomous agent that keeps up for you, checks its own work, improves its own instructions, drives its own roadmap, and keeps a memory you can read — explained visually." />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Scout — nothing falls through the cracks, and you can trust what it surfaces" />
-<meta property="og:description" content="An autonomous agent that watches everything you connect, on routines you or it define, and brings you only what matters — every claim cross-checked, every contradiction shown." />
-<meta property="og:url" content="https://jordanrburger.github.io/scout-plugin/" />
-<meta property="og:image" content="https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/docs/assets/scout-icon.svg" />
+<meta property="og:title" content="Scout — an autonomous agent that runs and improves itself" />
+<meta property="og:description" content="It reads everything you connect, cross-checks every claim, drives its own roadmap, and improves its own instructions — a memory you can read, on your machine." />
+<meta property="og:url" content="https://raven-scout.github.io/scout-plugin/" />
+<meta property="og:image" content="https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/docs/assets/og.png" />
 <meta name="twitter:card" content="summary_large_image" />
-
-<script>try{if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('theme-dark');}catch(e){}</script>
-
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="landing.css" />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="hybrid.css" />
 <link rel="icon" type="image/svg+xml" href="assets/scout-icon.svg" />
+<style>
+  /* ---- width / responsiveness: use the screen on laptops, scale visuals up ---- */
+  .wrap{max-width:1200px;}
+  .proof > .col{max-width:1140px;padding-left:24px;padding-right:24px;}
+  .hero .win{max-width:960px;}
+  @media (max-width:640px){ .proof > .col{padding-left:20px;padding-right:20px;} .partlabel{padding-top:54px;} }
+  @media (min-width:1080px){
+    .vrow{grid-template-columns:0.88fr 1.12fr;gap:68px;padding:56px 0;}
+    .vvis{padding:32px;}
+    .vtext h3{font-size:27px;}
+    .vtext p{font-size:16.5px;max-width:40ch;}
+    .partlabel h2{font-size:clamp(34px,3.2vw,46px);}
+    .pcard .ln, .legend .r, .chk .it, .q .row, .bi h4{font-size:15px;}
+    .win .body{padding:22px 28px 24px;}
+    .kg svg{max-width:480px;margin:0 auto;}
+  }
+  @media (min-width:1440px){
+    .wrap{max-width:1320px;}
+    .proof > .col{max-width:1240px;}
+    .vrow{gap:84px;}
+  }
+
+  /* lighter, visual layout */
+  .hero .lede2{margin:22px 0 0;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--ink-2);max-width:50ch;}
+  .partlabel{text-align:center;padding:70px 0 0;}
+  .partlabel .k{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);}
+  .partlabel h2{font-family:var(--serif);font-weight:500;font-size:clamp(26px,3.4vw,38px);letter-spacing:-.015em;margin:12px auto 0;max-width:24ch;line-height:1.18;}
+
+  .vrow{display:grid;grid-template-columns:0.92fr 1.08fr;gap:46px;align-items:center;padding:44px 0;border-top:1px solid var(--line);}
+  .vrow.flip .vtext{order:2;}
+  .vtext .sysnum{font-family:var(--mono);font-size:11px;color:var(--acc);letter-spacing:.05em;text-transform:uppercase;}
+  .vtext h3{font-family:var(--sans);font-size:23px;font-weight:800;letter-spacing:-.02em;margin:9px 0 11px;line-height:1.2;}
+  .vtext p{font-family:var(--sans);font-size:15.5px;line-height:1.62;color:var(--ink-2);margin:0;max-width:44ch;}
+  .vtext p b{color:var(--ink);font-weight:600;} .vtext p em{font-style:italic;}
+  .vvis{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 22px 46px -30px rgba(60,40,15,.24);}
+  @media(max-width:860px){.vrow{grid-template-columns:1fr;gap:22px;}.vrow.flip .vtext{order:0;}}
+
+  /* briefing mock (hero) */
+  .win{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 28px 60px -32px rgba(60,40,15,.34);max-width:760px;margin:46px auto 0;text-align:left;}
+  .win .bar{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--sunk);}
+  .win .bar .d{width:10px;height:10px;border-radius:50%;background:#e1dccd;}
+  .win .bar .t{font-size:12.5px;color:var(--ink-3);margin-left:6px;}
+  .win .bar .r{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);}
+  .win .body{padding:18px 22px 20px;}
+  .bi{display:grid;grid-template-columns:12px 1fr;gap:12px;padding:13px 0;border-top:1px solid var(--line);}
+  .bi:first-child{border-top:none;} .bi .p{width:9px;height:9px;border-radius:50%;margin-top:5px;}
+  .bi h4{margin:0 0 3px;font-size:14.5px;font-weight:600;color:var(--ink);} .bi p{margin:0;font-size:12.5px;color:var(--ink-2);}
+  .bi .r{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .src{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);padding:3px 8px;border-radius:5px;background:var(--sunk);}
+  .conflict{margin-top:9px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .sd{border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--ink-2);}
+  .sd .l{display:block;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px;} .sd b{color:var(--ink);}
+
+  /* cross-check flow */
+  .xc{display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .xc .srcs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .xc .arr{color:var(--ink-4);font-size:20px;line-height:1;}
+  .xc .out{display:flex;align-items:center;gap:8px;border:1px solid var(--ok);background:#eef5ef;border-radius:9px;padding:9px 13px;font-size:13.5px;font-weight:600;color:var(--ink);}
+
+  /* tag legend */
+  .legend{display:flex;flex-direction:column;gap:10px;}
+  .legend .r{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--ink-2);}
+  .legend .tag{min-width:104px;justify-content:center;}
+
+  /* pattern card */
+  .pcard .head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+  .pcard .id{font-family:var(--mono);font-size:13px;font-weight:600;}
+  .pill{font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:999px;font-weight:500;}
+  .pill.regress{background:#f7e3df;color:var(--red);} .pill.fixed{background:#e3efe7;color:var(--ok);}
+  .pcard .ln{display:flex;gap:9px;font-size:13px;color:var(--ink-2);padding:7px 0;border-top:1px solid var(--line);}
+  .pcard .ln .k{font-family:var(--mono);font-size:10px;color:var(--ink-3);width:74px;flex:none;text-transform:uppercase;padding-top:1px;}
+  .occ{display:flex;gap:5px;align-items:center;margin-top:11px;}
+  .occ .d{width:8px;height:8px;border-radius:50%;background:var(--red);opacity:.85;}
+  .occ .lbl{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-left:5px;}
+
+  /* proposal flow */
+  .flow{display:flex;align-items:stretch;gap:9px;}
+  .fstep{flex:1;border:1px solid var(--line-2);border-radius:10px;padding:11px 9px;text-align:center;background:var(--bg);}
+  .fstep .t{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;}
+  .fstep .b{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:5px;line-height:1.25;}
+  .fstep.acc{border-color:var(--acc);} .fstep.acc .b{color:var(--acc-2);}
+  .farr{align-self:center;color:var(--ink-4);font-size:16px;}
+  .commit{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-top:12px;}
+  .commit .h{color:var(--acc);} .commit .rv{color:var(--ink-3);}
+
+  /* checklist */
+  .chk .it{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--line);font-size:14px;color:var(--ink);}
+  .chk .it:first-child{border-top:none;}
+  .chk .box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line-2);flex:none;}
+  .chk .it.done .box{background:var(--ok);border-color:var(--ok);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 8.5l3 3 7-7'/></svg>");background-size:12px;background-repeat:no-repeat;background-position:center;}
+  .chk .it.done span{color:var(--ink-3);}
+  .chk .it .tg{margin-left:auto;font-family:var(--mono);font-size:9.5px;}
+  .chk .it.done .tg{color:var(--ok);} .chk .it .tg.wip{color:var(--amb);}
+
+  /* research queue */
+  .q .pin{display:flex;gap:9px;align-items:flex-start;background:var(--acc-wash);border:1px dashed var(--acc);border-radius:9px;padding:10px 12px;}
+  .q .pin .mono{font-family:var(--mono);font-size:11px;color:var(--acc-2);}
+  .q .pin .x{font-size:13px;color:var(--ink);} .q .pin .x b{color:var(--acc-2);}
+  .q .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2);}
+  .q .row .age{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-3);}
+  .q .rot{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:11px;}
+
+  /* enrichment */
+  .bubble{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:13px 15px;}
+  .bubble .q{font-size:14px;font-weight:600;color:var(--ink);} .bubble .g{font-size:12px;color:var(--ink-3);margin-top:5px;}
+  .route{display:flex;align-items:center;gap:9px;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--acc);}
+  .route .e{background:var(--surface);border:1px solid var(--line-2);border-radius:7px;padding:5px 10px;color:var(--ink-2);}
+
+  /* review held */
+  .held .lbl{font-family:var(--mono);font-size:10px;color:var(--amb);text-transform:uppercase;letter-spacing:.04em;}
+  .held .claim{font-size:13.5px;color:var(--ink-2);margin:9px 0 13px;line-height:1.5;} .held .claim b{color:var(--ink);}
+  .held .acts{display:flex;gap:8px;}
+  .held .a{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:7px;border:1px solid var(--line-2);background:var(--bg);}
+  .held .a.y{color:var(--ok);border-color:#bfe0cb;} .held .a.n{color:var(--red);border-color:#eccbc4;}
+
+  /* connectors */
+  .conn{display:flex;flex-wrap:wrap;gap:8px;}
+  .conn .c{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink-2);background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;}
+  .conn .c.more{color:var(--acc);background:var(--acc-wash);border-color:transparent;}
+
+  .kg svg{width:100%;height:auto;display:block;}
+  .kgstat{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:center;margin-top:6px;}
+  .vcap{font-family:var(--mono);font-size:10px;color:var(--ink-4);text-align:center;margin-top:12px;text-transform:uppercase;letter-spacing:.05em;}
+
+  /* ===== animation layer (scroll-sequenced) ===== */
+  html.js .seq{opacity:0;transform:translateY(10px);}
+  html.js .vvis.in .seq, html.js .win.in .seq{opacity:1;transform:none;transition:opacity .5s cubic-bezier(.2,.7,.2,1),transform .5s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0s);}
+  html.js .occ .d{transform:scale(0);} html.js .vvis.in .occ .d{animation:popdot .3s cubic-bezier(.3,1.4,.5,1) forwards;animation-delay:var(--d,0s);}
+  @keyframes popdot{to{transform:scale(1);}}
+  @media (prefers-reduced-motion: reduce){ html.js .seq, html.js .vvis.in .seq, html.js .win.in .seq, html.js .occ .d{opacity:1!important;transform:none!important;animation:none!important;} }
+
+  /* ===== interactive knowledge graph ===== */
+  .kg2 svg{width:100%;height:auto;display:block;max-width:520px;margin:0 auto;}
+  .kg2 .edge{stroke:#dcd5c5;stroke-width:1.4;transition:stroke .15s,opacity .15s,stroke-width .15s;}
+  .kg2 .node{cursor:pointer;outline:none;}
+  .kg2 .node circle{transition:transform .16s ease,opacity .15s;transform-box:fill-box;transform-origin:center;}
+  .kg2 .node text{transition:opacity .15s;}
+  .kg2.dim .edge{opacity:.14;} .kg2.dim .node{opacity:.3;}
+  .kg2 .node.hot{opacity:1;} .kg2 .node.hot circle{transform:scale(1.4);}
+  .kg2 .node.hot text{font-weight:700;}
+  .kg2 .edge.hot{stroke:var(--acc);opacity:1;stroke-width:2.4;}
+  .kgcap{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:center;margin-top:14px;min-height:32px;line-height:1.5;}
+  .kgcap b{color:var(--acc-2);} .kgcap .nn{color:var(--ink);font-weight:600;}
+
+  /* ===== playable briefing ===== */
+  .playtoggle{display:inline-flex;gap:5px;background:var(--sunk);border:1px solid var(--line);border-radius:11px;padding:4px;margin:26px auto 0;}
+  .pt{font-family:var(--mono);font-size:12.5px;border:none;background:none;color:var(--ink-3);padding:9px 18px;border-radius:8px;cursor:pointer;transition:.15s;}
+  .pt.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(40,30,15,.08);}
+  .playwrap{max-width:760px;margin:18px auto 0;}
+  .playwrap .bi{cursor:pointer;transition:background .15s;border-radius:8px;}
+  .playwrap .bi:hover{background:var(--bg);}
+  .bi h4 .more{font-family:var(--mono);font-size:10px;color:var(--acc);font-weight:500;margin-left:6px;}
+  .bi.open h4 .more{color:var(--ink-3);}
+  .bi .why{display:none;margin-top:9px;border-top:1px dashed var(--line-2);padding-top:9px;font-family:var(--sans);font-size:12.5px;line-height:1.55;color:var(--ink-2);}
+  .bi .why b{color:var(--ink);}
+  .bi.open .why{display:block;}
+  .win .tag[data-tip]{position:relative;cursor:help;}
+  .win .tag[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--ink);color:var(--bg);font-family:var(--sans);font-size:11px;font-weight:400;padding:6px 10px;border-radius:7px;z-index:6;box-shadow:0 8px 20px -6px rgba(0,0,0,.4);}
+  .win .tag[data-tip]:hover::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink);z-index:6;}
+  .chaos{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 28px 60px -32px rgba(60,40,15,.34);}
+  .chaos .capx{font-family:var(--sans);font-size:14px;color:var(--ink-2);text-align:center;margin-bottom:18px;}
+  .chaos .apps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .chaos .app{position:relative;background:var(--bg);border:1px solid var(--line-2);border-radius:11px;padding:17px 10px;text-align:center;}
+  .chaos .app .nm{font-size:13px;color:var(--ink-2);font-weight:500;}
+  .chaos .app .b{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;border-radius:11px;background:var(--red);color:#fff;font-family:var(--mono);font-size:11px;display:grid;place-items:center;padding:0 5px;}
+  .chaos .capx2{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-3);text-align:center;margin-top:20px;}
+  @media(max-width:560px){.chaos .apps{grid-template-columns:repeat(2,1fr);}}
+</style>
 </head>
 <body>
-
-<div class="scroll-progress" aria-hidden="true"></div>
-
-<header class="nav">
-  <div class="wrap nav-inner">
-    <a class="wordmark" href="#">
-      <img class="sigil-img" src="assets/scout-icon.svg" alt="" width="28" height="28" />
-      <span class="name">Scout</span>
-    </a>
-    <nav class="nav-links">
-      <a class="plain" href="#payoff">The payoff</a>
-      <a class="plain" href="#corroborates">Why Scout</a>
-      <a class="plain" href="#autonomy">Autonomy</a>
-      <a class="plain" href="#how">Routines</a>
-      <a class="plain" href="#install">Install</a>
-      <a class="nm-btn" href="https://github.com/jordanrburger/scout-plugin">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
-        GitHub
-      </a>
-    </nav>
-  </div>
-</header>
+<header class="nav"><div class="wrap nav-in">
+  <a class="brand" href="#"><img src="assets/scout-icon.svg" alt=""/><b>Scout</b></a>
+  <span class="sp"></span>
+  <a class="lnk" href="#trust">Trust</a>
+  <a class="lnk" href="#self">Self-operating</a>
+  <a class="lnk" href="#yours">Yours</a>
+  <a class="btn btn-p sm cta" href="#install">Install</a>
+</div></header>
 
 <main>
   <!-- HERO -->
-  <section class="hero wrap">
-    <span class="eyebrow"><span class="dot"></span>An autonomous agent on Claude Code</span>
-    <h1>Nothing falls through the cracks — and you can <em>trust</em> what it surfaces.</h1>
-    <p class="lede">Scout is an autonomous agent that watches everything you connect, on routines you — or it — define, and brings you only what matters. Every claim is cross-checked across your tools, every contradiction shown, <b>nothing guessed</b>.</p>
-    <div class="hero-ctas">
-      <a class="btn-accent" href="#install">Install Scout</a>
-      <a class="btn-quiet" href="https://github.com/jordanrburger/scout-plugin">View on GitHub</a>
+  <section class="hero" style="text-align:center;"><div class="wrap">
+    <p class="eyebrow" style="display:inline-block;">An autonomous agent for Claude Code</p>
+    <h1 style="margin-left:auto;margin-right:auto;max-width:17ch;">There's always more happening than you can <em>keep up with</em>.</h1>
+    <p class="lede2" style="margin-left:auto;margin-right:auto;">So I built an agent that keeps up for me — reads everything, checks its own work, and reaches back only when it's worth it.</p>
+    <div class="ctas" style="justify-content:center;">
+      <a class="btn btn-p" href="#install">Install Scout</a>
+      <a class="btn btn-s" href="https://github.com/Raven-Scout/scout-plugin">View on GitHub</a>
     </div>
-    <p class="hero-note">open source &middot; runs on your machine, on your subscription</p>
-  </section>
 
-  <!-- BRIEFING DEMO -->
-  <section class="demo wrap" id="demo">
-    <div class="briefing reveal" role="img" aria-label="A Scout briefing with items tagged by confidence">
-      <div class="titlebar">
-        <div class="traffic"><span class="tdot c1"></span><span class="tdot c2"></span><span class="tdot c3"></span></div>
-        <span class="crumbs">Scout<span class="chev">&rsaquo;</span><b>Today</b></span>
-        <span class="run-chip">cross-checked &middot; confidence-tagged</span>
+    <div class="playtoggle reveal" role="tablist">
+      <button class="pt active" data-view="with">With Scout</button>
+      <button class="pt" data-view="without">Without Scout</button>
+    </div>
+
+    <div class="playwrap reveal">
+      <div class="win" data-view="with">
+        <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Scout — Today</span><span class="r">tap an item to see how it knows</span></div>
+        <div class="body">
+          <div class="bi"><span class="p" style="background:var(--red)"></span><div><h4>Reply to Priya — she's asked twice. <span class="more">why ›</span></h4><p>The migration doc she needs is already in your drafts.</p><div class="r"><span class="tag v" data-tip="Confirmed by 2+ independent sources">verified</span><span class="src">Slack</span><span class="src">Gmail</span></div><div class="why">Scout matched her Slack nudge in #platform to the Gmail thread, saw the second ask landed at 4:40pm, and found the migration doc already in your drafts. Two sources agree → <b>verified</b>.</div></div></div>
+          <div class="bi"><span class="p" style="background:var(--amb)"></span><div><h4>Renewal call may have moved to 3:00. <span class="more">why ›</span></h4><p>Only the calendar says so — treat as tentative.</p><div class="r"><span class="tag s" data-tip="Only one source says so — treat as tentative">single-source</span><span class="src">Calendar</span></div><div class="why">The calendar event shifted, but nothing in email or Slack confirms it. One source only → flagged <b>single-source</b>, not asserted as fact.</div></div></div>
+          <div class="bi"><span class="p" style="background:var(--ink-3)"></span><div><h4>Did PROJ-214 ship? Sources disagree. <span class="more">why ›</span></h4><div class="conflict"><div class="sd"><span class="l">Linear</span><b>Done</b></div><div class="sd"><span class="l">GitHub</span>PR <b>still open</b></div></div><div class="r"><span class="tag x" data-tip="Sources disagree — both sides shown, never guessed">contradicted</span></div><div class="why">Linear says done; the PR is still open with no approvals. Scout won't pick a winner — it surfaces both and holds it for you. This contradiction is usually the most important thing in the day.</div></div></div>
+        </div>
       </div>
-      <div class="briefing-body">
-        <div class="dateline">
-          <h2>June 12</h2><span class="wd">Friday</span>
-          <span class="meta"><b>3</b> need you &middot; <b>1</b> contradiction surfaced</span>
-        </div>
 
-        <div class="b-item" style="--p: var(--err);">
-          <span class="pdot"></span>
-          <div>
-            <h3>Reply to Priya on the API deprecation thread — she has asked twice.</h3>
-            <p>Second nudge landed yesterday at 4:40&nbsp;pm; the migration doc she needs is already in your drafts.</p>
-            <div class="b-row">
-              <span class="tag verified">verified</span>
-              <span class="src">Slack&nbsp;#platform</span>
-              <span class="src">Gmail</span>
-              <span class="b-why">confirmed in 2 sources</span>
-            </div>
-          </div>
+      <div class="chaos" data-view="without" hidden>
+        <div class="capx">Without Scout, the same morning looks like this — somewhere in here is the thing that matters:</div>
+        <div class="apps">
+          <div class="app"><span class="nm">Slack</span><span class="b">47</span></div>
+          <div class="app"><span class="nm">Gmail</span><span class="b">23</span></div>
+          <div class="app"><span class="nm">Linear</span><span class="b">12</span></div>
+          <div class="app"><span class="nm">Calendar</span><span class="b">5</span></div>
+          <div class="app"><span class="nm">GitHub</span><span class="b">8</span></div>
+          <div class="app"><span class="nm">Granola</span><span class="b">3</span></div>
+          <div class="app"><span class="nm">Drive</span><span class="b">9</span></div>
+          <div class="app"><span class="nm">WhatsApp</span><span class="b">6</span></div>
         </div>
-
-        <div class="b-item" style="--p: var(--warn);">
-          <span class="pdot"></span>
-          <div>
-            <h3>Northwind renewal call may have moved to 3:00.</h3>
-            <p>Only the calendar says so — no confirmation from Dana by email or Slack. Treat the new time as tentative until she replies.</p>
-            <div class="b-row">
-              <span class="tag single">single-source</span>
-              <span class="src">Calendar</span>
-              <span class="b-why">no corroborating source found</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="b-item" style="--p: var(--ink-4);">
-          <span class="pdot"></span>
-          <div>
-            <h3>Did PROJ-214 actually ship?</h3>
-            <p>Your sources disagree. Scout won't guess — here is what each one says:</p>
-            <div class="conflict">
-              <div class="side"><span class="lbl">Linear</span>Ticket moved to <b>Done</b> by Marcus, yesterday 6:12&nbsp;pm.</div>
-              <div class="side"><span class="lbl">GitHub</span>PR <b>#482 is still open</b> — two reviews requested, none approved.</div>
-            </div>
-            <div class="b-row">
-              <span class="tag contradicted">contradicted</span>
-              <span class="b-why">disagreement is the signal — both sides shown</span>
-            </div>
-          </div>
-        </div>
-
+        <div class="capx2">…and you reconcile it all by hand, hoping you didn't miss anything.</div>
       </div>
     </div>
-  </section>
+  </div></section>
 
-  <!-- PRINCIPLES STRIP -->
-  <div class="band">
-  <section class="section wrap" id="principles">
-    <p class="section-kicker reveal">No fixed list of anything</p>
-    <h2 class="big reveal">Scout's shape isn't hard-coded.</h2>
-    <p class="sub reveal">What it watches, how often it runs, and what it does are all open-ended — not a menu you pick from.</p>
+  <!-- PART I — TRUST -->
+  <div class="proof"><div class="col">
+    <div class="partlabel"><p class="k reveal">Part I — Trust by construction</p><h2 class="reveal">No source gets taken at its word.</h2></div>
 
-    <div class="compound-grid stagger">
-      <div class="compound reveal">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.4 5.2a2.8 2.8 0 1 0 0 5.6c2 0 2.6-2.8 3.6-2.8s1.6 2.8 3.6 2.8a2.8 2.8 0 1 0 0-5.6c-2 0-2.6 2.8-3.6 2.8s-1.6-2.8-3.6-2.8Z"></path></svg></span>
-        <h3>Endless connectors</h3>
-        <p>Anything you've connected to Claude — Slack, Gmail, Linear, GitHub, Granola, an MCP you wrote yourself, one the community shared — Scout auto-discovers and puts to work. The list is <span class="lim">never closed</span>.</p>
-      </div>
-      <div class="compound reveal">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.6V8l2.4 1.6"></path></svg></span>
-        <h3>Routines without limits</h3>
-        <p>Run the defaults, retime them, invent your own session types, or let Scout propose its own — fired on a schedule, on real-world events, or on Scout's <span class="lim">own judgment</span>.</p>
-      </div>
-      <div class="compound reveal">
-        <span class="c-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v3.5c0 3.2-2.1 5.2-5 6.5-2.9-1.3-5-3.3-5-6.5V3.8l5-2Z"></path><path d="M5.8 8l1.5 1.6L10.4 6.6"></path></svg></span>
-        <h3>Trust by construction</h3>
-        <p>No source is taken at its word. Every claim is corroborated across your tools before it reaches you — or it's <span class="lim">clearly flagged</span>.</p>
-      </div>
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">Cross-checked, not collected</p><h3>It reconciles your tools before it tells you anything.</h3><p>A calendar invite checked against the transcript; a ticket against its PR. And what you <b>actually did</b> beats what a note says you'll do.</p></div>
+      <div class="vvis reveal"><div class="xc">
+        <div class="srcs"><span class="src">Calendar</span><span class="src">Slack</span><span class="src">Gmail</span></div>
+        <span class="arr">↓</span>
+        <div class="out"><span class="tag v">verified</span> one answer, confirmed by 2+</div>
+      </div></div>
     </div>
-  </section>
-  </div>
 
-  <!-- THE PROBLEM -->
-  <section class="section wrap" id="problem">
-    <p class="section-kicker reveal">The problem</p>
-    <h2 class="big reveal">You generate more signal than any human can track.</h2>
-    <p class="sub reveal">Every Slack DM, calendar invite, PR review and offhand decision is real and time-sensitive — and it arrives faster than anyone can read. So you cope one of two ways, and both quietly cost you.</p>
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">Confidence on every line</p><h3>You always know how much to trust it.</h3><p>Every claim carries its evidence level. A one-source claim is <b>never</b> quietly promoted to fact.</p></div>
+      <div class="vvis reveal"><div class="legend">
+        <div class="r"><span class="tag v">verified</span> 2+ sources agree</div>
+        <div class="r"><span class="tag s">single-source</span> only one — tentative</div>
+        <div class="r"><span class="tag" style="color:var(--ink-3)">unverified</span> mentioned, not corroborated</div>
+        <div class="r"><span class="tag" style="color:var(--ink-4)">stale</span> true once, not reconfirmed</div>
+        <div class="r"><span class="tag x">contradicted</span> sources disagree</div>
+      </div></div>
+    </div>
 
-    <div class="fail-grid stagger">
-      <div class="fail reveal">
-        <span class="fail-tag">The completionist</span>
-        <h3>Read everything, burn out</h3>
-        <p>You try to keep up with every channel and inbox. Your attention degrades, the important thing drowns in the noise, and you still end the day unsure you caught it all.</p>
-      </div>
-      <div class="fail reveal">
-        <span class="fail-tag">The triager</span>
-        <h3>Skim the top, miss the rest</h3>
-        <p>You give up and read only what's loud. The quiet, critical signal — the buried contract clause, the blocked teammate — slips straight through, and resurfaces later as a fire.</p>
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">Disagreement is the signal</p><h3>When tools conflict, it shows both sides.</h3><p>It won't pick a winner. That contradiction is usually the most important thing in your day — and what every other tool hides.</p></div>
+      <div class="vvis reveal"><div class="conflict" style="margin-top:0;"><div class="sd"><span class="l">Linear</span>moved to <b>Done</b> by Marcus, 6:12pm</div><div class="sd"><span class="l">GitHub</span>PR <b>#482 still open</b>, 0 approvals</div></div><div style="margin-top:10px;"><span class="tag x">contradicted</span> <span class="src" style="background:none;color:var(--ink-3)">→ held for you, never guessed</span></div></div>
+    </div>
+  </div></div>
+
+  <!-- PART II — SELF-OPERATING -->
+  <div class="band"><div class="proof" style="padding-top:0;"><div class="col">
+    <div class="partlabel"><p class="k reveal">Part II — It runs &amp; improves itself</p><h2 class="reveal">The part nothing else does. Six loops it runs on its own.</h2></div>
+
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">01 — Mistake audit</p><h3>It keeps a model of its own mistakes.</h3><p>Flag something wrong and it logs a pattern. If a "fixed" one comes back, it flips to <b>regression</b> — so a fix that didn't hold can't quietly rot. <em>Scout shouldn't be limited by me; it should improve itself.</em></p></div>
+      <div class="vvis reveal"><div class="pcard">
+        <div class="head"><span class="id">Pattern #58</span><span class="pill regress">regression</span></div>
+        <div class="ln"><span class="k">error</span><span>relied on a transcript for a name</span></div>
+        <div class="ln"><span class="k">root cause</span><span>didn't check the knowledge graph first</span></div>
+        <div class="ln"><span class="k">fix</span><span>names resolve against the graph, never the transcript</span></div>
+        <div class="occ"><span class="d"></span><span class="d"></span><span class="d"></span><span class="lbl">seen 3× → fix written back into its own rules</span></div>
+      </div></div>
+    </div>
+
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">02 — Dreaming proposals</p><h3>It rewrites its own instructions, in the open.</h3><p>Small fixes apply directly. Bigger ones wait and <b>auto-apply unless you reject them</b>. Every change is a git commit you can revert — transparency, not a gate on every step.</p></div>
+      <div class="vvis reveal">
+        <div class="flow">
+          <div class="fstep"><div class="t">learns</div><div class="b">a mistake → a fix</div></div>
+          <span class="farr">→</span>
+          <div class="fstep acc"><div class="t">proposes</div><div class="b">auto-applies in 3 days unless rejected</div></div>
+          <span class="farr">→</span>
+          <div class="fstep"><div class="t">applies</div><div class="b">edits its own skill file</div></div>
+        </div>
+        <div class="commit"><span class="h">dreaming [21:30]:</span> apply proposal — names resolve via graph &nbsp;<span class="rv">· git revert anytime</span></div>
       </div>
     </div>
 
-    <p class="problem-resolve reveal">Scout is the third option. <b>Delegate everything that doesn't need your judgment</b> to an agent that reads all of it, cross-checks it against itself, and reaches into your day only when something <em>genuinely</em> needs you. You stay the authority on what only you can know; it handles the rest — and it can read far more in a day than you ever could. That's the point, not a limitation.</p>
-  </section>
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">03 — The wishlist</p><h3>It drives its own roadmap.</h3><p>It keeps a wishlist and ships from it on its own — including the tools it built <b>for itself</b>. You're not the only one filing feature requests.</p></div>
+      <div class="vvis reveal"><div class="chk">
+        <div class="it done"><span class="box"></span><span>macOS Control Center app</span><span class="tg">shipped</span></div>
+        <div class="it done"><span class="box"></span><span>Terminal action-items UI</span><span class="tg">shipped</span></div>
+        <div class="it done"><span class="box"></span><span>Research session type</span><span class="tg">shipped</span></div>
+        <div class="it"><span class="box"></span><span>Event-driven triggers</span><span class="tg wip">in progress</span></div>
+      </div></div>
+    </div>
 
-  <!-- THE PAYOFF -->
-  <div class="band">
-  <section class="section wrap" id="payoff">
-    <p class="section-kicker reveal">The payoff</p>
-    <h2 class="big reveal">What changes when Scout has your back.</h2>
-    <p class="sub reveal">It isn't one more dashboard to check. It's the opposite — the thing that finally lets you <em>stop</em> checking.</p>
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">04 — Research queue</p><h3>It goes and finds what it's missing.</h3><p>It researches what's gone stale and rotates across your projects. Leave a note in the vault and it jumps to the top of the queue.</p></div>
+      <div class="vvis reveal"><div class="q">
+        <div class="pin"><span class="mono">//==&lt;&lt;</span><span class="x"><b>look into the data-app competition</b> — my note, picked up next run</span></div>
+        <div class="row"><span>refresh stale project files</span><span class="age">12d old</span></div>
+        <div class="row"><span>thin entity → enrich from the web</span><span class="age">scored</span></div>
+        <div class="rot">rotation: ✓ channels → ✓ fi-app → <b style="color:var(--acc-2)">next: ai-enablement</b> &nbsp;(never the same project twice running)</div>
+      </div></div>
+    </div>
 
-    <div class="outcomes stagger">
-      <div class="outcome reveal">
-        <span class="o-k">Your mornings</span>
-        <h3>Begin the day oriented, not buried</h3>
-        <p>The hour you'd spend reconstructing what happened across a dozen tools is just gone. Scout did it overnight, cross-checked it, and left a short list of what actually moved.</p>
-        <div class="o-ba"><s>scrape every app, hope you didn't miss anything</s><span class="arr">&rarr;</span><b>read one trustworthy list</b></div>
-      </div>
-      <div class="outcome reveal">
-        <span class="o-k">Your blind spots</span>
-        <h3>Never get quietly blindsided</h3>
-        <p>The buried contract clause. The teammate blocked on your review for two days. The thread that went cold. Scout surfaces the quiet, critical signal that never shouts loudly enough to get noticed.</p>
-        <div class="o-ba"><s>&ldquo;wait — when did that become urgent?&rdquo;</s><span class="arr">&rarr;</span><b>you saw it three days early</b></div>
-      </div>
-      <div class="outcome reveal">
-        <span class="o-k">Your attention</span>
-        <h3>Close the tabs without the dread</h3>
-        <p>Because the list is complete and every item shows its evidence, you can finally trust it enough to stop doom-refreshing. The calm comes from the cross-check — not from hoping you didn't miss something.</p>
-        <div class="o-ba"><s>refreshing Slack &ldquo;just in case&rdquo; all day</s><span class="arr">&rarr;</span><b>the list is the list</b></div>
-      </div>
-      <div class="outcome reveal">
-        <span class="o-k">Your reputation</span>
-        <h3>Look prepared — because you are</h3>
-        <p>Walk into the renewal call already knowing the notes contradict the calendar. Reply to the right person before the second nudge lands. Become the one who never seems to drop anything.</p>
-        <div class="o-ba"><s>caught flat-footed in the meeting</s><span class="arr">&rarr;</span><b>three steps ahead</b></div>
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">05 — Enrichment questions</p><h3>It asks you only what it can't find.</h3><p>Targeted, low-stakes, with a link and a one-line gist so you can answer in seconds — and <b>never the same question twice</b>.</p></div>
+      <div class="vvis reveal">
+        <div class="bubble"><div class="q">Who owns the migration decision — you or Marco?</div><div class="g">↳ only one source says you; I won't guess on a person</div></div>
+        <div class="route">answer →<span class="e">person · relationship filled</span>→ never asked again</div>
       </div>
     </div>
-  </section>
-  </div>
 
-  <!-- WHY -->
-  <section class="section wrap" id="corroborates">
-    <p class="section-kicker reveal">Why it's different</p>
-    <h2 class="big reveal">Most assistants summarize. Scout corroborates.</h2>
-    <p class="sub reveal">Markdown memory, scheduled runs and self-improvement loops are table stakes now. Scout's difference is what it does <em>before</em> it tells you anything.</p>
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">06 — Review queue</p><h3>It refuses to guess about people.</h3><p>Anything uncertain — especially merging or naming a person — is <b>held for you to confirm</b>, instead of silently corrupting the graph.</p></div>
+      <div class="vvis reveal"><div class="held">
+        <span class="lbl">⏸ held for review</span>
+        <div class="claim">Is <b>"A. Bouška"</b> a new person, or the Adam already in your graph? One source, can't tell.</div>
+        <div class="acts"><span class="a y">✓ confirm</span><span class="a n">✕ reject</span></div>
+      </div></div>
+    </div>
+  </div></div></div>
 
-    <div class="points stagger">
-      <div class="point reveal">
-        <span class="num">01</span>
-        <div>
-          <h3>Cross-checked, not collected</h3>
-          <p>No single tool is treated as the truth. A calendar invite is verified against the transcript, a Linear ticket against its PR, an email against Slack. And your own actions outrank everything — what you <em>sent, merged or cancelled</em> beats what a meeting note says you'll do. <b>So the list you act on is the reconciled truth — not a dozen apps' worth of half-stories you have to merge in your head.</b></p>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">02</span>
-        <div>
-          <h3>Confidence on every line</h3>
-          <p>Every item carries its evidence level, so you always know how much weight to give it — and a one-source claim is never silently promoted to fact. <b>Hover any tag:</b></p>
-          <div class="tag-rack">
-            <span class="tag verified" data-tip="Confirmed by 2+ independent sources">verified</span>
-            <span class="tag single" data-tip="Only one source says so — treat as tentative">single-source</span>
-            <span class="tag unverified" data-tip="Mentioned, but not yet corroborated">unverified</span>
-            <span class="tag stale" data-tip="Was true once; not reconfirmed recently">stale</span>
-            <span class="tag contradicted" data-tip="Sources disagree — both sides shown, no guess">contradicted</span>
-          </div>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">03</span>
-        <div>
-          <h3>Disagreement is the signal</h3>
-          <p>When your sources conflict, Scout doesn't pick a winner. It surfaces the contradiction with both sides laid out — because that conflict is usually the single most important thing in your day, and the thing every other tool hides.</p>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">04</span>
-        <div>
-          <h3>A real knowledge graph</h3>
-          <p>Typed people, projects, tasks and relationships you can query — not a flat pile of notes. <b>So Scout actually understands how your world connects</b> and gets the context right instead of guessing. Browsable in Obsidian as an interlinked graph.</p>
-        </div>
+  <!-- PART III — MEMORY -->
+  <div class="proof"><div class="col">
+    <div class="partlabel"><p class="k reveal">Part III — A memory you can read</p><h2 class="reveal">A living, validated knowledge graph — not a notes pile.</h2></div>
+
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">The graph</p><h3>Typed people, projects, tasks — and the links between them.</h3><p>Densely interconnected on purpose: corroboration needs more than one edge to lean on. Validated against a formal ontology on every run.</p></div>
+      <div class="vvis reveal"><div class="kg2" id="kg2">
+        <svg viewBox="0 0 420 250" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="9.5">
+          <g class="edges">
+            <line class="edge" data-a="you" data-b="proj" x1="95" y1="120" x2="205" y2="72"/>
+            <line class="edge" data-a="you" data-b="org" x1="95" y1="120" x2="345" y2="62"/>
+            <line class="edge" data-a="you" data-b="mate" x1="95" y1="120" x2="330" y2="150"/>
+            <line class="edge" data-a="you" data-b="task" x1="95" y1="120" x2="200" y2="185"/>
+            <line class="edge" data-a="proj" data-b="mate" x1="205" y1="72" x2="330" y2="150"/>
+            <line class="edge" data-a="proj" data-b="tool" x1="205" y1="72" x2="70" y2="46"/>
+            <line class="edge" data-a="proj" data-b="task" x1="205" y1="72" x2="200" y2="185"/>
+            <line class="edge" data-a="proj" data-b="meet" x1="205" y1="72" x2="320" y2="212"/>
+            <line class="edge" data-a="task" data-b="pr" x1="200" y1="185" x2="120" y2="205"/>
+          </g>
+          <g class="node" data-id="you" data-rels="works_on → Project · employed_by → Org · works_with → Teammate · assigned → Task"><circle cx="95" cy="120" r="9" fill="#2f7d52"/><text x="95" y="142" fill="#534c41" text-anchor="middle">You</text></g>
+          <g class="node" data-id="proj" data-rels="worked_on_by → You, Teammate · depends_on → Tool · about ← Task, Meeting"><circle cx="205" cy="72" r="9" fill="#b4541f"/><text x="205" y="58" fill="#534c41" text-anchor="middle">Project</text></g>
+          <g class="node" data-id="org" data-rels="employs → You"><circle cx="345" cy="62" r="9" fill="#2f4a55"/><text x="345" y="48" fill="#534c41" text-anchor="middle">Org</text></g>
+          <g class="node" data-id="mate" data-rels="works_on → Project · works_with → You"><circle cx="330" cy="150" r="9" fill="#2f7d52"/><text x="330" y="170" fill="#534c41" text-anchor="middle">Teammate</text></g>
+          <g class="node" data-id="task" data-rels="assigned_to → You · about → Project · blocked_by → PR"><circle cx="200" cy="185" r="9" fill="#b07d2c"/><text x="200" y="205" fill="#534c41" text-anchor="middle">Task</text></g>
+          <g class="node" data-id="tool" data-rels="used_by → Project"><circle cx="70" cy="46" r="9" fill="#2f4a55"/><text x="70" y="32" fill="#534c41" text-anchor="middle">Tool</text></g>
+          <g class="node" data-id="meet" data-rels="about → Project"><circle cx="320" cy="212" r="9" fill="#b07d2c"/><text x="320" y="232" fill="#534c41" text-anchor="middle">Meeting</text></g>
+          <g class="node" data-id="pr" data-rels="blocks → Task"><circle cx="120" cy="205" r="9" fill="#2f4a55"/><text x="120" y="225" fill="#534c41" text-anchor="middle">PR</text></g>
+        </svg>
+        <div class="kgcap" id="kgcap">≈140 entities · ≈950 relationships — <b>hover a node</b> to trace its links</div>
+      </div></div>
+    </div>
+
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">Git as memory</p><h3>Every run is a commit. The history is its memory.</h3><p>Trace exactly what it changed, when, and why — and undo any of it. 800+ committed sessions and counting.</p></div>
+      <div class="vvis reveal"><div class="commit" style="margin-top:0;line-height:1.95;">
+        <div><span class="h">briefing [06-15]:</span> 3 need you · 1 contradiction surfaced</div>
+        <div><span class="h">consolidation [12:30]:</span> reconciled 2 items · 1 done</div>
+        <div><span class="h">research [15:00]:</span> refreshed ai-enablement</div>
+        <div><span class="h">dreaming [21:30]:</span> logged pattern #58 · applied 1 fix</div>
+      </div></div>
+    </div>
+  </div></div>
+
+  <!-- PART IV — YOURS -->
+  <div class="band"><div class="proof" style="padding-top:0;"><div class="col">
+    <div class="partlabel"><p class="k reveal">Part IV — Built for anyone, owned by you</p><h2 class="reveal">It runs on your machine, your tools, your files.</h2></div>
+
+    <div class="vrow">
+      <div class="vtext reveal"><p class="sysnum">Endless connectors</p><h3>Connect anything. The list is never closed.</h3><p>It auto-discovers whatever you've wired into Claude — official, custom, or community. Adds no new cloud; there's no Scout server.</p></div>
+      <div class="vvis reveal"><div class="conn">
+        <span class="c">Slack</span><span class="c">Gmail</span><span class="c">Calendar</span><span class="c">Linear</span><span class="c">GitHub</span><span class="c">Granola</span><span class="c">Drive</span><span class="c">WhatsApp</span><span class="c more">+ any MCP you add</span>
+      </div></div>
+    </div>
+
+    <div class="vrow flip">
+      <div class="vtext reveal"><p class="sysnum">Yours to keep</p><h3>Plain markdown, in a folder you own.</h3><p>Human-readable files with <code style="font-family:var(--mono);font-size:13px;">[[wikilinks]]</code> — open it, grep it, walk away with it. Not locked to one model or harness.</p></div>
+      <div class="vvis reveal"><div class="commit" style="margin-top:0;line-height:1.9;">
+        <div>~/Scout/</div>
+        <div style="color:var(--ink-3)">&nbsp;&nbsp;people/ · projects/ · personal/</div>
+        <div style="color:var(--ink-3)">&nbsp;&nbsp;action-items/ · meetings/</div>
+        <div style="color:var(--ink-3)">&nbsp;&nbsp;.git/ &nbsp;<span style="color:var(--acc)">← every change, reversible</span></div>
+      </div></div>
+    </div>
+
+    <div class="block" id="install" style="padding-top:54px;border-top:1px solid var(--line);">
+      <p class="kick reveal">Install</p>
+      <h3 class="sec reveal" style="font-family:var(--sans);font-size:28px;font-weight:800;">Run it yourself in under five minutes.</h3>
+      <p class="lead reveal">Two commands in Claude Code, then <code>/scout-setup</code> detects what you've connected and scaffolds your vault.</p>
+      <div class="term reveal"><div class="h">claude</div><pre><code><span class="c"># in Claude Code:</span>
+<span class="g">/plugin</span> marketplace add Raven-Scout/scout-plugin
+<span class="g">/plugin</span> install scout@scout-plugin
+
+<span class="c"># then create your vault:</span>
+<span class="g">/scout-setup</span></code></pre></div>
+      <div class="ctas reveal" style="margin-top:24px;">
+        <a class="btn btn-p" href="https://github.com/Raven-Scout/scout-plugin">Get Scout on GitHub</a>
+        <a class="btn btn-s" href="https://github.com/jordanrburger/Scout/releases">Download the Mac app</a>
       </div>
     </div>
-  </section>
-
-  <!-- AUTONOMY -->
-  <div class="band">
-  <section class="section wrap" id="autonomy">
-    <p class="section-kicker reveal">On its own terms</p>
-    <h2 class="big reveal">It runs itself — and reaches you only when it's worth it.</h2>
-    <p class="sub reveal">Scout isn't something you operate. It works in the background on its own clock, doing more in a day than you could read — and stays out of your way until it genuinely needs you.</p>
-
-    <div class="points stagger">
-      <div class="point reveal">
-        <span class="num">01</span>
-        <div>
-          <h3>Works while you don't</h3>
-          <p>Scout runs unattended, around the clock, accruing knowledge faster than you can read it. You stay the authority on the things only you know; it handles everything else, autonomously.</p>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">02</span>
-        <div>
-          <h3>Asks only when it matters</h3>
-          <p>When Scout needs your judgment it messages you and moves on — picking up your reply on its next run. Conversations are slow, parallel, and never block your day. No notification firehose, no babysitting.</p>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">03</span>
-        <div>
-          <h3>Extends and rewrites itself</h3>
-          <p>It proposes new routines when it spots a pattern, reads its own mistakes, and edits its own instructions to stop repeating them — every change a labelled, reversible git commit you can read and undo.</p>
-        </div>
-      </div>
-      <div class="point reveal">
-        <span class="num">04</span>
-        <div>
-          <h3>Forgets on purpose</h3>
-          <p>Every evening it lets a few things that no longer matter fall away. An agent that only ever accumulates becomes a worse partner over time; deliberate decay keeps the signal sharp and the briefing honest.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-  </div>
-
-  <!-- HOW / ROUTINES -->
-  <section class="section wrap" id="how">
-    <p class="section-kicker reveal">Routines</p>
-    <h2 class="big reveal">Sessions that run themselves — and ones you invent.</h2>
-    <p class="sub reveal">Out of the box, Scout runs the sessions below. They're starting points, not limits — retime them, add your own, or trigger them on real-world events instead of a clock.</p>
-
-    <div class="timeline">
-      <div class="t-row reveal-l">
-        <span class="when">07:00</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"></path></svg></span>
-        <div>
-          <h3>Morning Briefing<span class="freq">daily</span></h3>
-          <p>Full cold start: reads the whole knowledge base, queries every tool, cross-checks, and hands you today's action items.</p>
-        </div>
-      </div>
-      <div class="t-row reveal-l">
-        <span class="when">12:30</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 1.5v3h-3"></path></svg></span>
-        <div>
-          <h3>Consolidation<span class="freq">through the day</span></h3>
-          <p>Lightweight delta scans — what changed, what's newly done, what needs reconciling since the last run.</p>
-        </div>
-      </div>
-      <div class="t-row reveal-l">
-        <span class="when">15:00</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg></span>
-        <div>
-          <h3>Research<span class="freq">daily</span></h3>
-          <p>Goes outward — expands what Scout knows about the people, projects and topics in your knowledge base.</p>
-        </div>
-      </div>
-      <div class="t-row reveal-l">
-        <span class="when">anytime</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
-        <div>
-          <h3>Work<span class="freq">interactive</span></h3>
-          <p>Walks today's items one at a time, each with a drafted action you approve, skip, or edit. You stay the editor.</p>
-        </div>
-      </div>
-      <div class="t-row reveal-l">
-        <span class="when">21:30</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a4.8 4.8 0 0 0 7 7Z"></path></svg></span>
-        <div>
-          <h3>Dreaming<span class="freq">nightly</span></h3>
-          <p>Self-improvement: processes your feedback, deepens the knowledge base, and learns from its own mistakes.</p>
-        </div>
-      </div>
-      <div class="t-row reveal-l t-add">
-        <span class="when">your call</span>
-        <span class="node"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"></path></svg></span>
-        <div>
-          <h3>Define your own<span class="freq">unlimited</span></h3>
-          <p>Describe any routine you want — <em>&ldquo;scan investor updates every Monday,&rdquo; &ldquo;watch for contract mentions,&rdquo; &ldquo;ping me if a PR sits unreviewed&rdquo;</em> — or let Scout propose one when it spots a pattern. Fire it on a schedule, on an event, or on Scout's own judgment.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- YOUR DATA -->
-  <div class="band">
-  <section class="section wrap" id="private">
-    <p class="section-kicker reveal">Yours, end to end</p>
-    <h2 class="big reveal">Runs on your machine. In plain files you own. Tied to no one tool.</h2>
-    <p class="sub reveal">Scout isn't a service you upload your life to. It's an agent that runs locally and writes to a folder on your own disk — there is no Scout cloud.</p>
-
-    <div class="assurances stagger">
-      <div class="assure reveal">
-        <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
-        <div>
-          <h4>Nothing new leaves your computer</h4>
-          <p>Scout reads the tools you've already connected to Claude and writes to local files. No Scout server ever sees your data — there isn't one to see it.</p>
-        </div>
-      </div>
-      <div class="assure reveal">
-        <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
-        <div>
-          <h4>Your memory is plain markdown</h4>
-          <p>The whole knowledge base is human-readable <code>.md</code> files with <code>[[wikilinks]]</code>. Open it in Obsidian, grep it, edit it, or walk away with it — markdown is canonical, everything else is just a view.</p>
-        </div>
-      </div>
-      <div class="assure reveal">
-        <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
-        <div>
-          <h4>You can audit and undo anything</h4>
-          <p>Because it's all in git, every change Scout makes is a commit you can read and <code>git revert</code> — including the changes it makes to <em>itself</em>. Nothing about the agent's mind is opaque to you.</p>
-        </div>
-      </div>
-      <div class="assure reveal">
-        <span class="chk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"></path></svg></span>
-        <div>
-          <h4>Not locked to one tool or model</h4>
-          <p>Scout runs on Claude Code today, but the harness is a transport — not a cage. Markdown, git and your own connectors mean the agent's mind isn't trapped in any one product; the plumbing can change, your knowledge stays.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-  </div>
-
-  <!-- INSTALL -->
-  <section class="section wrap" id="install">
-    <p class="section-kicker reveal">Get started</p>
-    <h2 class="big reveal">Installed in under five minutes.</h2>
-
-    <div class="install-grid">
-      <div class="term reveal">
-        <div class="term-head">claude</div>
-        <pre><code><span class="cm"># In Claude Code:</span>
-<span class="cmd">/plugin</span> marketplace add jordanrburger/scout-plugin
-<span class="cmd">/plugin</span> install scout@scout-plugin
-
-<span class="cm"># then create your vault:</span>
-<span class="cmd">/scout-setup</span></code></pre>
-      </div>
-      <div class="install-aside reveal">
-        <div class="step">
-          <span class="n">1</span>
-          <div><h4>Add the plugin</h4><p>Two commands inside Claude Code — no separate install.</p></div>
-        </div>
-        <div class="step">
-          <span class="n">2</span>
-          <div><h4>Run setup</h4><p><code>/scout-setup</code> auto-detects every tool you've connected and scaffolds your vault.</p></div>
-        </div>
-        <div class="step">
-          <span class="n">3</span>
-          <div><h4>Let it run</h4><p>Scout starts watching, cross-checking, and surfacing — and gets sharper every night.</p></div>
-        </div>
-        <p class="install-note"><b>Works with whatever you've got connected.</b> Even a single connector is useful — every tool you add deepens the cross-checking.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- MAC APP -->
-  <section class="section wrap" id="app">
-    <div class="app-grid">
-      <div class="app-icon-col reveal">
-        <img class="app-icon" src="assets/scout-icon.svg" alt="Scout.app icon — a sail under a morning sun" width="168" height="168" />
-      </div>
-      <div>
-        <p class="section-kicker reveal">Companion app</p>
-        <h2 class="big reveal">Scout.app — a native window onto everything Scout writes.</h2>
-        <p class="sub reveal">The agent does the work; the free macOS app gives you a live interface on top of it — one of several surfaces, with phone and ambient capture on the way.</p>
-        <div class="app-feats stagger">
-          <div class="feat reveal"><h4>Control Center</h4><p>Session activity, upcoming runs, cost per run, and a usage heatmap.</p></div>
-          <div class="feat reveal"><h4>Action Items</h4><p>The current briefing as a live list — inline comments, deep links to Linear, PRs and Slack.</p></div>
-          <div class="feat reveal"><h4>Schedules</h4><p>Edit every routine — times, weekdays, on-miss policy — with validated saves.</p></div>
-        </div>
-        <div class="hero-ctas" style="justify-content: flex-start;">
-          <a class="btn-accent" href="https://github.com/jordanrburger/Scout/releases">Download for macOS</a>
-        </div>
-        <p class="hero-note" style="text-align: left;">free &middot; macOS 13+ &middot; first launch: right-click &rarr; Open (ad-hoc signed)</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- FAQ -->
-  <div class="band">
-  <section class="section wrap" id="faq">
-    <p class="section-kicker reveal">Questions</p>
-    <h2 class="big reveal">Good questions, honest answers.</h2>
-
-    <div class="faq-list reveal">
-      <details class="qa">
-        <summary>Do I need Claude Code?<span class="pm">+</span></summary>
-        <p class="ans">Today, yes — Scout runs as scheduled Claude Code sessions on your own machine. But it's deliberately built so the harness is replaceable: markdown memory, git history and your own connectors mean Scout isn't permanently wedded to one tool.</p>
-      </details>
-      <details class="qa">
-        <summary>How many tools and routines can it have?<span class="pm">+</span></summary>
-        <p class="ans">There's no fixed number of either. Scout uses <b>any</b> connector you've added to Claude — built-in, custom, or community — and runs <b>any</b> routine you define, on a schedule or triggered by real-world events. It'll even propose new routines of its own when it notices a pattern worth automating.</p>
-      </details>
-      <details class="qa">
-        <summary>What does it cost to run?<span class="pm">+</span></summary>
-        <p class="ans">Scout itself is free and open source. It spends tokens on <b>your own</b> Claude subscription or API when sessions run. A built-in budget check skips runs once you're over your daily limit, and every session's cost is logged — so there are no surprises.</p>
-      </details>
-      <details class="qa">
-        <summary>Do I have to use Obsidian?<span class="pm">+</span></summary>
-        <p class="ans">No. The knowledge base is just markdown with <code>[[wikilinks]]</code> — any editor works. Obsidian gives the nicest reading experience, a graph view of how people, projects and channels connect, but it's entirely optional.</p>
-      </details>
-      <details class="qa">
-        <summary>How is this different from giving an AI &ldquo;memory&rdquo;?<span class="pm">+</span></summary>
-        <p class="ans">Memory remembers what it's <em>told</em>. Scout corroborates what it <em>observes</em> across your tools, gives it structure (typed people, projects, tasks), flags what it isn't sure of, and surfaces contradictions instead of guessing — and you can audit every change in git. Remembering is the easy part; the <b>trust</b> is the point.</p>
-      </details>
-      <details class="qa">
-        <summary>Can my whole team use it?<span class="pm">+</span></summary>
-        <p class="ans">Each person runs their own Scout with their own knowledge base — it's built around individual context. Team knowledge still flows through your normal tools; Scout keeps <em>each</em> person on top of what matters to them.</p>
-      </details>
-    </div>
-  </section>
-  </div>
-
-  <!-- HORIZON -->
-  <section class="section wrap" id="horizon">
-    <p class="section-kicker reveal">The horizon</p>
-    <h2 class="big reveal">An early instance of something bigger.</h2>
-    <p class="horizon-note reveal">Scout is a deliberate early version of <b>fully autonomous agents</b> — ones that run on your life's timescale, keep their memory in the open, improve themselves, and reach back into your world only when it's worth the interruption. The daily briefing is just where it starts. The same engine is heading somewhere far more ambitious:</p>
-    <div class="h-chips reveal">
-      <span class="chip">event-driven triggers</span>
-      <span class="chip">phone &amp; ambient capture</span>
-      <span class="chip soon">harness-independent &middot; soon</span>
-      <span class="chip soon">agent-to-agent memory &middot; someday</span>
-    </div>
-  </section>
+  </div></div></div>
 </main>
 
-<!-- CLOSING CTA -->
-<section class="cta-band">
-  <h2>Let an agent watch the things you <em>can't</em>.</h2>
-  <p>Install the plugin, run <code>/scout-setup</code>, and let Scout start watching, cross-checking, and surfacing — on your machine, on your terms.</p>
-  <div class="hero-ctas">
-    <a class="btn-accent" href="#install">Install Scout</a>
-    <a class="btn-quiet" href="https://github.com/jordanrburger/scout-plugin">View on GitHub</a>
-  </div>
-</section>
+<footer><div class="wrap foot">
+  <span class="b"><img src="assets/scout-icon.svg" alt=""/>Scout</span><span>· an autonomous agent that runs and improves itself</span><span class="sp"></span>
+  <a href="https://github.com/Raven-Scout/scout-plugin">Repository</a>
+  <a href="https://code.claude.com/docs/en/discover-plugins">Claude Code plugins</a>
+</div></footer>
 
-<footer class="footer">
-  <div class="wrap footer-inner">
-    <span class="foot-brand"><img src="assets/scout-icon.svg" alt="" width="18" height="18" />Scout &middot; open source on GitHub</span>
-    <span class="spacer"></span>
-    <a href="https://github.com/jordanrburger/scout-plugin">Repository</a>
-    <a href="https://github.com/jordanrburger/Scout/releases">Mac app</a>
-    <a href="https://github.com/jordanrburger/scout-plugin/issues">Issues</a>
-    <a href="https://code.claude.com/docs/en/discover-plugins">Claude Code plugins</a>
-  </div>
-</footer>
+<script>(function(){
+  var root=document.documentElement; root.classList.add('js');
+  var seqSel='.src,.legend .r,.pcard .ln,.chk .it,.q .row,.q .pin,.bi,.commit > div,.conn .c,.bubble,.route,.held .claim,.held .acts,.fstep,.out';
+  document.querySelectorAll('.vvis, .win').forEach(function(v){
+    v.querySelectorAll(seqSel).forEach(function(k,i){ k.classList.add('seq'); k.style.setProperty('--d',(i*0.07).toFixed(2)+'s'); });
+    v.querySelectorAll('.occ .d').forEach(function(d,i){ d.style.setProperty('--d',(0.35+i*0.13).toFixed(2)+'s'); });
+  });
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.16,rootMargin:'0px 0px -7% 0px'});
+  document.querySelectorAll('.reveal, .vvis, .win').forEach(function(e){io.observe(e);});
 
-<script src="landing.js" defer></script>
+  /* interactive knowledge graph */
+  var kg=document.getElementById('kg2');
+  if(kg){
+    var cap=document.getElementById('kgcap'), def=cap.innerHTML;
+    var nodes=[].slice.call(kg.querySelectorAll('.node')), edges=[].slice.call(kg.querySelectorAll('.edge'));
+    var clear=function(){kg.classList.remove('dim');nodes.forEach(function(n){n.classList.remove('hot');});edges.forEach(function(e){e.classList.remove('hot');});cap.innerHTML=def;};
+    nodes.forEach(function(n){ n.setAttribute('tabindex','0');
+      var f=function(){ var id=n.getAttribute('data-id'); kg.classList.add('dim'); n.classList.add('hot');
+        edges.forEach(function(e){ var a=e.getAttribute('data-a'),b=e.getAttribute('data-b'); if(a===id||b===id){e.classList.add('hot'); var o=kg.querySelector('.node[data-id="'+(a===id?b:a)+'"]'); if(o)o.classList.add('hot');} });
+        cap.innerHTML='<span class="nn">'+n.querySelector('text').textContent+'</span> — '+n.getAttribute('data-rels'); };
+      n.addEventListener('mouseenter',f); n.addEventListener('focus',f); n.addEventListener('mouseleave',clear); n.addEventListener('blur',clear);
+    });
+    kg.addEventListener('mouseleave',clear);
+  }
 
+  /* playable briefing */
+  document.querySelectorAll('.playwrap .bi').forEach(function(bi){ bi.addEventListener('click',function(e){ if(e.target.closest('.tag'))return; bi.classList.toggle('open'); }); });
+  var btns=[].slice.call(document.querySelectorAll('.pt')), views=[].slice.call(document.querySelectorAll('.playwrap [data-view]'));
+  btns.forEach(function(b){ b.addEventListener('click',function(){ btns.forEach(function(x){x.classList.toggle('active',x===b);}); var v=b.getAttribute('data-view'); views.forEach(function(el){el.hidden=el.getAttribute('data-view')!==v;}); }); });
+})();</script>
 </body>
 </html>

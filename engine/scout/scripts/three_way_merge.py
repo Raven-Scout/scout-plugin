@@ -41,20 +41,27 @@ def three_way_merge(*, base: str, ours: str, theirs: str) -> MergeResult:
         base_path.write_text(base, encoding="utf-8")
         theirs_path.write_text(theirs, encoding="utf-8")
 
-        proc = subprocess.run(
-            [
-                "git",
-                "merge-file",
-                "--diff3",
-                "-p",
-                str(ours_path),
-                str(base_path),
-                str(theirs_path),
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
+        try:
+            proc = subprocess.run(
+                [
+                    "git",
+                    "merge-file",
+                    "--diff3",
+                    "-p",
+                    str(ours_path),
+                    str(base_path),
+                    str(theirs_path),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                # A wedged git (e.g. waiting on a lock) must not hang
+                # bootstrap upgrade forever; merge-file on three small text
+                # files is sub-second, so 30s is generous (#47).
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("git merge-file timed out after 30s") from e
         # git merge-file: returncode 0 = clean, 1..127 = conflict count,
         # 128/255 = fatal git error. Treat fatal as "raise".
         if proc.returncode < 0 or proc.returncode > 127:
