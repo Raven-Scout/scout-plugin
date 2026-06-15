@@ -13,6 +13,8 @@ from pathlib import Path
 
 import yaml
 
+from scout.errors import ConfigError
+
 
 class ProbeKind(Enum):
     MCP_TOOL = "mcp_tool"  # primary is an MCP tool name to call
@@ -68,3 +70,57 @@ def load_registry(path: Path) -> dict[str, Probe]:
                 needs_user_input=needs,
             )
     return out
+
+
+def _default_plugin_root() -> Path:
+    """Plugin root = the dir that contains the engine venv and templates/.
+
+    Derived from the running package location, mirroring
+    install_schedule_plist.resolve_scoutctl_bin().
+    """
+    import scout
+
+    return Path(scout.__file__).parent.parent.parent
+
+
+def resolve_registry(
+    *,
+    plugin_root: Path | None = None,
+    data_dir: Path | None = None,
+) -> dict[str, Probe]:
+    """Merge the shipped probe registry with the optional user overlay.
+
+    Shipped: ``<plugin_root>/templates/connector-probes.yaml`` (required).
+    Overlay: ``<data_dir>/connector-probes.local.yaml`` (optional).
+    Union of the two; on a key collision the overlay entry wins, letting a
+    user repoint a shipped probe or add new connectors that survive plugin
+    updates (#97).
+
+    Raises ConfigError (naming the offending file) if the shipped registry
+    is missing/invalid or the overlay is invalid. The overlay being absent
+    or empty is normal and leaves the shipped set unchanged.
+    """
+    if plugin_root is None:
+        plugin_root = _default_plugin_root()
+    if data_dir is None:
+        from scout import paths
+
+        data_dir = paths.data_dir()
+
+    shipped_path = plugin_root / "templates" / "connector-probes.yaml"
+    if not shipped_path.exists():
+        raise ConfigError(f"shipped connector-probes.yaml not found at {shipped_path}")
+    try:
+        merged = dict(load_registry(shipped_path))
+    except (ValueError, yaml.YAMLError) as e:
+        raise ConfigError(f"shipped connector-probes.yaml is invalid: {e}") from e
+
+    overlay_path = data_dir / "connector-probes.local.yaml"
+    if overlay_path.exists():
+        try:
+            overlay = load_registry(overlay_path)
+        except (ValueError, yaml.YAMLError) as e:
+            raise ConfigError(f"{overlay_path.name} is invalid: {e}") from e
+        merged.update(overlay)  # overlay wins on key collision
+
+    return merged

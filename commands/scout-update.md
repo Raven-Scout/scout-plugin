@@ -145,6 +145,9 @@ Capture exit code (0 = green, 1 = yellow, 2 = red) and stdout/stderr.
 
 If runner backups appeared (`run-*.sh.bak.*`), tell the user the live runners had hand-edits that have been preserved as backups; the fresh templates were installed.
 
+- `~/Scout/connector-probes.local.yaml` (custom connector probes) is a user
+  file, never templated, so it is preserved untouched across upgrades.
+
 ---
 
 ## Auto-update nudge
