@@ -63,3 +63,31 @@ def parse_wishlist_item(bullet: str, in_done_file: bool = False) -> Item:
     body = rest.strip()
     return Item(title=title, status=status, priority=priority,
                 date=date, source=source, body=body)
+
+
+def parse_research_item(line: str, area: str | None = None) -> Item:
+    """Parse one research-queue checklist line:
+    `- [ ] 🔴 **START IMMEDIATELY — Title** body` (emoji = priority)."""
+    t = line.strip()
+    m = re.match(r"^[-*]\s*\[( |x|X)\]\s*", t)
+    status = "open"
+    if m:
+        status = "done" if m.group(1).lower() == "x" else "open"
+        t = t[m.end():]
+    priority = "medium"
+    if t.startswith("🔴"):
+        priority = "urgent"
+    elif t.startswith("🟢"):
+        priority = "low"
+    elif t.startswith("🟡"):
+        priority = "medium"
+    t = re.sub(r"^(🔴|🟡|🟢|🔵)\s*", "", t)
+    bm = re.match(r"\*\*(.+?)\*\*(.*)$", t, re.S)
+    lead, rest = (bm.group(1), bm.group(2)) if bm else (t, "")
+    title = re.sub(r"^START IMMEDIATELY\s*(—|-|–)\s*", "", lead.strip()).strip()
+    date = None
+    dm = DATE_RE.search(rest)
+    if dm:
+        date = dm.group(1)
+    return Item(title=title, status=status, priority=priority,
+                date=date, source=None, body=rest.strip(), area=area)
