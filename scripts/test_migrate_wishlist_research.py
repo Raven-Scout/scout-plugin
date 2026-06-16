@@ -45,6 +45,11 @@ def test_research_green_low():
     assert item.priority == "low"
     assert item.title == "G6 · CEE conference entities"
 
+def test_research_start_immediately_keyword_without_emoji_is_urgent():
+    item = parse_research_item("- [ ] **START IMMEDIATELY — Some title** body")
+    assert item.priority == "urgent"
+    assert item.title == "Some title"
+
 from migrate_wishlist_research import slugify, render_item, filename_for, Item
 
 def test_slugify_basic():

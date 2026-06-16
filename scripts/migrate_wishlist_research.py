@@ -84,7 +84,10 @@ def parse_research_item(line: str, area: str | None = None) -> Item:
     t = re.sub(r"^(🔴|🟡|🟢|🔵)\s*", "", t)
     bm = re.match(r"\*\*(.+?)\*\*(.*)$", t, re.S)
     lead, rest = (bm.group(1), bm.group(2)) if bm else (t, "")
-    title = re.sub(r"^START IMMEDIATELY\s*(—|-|–)\s*", "", lead.strip()).strip()
+    lead_stripped = lead.strip()
+    if lead_stripped.upper().startswith("START IMMEDIATELY"):
+        priority = "urgent"
+    title = re.sub(r"^START IMMEDIATELY\s*(—|-|–)\s*", "", lead_stripped, flags=re.I).strip()
     date = None
     dm = DATE_RE.search(rest)
     if dm:
