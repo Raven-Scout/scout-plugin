@@ -206,6 +206,25 @@ def _stage_install_only_seeds(cfg: BootstrapConfig) -> None:
         _atomic_write(target, rendered)
 
 
+def _unique_backup_path(target: Path) -> Path:
+    """A backup path for `target` that never overwrites an existing backup.
+
+    Keeps the familiar ``<name>.bak.<YYYY-MM-DD>`` form for the first backup
+    of the day; on a second same-day run, appends ``-1``, ``-2``, ... so an
+    earlier run's backup of a different hand-edit is never clobbered (#62).
+    """
+    today = _dt.date.today().isoformat()
+    base = target.with_name(f"{target.name}.bak.{today}")
+    if not base.exists():
+        return base
+    n = 1
+    while True:
+        candidate = target.with_name(f"{target.name}.bak.{today}-{n}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 def _stage_cat1b_runners(cfg: BootstrapConfig, *, is_upgrade: bool) -> list[str]:
     """Stage 4: cat 1b runner writes."""
     vars_ = _template_vars(cfg)
@@ -219,10 +238,7 @@ def _stage_cat1b_runners(cfg: BootstrapConfig, *, is_upgrade: bool) -> list[str]
         if is_upgrade and target.exists():
             current = target.read_text(encoding="utf-8")
             if current != rendered:
-                today = _dt.date.today().isoformat()
-                bak = cfg.vault / f"{vault_rel}.bak.{today}"
-                # Overwrites same-day backup if present — only the most recent
-                # hand-edit-vs-template divergence is preserved per day.
+                bak = _unique_backup_path(target)
                 shutil.copy2(target, bak)
                 backups.append(bak.name)
         _atomic_write(target, rendered)

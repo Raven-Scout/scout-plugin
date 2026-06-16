@@ -82,9 +82,17 @@ def parse_action_items(filepath: Path) -> list[ActionItem]:
     """
     if not filepath.exists():
         return []
+    return parse_lines(filepath.read_text(encoding="utf-8").splitlines())
 
+
+def parse_lines(lines: list[str]) -> list[ActionItem]:
+    """Parse already-read markdown lines into ActionItem records.
+
+    Lets a caller that already holds the file's bytes (e.g. backfill, which
+    must filter against the same raw lines) parse without a second read,
+    closing the parse-vs-reread TOCTOU window (#41).
+    """
     items: list[ActionItem] = []
-    lines = filepath.read_text(encoding="utf-8").splitlines()
 
     current_section = ""
     current_subsection = ""

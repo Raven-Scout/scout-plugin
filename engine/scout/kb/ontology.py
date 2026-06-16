@@ -23,6 +23,8 @@ from typing import Any
 
 import yaml
 
+from scout.errors import KBSchemaError
+
 
 class KnowledgeGraph:
     """Markdown-native knowledge graph with YAML frontmatter entities."""
@@ -35,8 +37,13 @@ class KnowledgeGraph:
         self.relationships: list[dict[str, str]] = []
 
     def _load_schema(self) -> dict[str, Any]:
-        with open(self.schema_path) as f:
-            return yaml.safe_load(f)
+        try:
+            with open(self.schema_path, encoding="utf-8") as f:
+                return yaml.safe_load(f)
+        except OSError as e:
+            raise KBSchemaError(f"KB schema not found at {self.schema_path}: {e}") from e
+        except yaml.YAMLError as e:
+            raise KBSchemaError(f"KB schema at {self.schema_path} is malformed: {e}") from e
 
     def load(self) -> KnowledgeGraph:
         """Walk all .md files in kb_root, extract frontmatter, build graph."""
@@ -138,7 +145,7 @@ class KnowledgeGraph:
                 continue
 
             # Check required properties
-            for prop in type_def["properties"].get("required", []):
+            for prop in type_def.get("properties", {}).get("required", []):
                 if prop not in entity:
                     errors.append({"entity": name, "message": f"Missing required property: {prop}"})
 

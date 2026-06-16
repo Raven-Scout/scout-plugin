@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime as _dt
+import shutil
 from pathlib import Path
 
 import pytest
@@ -253,3 +255,33 @@ def test_upgrade_leaves_existing_version_at_last_setup_alone(tmp_path):
     after = yaml.safe_load((vault / "scout-config.yaml").read_text())
     assert after["plugin"]["version_at_last_setup"] == "0.4.0"
     assert after["plugin"]["version_at_last_update"] == "0.4.5"
+
+
+def test_unique_backup_path_never_clobbers_same_day(tmp_path, monkeypatch):
+    """#62: two backups of the same runner on the same calendar day must get
+    distinct paths, so the first hand-edit's backup is never overwritten."""
+    import scout.scripts.bootstrap as bs
+
+    class _FixedDate(_dt.date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 6, 15)
+
+    monkeypatch.setattr(bs._dt, "date", _FixedDate)
+
+    target = tmp_path / "run-scout.sh"
+
+    target.write_text("A\n")
+    first = bs._unique_backup_path(target)
+    shutil.copy2(target, first)
+    assert first.exists()
+
+    target.write_text("B\n")
+    second = bs._unique_backup_path(target)
+    assert second != first, "same-day second backup reused the first backup path"
+    shutil.copy2(target, second)
+
+    assert first.read_text() == "A\n"  # first backup preserved
+    assert second.read_text() == "B\n"
+    # First path keeps the familiar dated name.
+    assert first.name == "run-scout.sh.bak.2026-06-15"
