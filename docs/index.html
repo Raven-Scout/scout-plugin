@@ -183,6 +183,129 @@
   .chaos .app .b{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;border-radius:11px;background:var(--red);color:#fff;font-family:var(--mono);font-size:11px;display:grid;place-items:center;padding:0 5px;}
   .chaos .capx2{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-3);text-align:center;margin-top:20px;}
   @media(max-width:560px){.chaos .apps{grid-template-columns:repeat(2,1fr);}}
+
+  /* ===== nav icon buttons + theme transition ===== */
+  body{transition:background .35s ease,color .35s ease;}
+  .iconbtn{background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);border-radius:8px;height:30px;padding:0 10px;cursor:pointer;font-family:var(--mono);font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:.15s;}
+  .iconbtn:hover{border-color:var(--ink-3);color:var(--ink);}
+  .iconbtn .kbd{font-size:11px;}
+  @media(max-width:760px){ #cmdk-btn{display:none;} }
+
+  /* ===== watch scout work ===== */
+  .win .bar .replay{margin-left:10px;background:none;border:1px solid var(--line-2);color:var(--ink-3);border-radius:6px;font-family:var(--mono);font-size:10.5px;padding:3px 8px;cursor:pointer;transition:.15s;}
+  .win .bar .replay:hover{color:var(--acc);border-color:var(--acc);}
+  .scan{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:12px 22px;border-bottom:1px solid var(--line);overflow:hidden;transition:max-height .4s ease,opacity .3s ease,padding .35s ease,border-color .3s ease;max-height:80px;}
+  .scan.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent;}
+  .scan .sc{font-family:var(--mono);font-size:11px;color:var(--ink-3);padding:4px 9px;border-radius:6px;border:1px solid var(--line-2);background:var(--bg);transition:.2s;}
+  .scan .sc.done{color:var(--ok);border-color:#bfe0cb;background:#eef5ef;}
+  .scan .sc.done::before{content:'✓ ';}
+  .scan .scctr{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-3);} .scan .scctr b{color:var(--ink-2);}
+  html.js .win.play .bi{opacity:0;transform:translateY(8px);}
+  html.js .win.play .bi.shown{opacity:1;transform:none;transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.2,1);}
+  @media(prefers-reduced-motion:reduce){ html.js .win.play .bi{opacity:1;transform:none;} .scan{display:none;} }
+
+  /* ===== a day with scout (scrolly) ===== */
+  .day{position:relative;padding:48px 0 28px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--sunk);}
+  .day-inner{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;}
+  .day-sticky{position:sticky;top:90px;height:min(68vh,500px);display:flex;gap:22px;align-items:stretch;}
+  .clock{position:relative;display:flex;flex-direction:column;justify-content:space-around;padding:18px 0;}
+  .clock .rail{position:absolute;left:33px;top:26px;bottom:26px;width:2px;background:var(--rule, var(--line-2));}
+  .clock .phase{display:flex;align-items:center;gap:12px;position:relative;z-index:1;opacity:.45;transition:opacity .3s;}
+  .clock .phase .t{font-family:var(--mono);font-size:12px;color:var(--ink-3);width:42px;}
+  .clock .phase .dot{width:14px;height:14px;border-radius:50%;background:var(--surface);border:2px solid var(--line-2);transition:.3s;}
+  .clock .phase.on{opacity:1;} .clock .phase.on .dot{background:var(--acc);border-color:var(--acc);transform:scale(1.35);} .clock .phase.on .t{color:var(--ink);}
+  .scene{flex:1;position:relative;min-height:240px;}
+  .scene .card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:30px;box-shadow:0 16px 40px -26px rgba(60,40,15,.34);opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease;display:flex;flex-direction:column;justify-content:center;}
+  .scene .card.on{opacity:1;transform:none;}
+  .scene .card .ic{font-size:32px;}
+  .scene .card h3{font-family:var(--serif);font-size:26px;font-weight:500;margin:14px 0 8px;color:var(--ink);}
+  .scene .card p{font-family:var(--serif);font-size:16px;line-height:1.62;color:var(--ink-2);margin:0;}
+  .day-steps{display:flex;flex-direction:column;}
+  .dstep{min-height:62vh;display:flex;flex-direction:column;justify-content:center;}
+  .dstep .k{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);}
+  .dstep h4{font-family:var(--sans);font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;margin:10px 0 8px;color:var(--ink);}
+  .dstep p{font-family:var(--sans);font-size:16px;line-height:1.6;color:var(--ink-2);max-width:40ch;margin:0;}
+  .day-foot{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink-3);text-align:center;margin:8px auto 0;max-width:60ch;}
+  @media(max-width:860px){ .day-inner{grid-template-columns:1fr;gap:8px;} .day-sticky{position:sticky;top:62px;height:auto;flex-direction:row;margin-bottom:14px;background:var(--sunk);padding:8px 0;z-index:5;} .scene{min-height:180px;} .dstep{min-height:auto;padding:34px 0;} }
+
+  /* ===== pointer tilt ===== */
+  @media(hover:hover){ .playwrap{perspective:1200px;} html.js .playwrap .win[data-view="with"]{transition:transform .12s ease;} }
+
+  /* ===== ⌘K palette ===== */
+  .cmdk{position:fixed;inset:0;z-index:80;background:rgba(20,15,8,.34);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding-top:14vh;}
+  .cmdk[hidden]{display:none;}
+  .cmdk-box{width:min(460px,92vw);background:var(--surface);border:1px solid var(--line-2);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);}
+  .cmdk-box input{width:100%;border:none;border-bottom:1px solid var(--line);background:none;padding:16px 18px;font-family:var(--sans);font-size:15px;color:var(--ink);outline:none;}
+  .cmdk-box ul{list-style:none;margin:0;padding:6px;max-height:300px;overflow:auto;}
+  .cmdk-box li{padding:11px 13px;border-radius:8px;font-family:var(--sans);font-size:14px;color:var(--ink-2);cursor:pointer;}
+  .cmdk-box li.sel,.cmdk-box li:hover{background:var(--sunk);color:var(--ink);}
+  .cmdk-box li[hidden]{display:none;}
+
+  /* ===== interactive: cross-check sandbox ===== */
+  .xc .srct{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink-3);cursor:pointer;transition:.15s;}
+  .xc .srct.on{color:var(--ok);border-color:#bfe0cb;background:#eef5ef;} .xc .srct.on::before{content:'✓ ';}
+  .xc .srct.conflict.on{color:var(--red);border-color:#eccbc4;background:#fbeeeb;} .xc .srct.conflict.on::before{content:'⚠ ';}
+  .xchint{font-family:var(--mono);font-size:10px;color:var(--ink-4);text-align:center;margin-top:10px;}
+
+  /* ===== interactive: pattern card ===== */
+  .pcard{cursor:pointer;transition:transform .15s ease;outline:none;border-radius:8px;} .pcard:hover{transform:translateY(-2px);}
+  .phint{font-family:var(--mono);font-size:10px;color:var(--acc);margin-top:11px;}
+  .pcard[data-fixed] .occ .d{background:var(--ok);} .pill.fixed{background:#e3efe7;color:var(--ok);}
+
+  /* ===== interactive: proposal ===== */
+  .prop .phead{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+  .prop .pid{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);}
+  .ptimer{font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:999px;background:var(--acc-wash);color:var(--acc-2);margin-left:auto;transition:.2s;}
+  .prop .ptext{font-size:13.5px;color:var(--ink-2);line-height:1.5;} .prop .ptgt{font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+  .pacts{display:flex;gap:8px;margin-top:14px;}
+  .pbtn{font-family:var(--mono);font-size:12px;padding:8px 14px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);cursor:pointer;transition:.15s;}
+  .pbtn.y{color:var(--ok);border-color:#bfe0cb;} .pbtn.y:hover{background:#eef5ef;}
+  .pbtn.n{color:var(--red);border-color:#eccbc4;} .pbtn.n:hover{background:#fbeeeb;}
+  .pbtn.reset{color:var(--ink-3);}
+  .pcommit{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);background:var(--bg);border:1px solid transparent;border-radius:8px;margin-top:14px;overflow:hidden;max-height:0;opacity:0;padding:0 11px;transition:.35s;}
+  .pcommit .h{color:var(--acc);} .pcommit .rv{color:var(--ink-3);}
+  .prop[data-state="applied"] .pcommit{max-height:60px;opacity:1;padding:9px 11px;border-color:var(--line);}
+  .prop[data-state="applied"] .ptimer{background:#e3efe7;color:var(--ok);}
+  .prop[data-state="rejected"] .ptimer{background:#f1ece3;color:var(--ink-3);}
+
+  /* ===== interactive: wishlist ===== */
+  .chk .it{cursor:pointer;border-radius:6px;} .chk .it:hover{background:var(--bg);}
+  .chkhint{font-family:var(--mono);font-size:10px;color:var(--acc);margin-top:12px;}
+
+  /* ===== interactive: research queue ===== */
+  .rq .rqlist{max-height:150px;overflow-y:auto;margin-top:6px;}
+  .rq .rrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--line);font-size:13.5px;color:var(--ink-2);}
+  .rq .rrow:first-child{border-top:none;} .rq .rrow .nm{flex:1;} .rq .rrow .age{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);}
+  .rq .rrow.done .nm{color:var(--ink-3);} .rq .rrow.done .age{color:var(--ok);} .rq .rrow.running .age{color:var(--acc);}
+  .rq .rqfoot{display:flex;align-items:center;gap:12px;margin-top:12px;}
+  .rq .rot{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);flex:1;}
+  .rqrun{font-family:var(--mono);font-size:11.5px;padding:7px 13px;border-radius:8px;border:1px solid var(--acc);color:var(--acc-2);background:var(--acc-wash);cursor:pointer;transition:.15s;}
+  .rqrun:hover{background:var(--acc);color:#fff;} .rqrun[disabled]{opacity:.5;cursor:default;}
+  .rq .rqlist::-webkit-scrollbar{width:8px;} .rq .rqlist::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px;}
+
+  /* ===== interactive: telegram chat ===== */
+  .tg{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 22px 46px -30px rgba(60,40,15,.26);max-width:440px;}
+  .tghead{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--slate);color:#fff;}
+  .tghead .tav{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;}
+  .tghead .tgnm{font-family:var(--sans);font-weight:700;font-size:14px;} .tghead .tgst{font-family:var(--sans);font-size:11px;opacity:.7;}
+  .tghead .tgreplay{margin-left:auto;cursor:pointer;font-size:15px;opacity:.8;} .tghead .tgreplay:hover{opacity:1;}
+  .tgbody{padding:16px;display:flex;flex-direction:column;gap:9px;min-height:236px;background:var(--bg);}
+  .msg{max-width:84%;padding:9px 12px;border-radius:13px;font-family:var(--sans);font-size:13px;line-height:1.45;opacity:0;transform:translateY(8px);animation:msgin .3s ease forwards;}
+  .msg.scout{align-self:flex-start;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-bottom-left-radius:4px;}
+  .msg.me{align-self:flex-end;background:var(--slate);color:#fff;border-bottom-right-radius:4px;}
+  .msg .react{margin-top:7px;display:flex;gap:6px;} .msg .react button{font-size:12px;background:var(--bg);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px;cursor:pointer;}
+  .msg .react button.picked{background:var(--acc-wash);border-color:var(--acc);}
+  @keyframes msgin{to{opacity:1;transform:none;}}
+  .typing{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:13px;border-bottom-left-radius:4px;padding:11px 14px;display:inline-flex;gap:4px;}
+  .typing span{width:6px;height:6px;border-radius:50%;background:var(--ink-4);animation:tdot 1s infinite;} .typing span:nth-child(2){animation-delay:.15s;} .typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes tdot{0%,60%,100%{opacity:.3;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
+  .tgchips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;background:var(--bg);} .tgchips:empty{display:none;}
+  .tgc{font-family:var(--sans);font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid var(--acc);color:var(--acc-2);background:var(--acc-wash);cursor:pointer;} .tgc:hover{background:var(--acc);color:#fff;}
+  @media(prefers-reduced-motion:reduce){.msg{animation:none;opacity:1;transform:none;}}
+
+  /* ===== interactive: review queue ===== */
+  .held .a{cursor:pointer;}
+  .held[data-state="confirmed"]{border-color:#bfe0cb;} .held[data-state="rejected"]{border-color:#eccbc4;}
 </style>
 </head>
 <body>
@@ -191,7 +314,10 @@
   <span class="sp"></span>
   <a class="lnk" href="#trust">Trust</a>
   <a class="lnk" href="#self">Self-operating</a>
+  <a class="lnk" href="#day">A day</a>
   <a class="lnk" href="#yours">Yours</a>
+  <button class="iconbtn" id="cmdk-btn" aria-label="Jump to a section" title="Jump to… (⌘K)"><span class="kbd">⌘K</span></button>
+  <button class="iconbtn" id="theme-btn" aria-label="Toggle light/dark theme" title="Toggle theme">◐</button>
   <a class="btn btn-p sm cta" href="#install">Install</a>
 </div></header>
 
@@ -213,7 +339,11 @@
 
     <div class="playwrap reveal">
       <div class="win" data-view="with">
-        <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Scout — Today</span><span class="r">tap an item to see how it knows</span></div>
+        <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Scout — Today</span><span class="r" id="winstatus">tap an item to see how it knows</span><button class="replay" id="replay" hidden>↻ replay</button></div>
+        <div class="scan" id="scan" aria-hidden="true">
+          <span class="sc" data-s="Slack">Slack</span><span class="sc" data-s="Gmail">Gmail</span><span class="sc" data-s="Calendar">Calendar</span><span class="sc" data-s="Linear">Linear</span><span class="sc" data-s="GitHub">GitHub</span>
+          <span class="scctr"><b id="scnum">0</b>/5 cross-checked</span>
+        </div>
         <div class="body">
           <div class="bi"><span class="p" style="background:var(--red)"></span><div><h4>Reply to Priya — she's asked twice. <span class="more">why ›</span></h4><p>The migration doc she needs is already in your drafts.</p><div class="r"><span class="tag v" data-tip="Confirmed by 2+ independent sources">verified</span><span class="src">Slack</span><span class="src">Gmail</span></div><div class="why">Scout matched her Slack nudge in #platform to the Gmail thread, saw the second ask landed at 4:40pm, and found the migration doc already in your drafts. Two sources agree → <b>verified</b>.</div></div></div>
           <div class="bi"><span class="p" style="background:var(--amb)"></span><div><h4>Renewal call may have moved to 3:00. <span class="more">why ›</span></h4><p>Only the calendar says so — treat as tentative.</p><div class="r"><span class="tag s" data-tip="Only one source says so — treat as tentative">single-source</span><span class="src">Calendar</span></div><div class="why">The calendar event shifted, but nothing in email or Slack confirms it. One source only → flagged <b>single-source</b>, not asserted as fact.</div></div></div>
@@ -244,10 +374,16 @@
 
     <div class="vrow">
       <div class="vtext reveal"><p class="sysnum">Cross-checked, not collected</p><h3>It reconciles your tools before it tells you anything.</h3><p>A calendar invite checked against the transcript; a ticket against its PR. And what you <b>actually did</b> beats what a note says you'll do.</p></div>
-      <div class="vvis reveal"><div class="xc">
-        <div class="srcs"><span class="src">Calendar</span><span class="src">Slack</span><span class="src">Gmail</span></div>
+      <div class="vvis reveal"><div class="xc" id="xc">
+        <div class="srcs">
+          <button class="srct on" data-k="a">Calendar</button>
+          <button class="srct on" data-k="b">Slack</button>
+          <button class="srct on" data-k="c">Gmail</button>
+          <button class="srct conflict" data-k="x">conflicting source</button>
+        </div>
         <span class="arr">↓</span>
-        <div class="out"><span class="tag v">verified</span> one answer, confirmed by 2+</div>
+        <div class="out" id="xcout"><span class="tag v">verified</span> <span class="xcmsg">confirmed by 3 sources</span></div>
+        <div class="xchint">toggle the sources — watch the confidence change</div>
       </div></div>
     </div>
 
@@ -274,66 +410,102 @@
 
     <div class="vrow">
       <div class="vtext reveal"><p class="sysnum">01 — Mistake audit</p><h3>It keeps a model of its own mistakes.</h3><p>Flag something wrong and it logs a pattern. If a "fixed" one comes back, it flips to <b>regression</b> — so a fix that didn't hold can't quietly rot. <em>Scout shouldn't be limited by me; it should improve itself.</em></p></div>
-      <div class="vvis reveal"><div class="pcard">
-        <div class="head"><span class="id">Pattern #58</span><span class="pill regress">regression</span></div>
+      <div class="vvis reveal"><div class="pcard" id="pcard" tabindex="0" role="button" aria-label="Apply the fix">
+        <div class="head"><span class="id">Pattern #58</span><span class="pill regress" id="ppill">regression</span></div>
         <div class="ln"><span class="k">error</span><span>relied on a transcript for a name</span></div>
         <div class="ln"><span class="k">root cause</span><span>didn't check the knowledge graph first</span></div>
         <div class="ln"><span class="k">fix</span><span>names resolve against the graph, never the transcript</span></div>
-        <div class="occ"><span class="d"></span><span class="d"></span><span class="d"></span><span class="lbl">seen 3× → fix written back into its own rules</span></div>
+        <div class="occ"><span class="d"></span><span class="d"></span><span class="d"></span><span class="lbl" id="pocc">seen 3× → fix written back into its own rules</span></div>
+        <div class="phint" id="phint">click to apply the fix ›</div>
       </div></div>
     </div>
 
     <div class="vrow flip">
       <div class="vtext reveal"><p class="sysnum">02 — Dreaming proposals</p><h3>It rewrites its own instructions, in the open.</h3><p>Small fixes apply directly. Bigger ones wait and <b>auto-apply unless you reject them</b>. Every change is a git commit you can revert — transparency, not a gate on every step.</p></div>
-      <div class="vvis reveal">
-        <div class="flow">
-          <div class="fstep"><div class="t">learns</div><div class="b">a mistake → a fix</div></div>
-          <span class="farr">→</span>
-          <div class="fstep acc"><div class="t">proposes</div><div class="b">auto-applies in 3 days unless rejected</div></div>
-          <span class="farr">→</span>
-          <div class="fstep"><div class="t">applies</div><div class="b">edits its own skill file</div></div>
-        </div>
-        <div class="commit"><span class="h">dreaming [21:30]:</span> apply proposal — names resolve via graph &nbsp;<span class="rv">· git revert anytime</span></div>
-      </div>
+      <div class="vvis reveal"><div class="prop" id="prop" data-state="pending">
+        <div class="phead"><span class="pid">proposal · resolve-names-via-graph</span><span class="ptimer" id="ptimer">auto-applies in 3d</span></div>
+        <div class="ptext">Resolve people against the knowledge graph, never the transcript. <span class="ptgt">→ edits SKILL.md</span></div>
+        <div class="pacts" id="pacts"><button class="pbtn y" data-act="approve">✓ Approve now</button><button class="pbtn n" data-act="reject">✕ Reject</button></div>
+        <div class="pcommit" id="pcommit"><span class="h">dreaming [21:30]:</span> <span id="pcommit-msg">applied — names resolve via graph</span> <span class="rv">· git revert anytime</span></div>
+      </div></div>
     </div>
 
     <div class="vrow">
       <div class="vtext reveal"><p class="sysnum">03 — The wishlist</p><h3>It drives its own roadmap.</h3><p>It keeps a wishlist and ships from it on its own — including the tools it built <b>for itself</b>. You're not the only one filing feature requests.</p></div>
-      <div class="vvis reveal"><div class="chk">
+      <div class="vvis reveal"><div class="chk" id="chk">
         <div class="it done"><span class="box"></span><span>macOS Control Center app</span><span class="tg">shipped</span></div>
         <div class="it done"><span class="box"></span><span>Terminal action-items UI</span><span class="tg">shipped</span></div>
         <div class="it done"><span class="box"></span><span>Research session type</span><span class="tg">shipped</span></div>
         <div class="it"><span class="box"></span><span>Event-driven triggers</span><span class="tg wip">in progress</span></div>
+        <div class="chkhint">tick an item — Scout works its own list</div>
       </div></div>
     </div>
 
     <div class="vrow flip">
       <div class="vtext reveal"><p class="sysnum">04 — Research queue</p><h3>It goes and finds what it's missing.</h3><p>It researches what's gone stale and rotates across your projects. Leave a note in the vault and it jumps to the top of the queue.</p></div>
-      <div class="vvis reveal"><div class="q">
-        <div class="pin"><span class="mono">//==&lt;&lt;</span><span class="x"><b>look into the competitor’s launch</b> — my note, picked up next run</span></div>
-        <div class="row"><span>refresh stale project files</span><span class="age">12d old</span></div>
-        <div class="row"><span>thin entity → enrich from the web</span><span class="age">scored</span></div>
-        <div class="rot">rotation: ✓ mobile-app → ✓ q3-launch → <b style="color:var(--acc-2)">next: billing-revamp</b> &nbsp;(never the same project twice running)</div>
+      <div class="vvis reveal"><div class="rq" id="rq">
+        <div class="pin"><span class="mono">//==&lt;&lt;</span><span class="x"><b>look into the competitor’s launch</b> — your note, jumped to the top</span></div>
+        <div class="rqlist" id="rqlist">
+          <div class="rrow"><span class="nm">billing-revamp</span><span class="age">12d stale</span></div>
+          <div class="rrow"><span class="nm">api-migration</span><span class="age">7d</span></div>
+          <div class="rrow"><span class="nm">data-pipeline</span><span class="age">9d</span></div>
+          <div class="rrow"><span class="nm">design-system</span><span class="age">4d</span></div>
+          <div class="rrow"><span class="nm">onboarding-flow</span><span class="age">6d</span></div>
+          <div class="rrow done"><span class="nm">mobile-app</span><span class="age">done ✓</span></div>
+          <div class="rrow done"><span class="nm">q3-launch</span><span class="age">done ✓</span></div>
+        </div>
+        <div class="rqfoot"><span class="rot">scroll the queue · rotates so nothing's forgotten</span><button class="rqrun" id="rqrun">▸ run next</button></div>
       </div></div>
     </div>
 
     <div class="vrow">
       <div class="vtext reveal"><p class="sysnum">05 — Enrichment questions</p><h3>It asks you only what it can't find.</h3><p>Targeted, low-stakes, with a link and a one-line gist so you can answer in seconds — and <b>never the same question twice</b>.</p></div>
-      <div class="vvis reveal">
-        <div class="bubble"><div class="q">Who owns the migration decision — you or Marco?</div><div class="g">↳ only one source says you; I won't guess on a person</div></div>
-        <div class="route">answer →<span class="e">person · relationship filled</span>→ never asked again</div>
+      <div class="vvis reveal" style="padding:0;background:none;border:none;box-shadow:none;">
+        <div class="tg" id="tg">
+          <div class="tghead"><span class="tav"><svg width="14" height="14" viewBox="0 0 40 40" fill="none"><path d="M12 26 L20 10 L28 26 M15 21 H25" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="tgnm">Scout</div><div class="tgst">bot · online</div></div><span class="tgreplay" id="tgreplay" title="replay">↻</span></div>
+          <div class="tgbody" id="tgbody"></div>
+          <div class="tgchips" id="tgchips"></div>
+        </div>
       </div>
     </div>
 
     <div class="vrow flip">
       <div class="vtext reveal"><p class="sysnum">06 — Review queue</p><h3>It refuses to guess about people.</h3><p>Anything uncertain — especially merging or naming a person — is <b>held for you to confirm</b>, instead of silently corrupting the graph.</p></div>
-      <div class="vvis reveal"><div class="held">
-        <span class="lbl">⏸ held for review</span>
-        <div class="claim">Is <b>"A. Rivera"</b> a new person, or the Alex already in your graph? One source, can't tell.</div>
-        <div class="acts"><span class="a y">✓ confirm</span><span class="a n">✕ reject</span></div>
+      <div class="vvis reveal"><div class="held" id="held" data-state="open">
+        <span class="lbl" id="heldlbl">⏸ held for review</span>
+        <div class="claim" id="heldclaim">Is <b>"A. Rivera"</b> a new person, or the Alex already in your graph? One source, can't tell.</div>
+        <div class="acts" id="heldacts"><button class="a y" data-act="confirm">✓ confirm</button><button class="a n" data-act="reject">✕ reject</button></div>
       </div></div>
     </div>
   </div></div></div>
+
+  <!-- A DAY WITH SCOUT (scrollytelling) -->
+  <section class="day" id="day">
+    <div class="day-inner wrap">
+      <div class="day-sticky">
+        <div class="clock" aria-hidden="true">
+          <div class="rail"></div>
+          <div class="phase" data-i="0"><span class="t">07:00</span><span class="dot"></span></div>
+          <div class="phase" data-i="1"><span class="t">12:30</span><span class="dot"></span></div>
+          <div class="phase" data-i="2"><span class="t">15:00</span><span class="dot"></span></div>
+          <div class="phase" data-i="3"><span class="t">21:30</span><span class="dot"></span></div>
+        </div>
+        <div class="scene">
+          <div class="card" data-i="0"><div class="ic">☀️</div><h3>Morning Briefing</h3><p>A full cold start — it reads the whole knowledge base, queries every tool, cross-checks, and hands you today's short list.</p></div>
+          <div class="card" data-i="1"><div class="ic">🔄</div><h3>Consolidation</h3><p>Lightweight delta scans through the day — what changed, what's newly done, what needs reconciling.</p></div>
+          <div class="card" data-i="2"><div class="ic">🔭</div><h3>Research</h3><p>It goes outward — expanding what it knows about the people, projects and topics you care about.</p></div>
+          <div class="card" data-i="3"><div class="ic">🌙</div><h3>Dreaming</h3><p>Self-improvement — it processes your feedback, deepens the knowledge base, and learns from its own mistakes.</p></div>
+        </div>
+      </div>
+      <div class="day-steps">
+        <div class="dstep" data-i="0"><span class="k">07:00 · morning</span><h4>You wake up already briefed.</h4><p>While you slept, Scout read everything and cross-checked it. The day starts with one short, trustworthy list — not a pile of unread tabs.</p></div>
+        <div class="dstep" data-i="1"><span class="k">12:30 · midday</span><h4>It keeps pace as the day moves.</h4><p>Light consolidation runs reconcile what changed since the morning — new replies, shipped tickets, a meeting that moved.</p></div>
+        <div class="dstep" data-i="2"><span class="k">15:00 · afternoon</span><h4>It goes looking, on its own.</h4><p>When there's budget and something's gone stale, it researches — rotating across your projects so nothing is quietly forgotten.</p></div>
+        <div class="dstep" data-i="3"><span class="k">21:30 · night</span><h4>It gets better while you're offline.</h4><p>Dreaming processes the day's feedback, prunes what no longer matters, and rewrites its own instructions for tomorrow.</p></div>
+      </div>
+    </div>
+    <p class="day-foot wrap">These four run by default — and you can retime them, add your own, or let Scout invent its own.</p>
+  </section>
 
   <!-- PART III — MEMORY -->
   <div class="proof"><div class="col">
@@ -417,6 +589,20 @@
   </div></div></div>
 </main>
 
+<div class="cmdk" id="cmdk" hidden>
+  <div class="cmdk-box">
+    <input id="cmdk-input" placeholder="Jump to a section…" autocomplete="off" spellcheck="false" />
+    <ul id="cmdk-list">
+      <li data-href="#top">Top</li>
+      <li data-href="#trust">Trust — verification</li>
+      <li data-href="#self">Self-operating loops</li>
+      <li data-href="#day">A day with Scout</li>
+      <li data-href="#yours">Your data</li>
+      <li data-href="#install">Install</li>
+    </ul>
+  </div>
+</div>
+
 <footer><div class="wrap foot">
   <span class="b"><img src="assets/scout-icon.svg" alt=""/>Scout</span><span>· an autonomous agent that runs and improves itself</span><span class="sp"></span>
   <a href="https://github.com/Raven-Scout/scout-plugin">Repository</a>
@@ -425,33 +611,168 @@
 
 <script>(function(){
   var root=document.documentElement; root.classList.add('js');
-  var seqSel='.src,.legend .r,.pcard .ln,.chk .it,.q .row,.q .pin,.bi,.commit > div,.conn .c,.bubble,.route,.held .claim,.held .acts,.fstep,.out';
-  document.querySelectorAll('.vvis, .win').forEach(function(v){
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* generic scroll reveal + stagger (hero .bi handled separately) */
+  var seqSel='.src,.legend .r,.pcard .ln,.chk .it,.q .row,.q .pin,.commit > div,.conn .c,.bubble,.route,.held .claim,.held .acts,.fstep,.out';
+  document.querySelectorAll('.vvis').forEach(function(v){
     v.querySelectorAll(seqSel).forEach(function(k,i){ k.classList.add('seq'); k.style.setProperty('--d',(i*0.07).toFixed(2)+'s'); });
     v.querySelectorAll('.occ .d').forEach(function(d,i){ d.style.setProperty('--d',(0.35+i*0.13).toFixed(2)+'s'); });
   });
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.16,rootMargin:'0px 0px -7% 0px'});
-  document.querySelectorAll('.reveal, .vvis, .win').forEach(function(e){io.observe(e);});
+  document.querySelectorAll('.reveal, .vvis').forEach(function(e){io.observe(e);});
 
   /* interactive knowledge graph */
   var kg=document.getElementById('kg2');
   if(kg){
     var cap=document.getElementById('kgcap'), def=cap.innerHTML;
     var nodes=[].slice.call(kg.querySelectorAll('.node')), edges=[].slice.call(kg.querySelectorAll('.edge'));
-    var clear=function(){kg.classList.remove('dim');nodes.forEach(function(n){n.classList.remove('hot');});edges.forEach(function(e){e.classList.remove('hot');});cap.innerHTML=def;};
+    var clr=function(){kg.classList.remove('dim');nodes.forEach(function(n){n.classList.remove('hot');});edges.forEach(function(e){e.classList.remove('hot');});cap.innerHTML=def;};
     nodes.forEach(function(n){ n.setAttribute('tabindex','0');
       var f=function(){ var id=n.getAttribute('data-id'); kg.classList.add('dim'); n.classList.add('hot');
         edges.forEach(function(e){ var a=e.getAttribute('data-a'),b=e.getAttribute('data-b'); if(a===id||b===id){e.classList.add('hot'); var o=kg.querySelector('.node[data-id="'+(a===id?b:a)+'"]'); if(o)o.classList.add('hot');} });
         cap.innerHTML='<span class="nn">'+n.querySelector('text').textContent+'</span> — '+n.getAttribute('data-rels'); };
-      n.addEventListener('mouseenter',f); n.addEventListener('focus',f); n.addEventListener('mouseleave',clear); n.addEventListener('blur',clear);
+      n.addEventListener('mouseenter',f); n.addEventListener('focus',f); n.addEventListener('mouseleave',clr); n.addEventListener('blur',clr);
     });
-    kg.addEventListener('mouseleave',clear);
+    kg.addEventListener('mouseleave',clr);
   }
 
-  /* playable briefing */
+  /* playable briefing: toggle + tap-to-expand */
   document.querySelectorAll('.playwrap .bi').forEach(function(bi){ bi.addEventListener('click',function(e){ if(e.target.closest('.tag'))return; bi.classList.toggle('open'); }); });
   var btns=[].slice.call(document.querySelectorAll('.pt')), views=[].slice.call(document.querySelectorAll('.playwrap [data-view]'));
   btns.forEach(function(b){ b.addEventListener('click',function(){ btns.forEach(function(x){x.classList.toggle('active',x===b);}); var v=b.getAttribute('data-view'); views.forEach(function(el){el.hidden=el.getAttribute('data-view')!==v;}); }); });
+
+  /* watch scout work: live build */
+  (function(){
+    var win=document.querySelector('.win[data-view="with"]'); if(!win) return;
+    var scan=win.querySelector('#scan'), status=win.querySelector('#winstatus'), replay=win.querySelector('#replay');
+    var chips=[].slice.call(win.querySelectorAll('.scan .sc')), num=win.querySelector('#scnum');
+    var items=[].slice.call(win.querySelectorAll('.bi')); var timers=[];
+    function done(){ win.classList.remove('play'); if(scan)scan.classList.add('gone'); items.forEach(function(i){i.classList.add('shown');}); if(status)status.textContent='5 sources cross-checked · 3 need you'; if(replay)replay.hidden=false; }
+    function play(){
+      if(reduce){ done(); return; }
+      timers.forEach(clearTimeout); timers=[];
+      win.classList.add('play'); if(replay)replay.hidden=true;
+      if(scan)scan.classList.remove('gone'); chips.forEach(function(c){c.classList.remove('done');}); if(num)num.textContent='0';
+      items.forEach(function(i){i.classList.remove('shown');}); if(status)status.textContent='reading your tools…';
+      var t=350;
+      chips.forEach(function(c,i){ timers.push(setTimeout(function(){ c.classList.add('done'); if(num)num.textContent=String(i+1); },t)); t+=250; });
+      timers.push(setTimeout(function(){ if(scan)scan.classList.add('gone'); if(status)status.textContent='cross-checking…'; },t+150)); t+=560;
+      items.forEach(function(it){ timers.push(setTimeout(function(){ it.classList.add('shown'); },t)); t+=400; });
+      timers.push(setTimeout(function(){ if(status)status.textContent='5 sources cross-checked · 3 need you'; if(replay)replay.hidden=false; },t+150));
+    }
+    if(replay)replay.addEventListener('click',play);
+    var started=false, hio=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;play();hio.disconnect();} });},{threshold:.4});
+    hio.observe(win);
+  })();
+
+  /* a day with scout: scrollytelling */
+  (function(){
+    var day=document.getElementById('day'); if(!day) return;
+    var phases=[].slice.call(day.querySelectorAll('.clock .phase')), cards=[].slice.call(day.querySelectorAll('.scene .card')), steps=[].slice.call(day.querySelectorAll('.dstep'));
+    function set(i){ phases.forEach(function(p,k){p.classList.toggle('on',k===i);}); cards.forEach(function(c,k){c.classList.toggle('on',k===i);}); }
+    set(0);
+    var sio=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ set(parseInt(e.target.getAttribute('data-i'),10)||0); } });},{rootMargin:'-45% 0px -45% 0px',threshold:0});
+    steps.forEach(function(s){sio.observe(s);});
+  })();
+
+  /* theme toggle */
+  (function(){
+    var btn=document.getElementById('theme-btn'); if(!btn) return;
+    try{ var s=localStorage.getItem('scout-theme'); if(s==='dark')root.classList.add('theme-dark'); else if(s==='light')root.classList.remove('theme-dark'); }catch(e){}
+    btn.addEventListener('click',function(){ var d=root.classList.toggle('theme-dark'); try{localStorage.setItem('scout-theme',d?'dark':'light');}catch(e){} });
+  })();
+
+  /* pointer tilt + magnetic buttons (hover devices, motion ok) */
+  if(window.matchMedia && matchMedia('(hover:hover)').matches && !reduce){
+    var wrap=document.querySelector('.playwrap'), w=wrap&&wrap.querySelector('.win[data-view="with"]');
+    if(wrap&&w){ wrap.addEventListener('mousemove',function(e){ var r=wrap.getBoundingClientRect(); var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5; w.style.transform='rotateX('+(-y*3).toFixed(2)+'deg) rotateY('+(x*4).toFixed(2)+'deg)'; }); wrap.addEventListener('mouseleave',function(){w.style.transform='';}); }
+    document.querySelectorAll('.btn-p').forEach(function(b){ b.addEventListener('mousemove',function(e){ var r=b.getBoundingClientRect(); b.style.transform='translate('+((e.clientX-r.left-r.width/2)*0.12).toFixed(1)+'px,'+((e.clientY-r.top-r.height/2)*0.18).toFixed(1)+'px)'; }); b.addEventListener('mouseleave',function(){b.style.transform='';}); });
+  }
+
+  /* ⌘K palette */
+  (function(){
+    var pal=document.getElementById('cmdk'), input=document.getElementById('cmdk-input'), list=document.getElementById('cmdk-list'), open=document.getElementById('cmdk-btn'); if(!pal) return;
+    var lis=[].slice.call(list.querySelectorAll('li')), sel=0;
+    function vis(){ return lis.filter(function(l){return !l.hidden;}); }
+    function mark(){ var v=vis(); v.forEach(function(l,i){l.classList.toggle('sel',i===sel);}); }
+    function filt(){ var q=input.value.toLowerCase(); lis.forEach(function(l){ l.hidden = q && l.textContent.toLowerCase().indexOf(q)<0; }); sel=0; mark(); }
+    function show(){ pal.hidden=false; input.value=''; filt(); input.focus(); }
+    function hide(){ pal.hidden=true; }
+    function go(l){ var h=l.getAttribute('data-href'); hide(); if(h==='#top'){window.scrollTo({top:0,behavior:'smooth'});} else { var t=document.querySelector(h); if(t)t.scrollIntoView({behavior:'smooth'}); } }
+    if(open)open.addEventListener('click',show);
+    document.addEventListener('keydown',function(e){
+      if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); pal.hidden?show():hide(); }
+      else if(!pal.hidden){ if(e.key==='Escape')hide(); else if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,vis().length-1);mark();} else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);mark();} else if(e.key==='Enter'){var v=vis();if(v[sel])go(v[sel]);} }
+    });
+    input.addEventListener('input',filt);
+    lis.forEach(function(l){ l.addEventListener('click',function(){go(l);}); });
+    pal.addEventListener('click',function(e){ if(e.target===pal)hide(); });
+  })();
+
+  /* cross-check sandbox */
+  (function(){ var xc=document.getElementById('xc'); if(!xc) return; var out=document.getElementById('xcout');
+    function upd(){ var on=xc.querySelectorAll('.srct.on:not(.conflict)').length; var conf=xc.querySelector('.srct.conflict.on'); var cls,lbl,msg;
+      if(conf){cls='x';lbl='contradicted';msg='sources disagree — held for you, never guessed';}
+      else if(on>=2){cls='v';lbl='verified';msg='confirmed by '+on+' sources';}
+      else if(on===1){cls='s';lbl='single-source';msg='one source — flagged, not asserted';}
+      else {cls='';lbl='unverified';msg='no corroboration yet';}
+      out.innerHTML='<span class="tag '+cls+'">'+lbl+'</span> <span class="xcmsg">'+msg+'</span>'; }
+    xc.querySelectorAll('.srct').forEach(function(b){ b.addEventListener('click',function(){ b.classList.toggle('on'); upd(); }); });
+  })();
+
+  /* pattern card flip */
+  (function(){ var c=document.getElementById('pcard'); if(!c) return; var pill=document.getElementById('ppill'),occ=document.getElementById('pocc'),hint=document.getElementById('phint'),fx=false;
+    function flip(){ fx=!fx; if(fx){c.setAttribute('data-fixed','');pill.textContent='fixed';pill.className='pill fixed';occ.textContent='✓ no recurrence since the fix landed';hint.textContent='fixed — click to replay';}
+      else {c.removeAttribute('data-fixed');pill.textContent='regression';pill.className='pill regress';occ.textContent='seen 3× → fix written back into its own rules';hint.textContent='click to apply the fix ›';} }
+    c.addEventListener('click',flip); c.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();} });
+  })();
+
+  /* proposal approve/reject */
+  (function(){ var p=document.getElementById('prop'); if(!p) return; var acts=document.getElementById('pacts'),timer=document.getElementById('ptimer'),cmsg=document.getElementById('pcommit-msg');
+    var pend='<button class="pbtn y" data-act="approve">✓ Approve now</button><button class="pbtn n" data-act="reject">✕ Reject</button>';
+    acts.addEventListener('click',function(e){ var b=e.target.closest('.pbtn'); if(!b)return; var a=b.getAttribute('data-act');
+      if(a==='approve'){p.setAttribute('data-state','applied');timer.textContent='applied ✓';cmsg.textContent='applied — names resolve via graph';acts.innerHTML='<button class="pbtn reset" data-act="reset">↻ try again</button>';}
+      else if(a==='reject'){p.setAttribute('data-state','rejected');timer.textContent='rejected — not applied';acts.innerHTML='<button class="pbtn reset" data-act="reset">↻ try again</button>';}
+      else {p.setAttribute('data-state','pending');timer.textContent='auto-applies in 3d';acts.innerHTML=pend;} });
+  })();
+
+  /* wishlist toggle */
+  (function(){ var chk=document.getElementById('chk'); if(!chk) return; chk.querySelectorAll('.it').forEach(function(it){ it.addEventListener('click',function(){ var done=it.classList.toggle('done'); var tg=it.querySelector('.tg'); if(tg){ if(done){tg.classList.remove('wip');tg.textContent='shipped';} else {tg.textContent='in progress';tg.classList.add('wip');} } }); }); })();
+
+  /* research queue run-next */
+  (function(){ var run=document.getElementById('rqrun'),list=document.getElementById('rqlist'); if(!run||!list) return;
+    run.addEventListener('click',function(){ var row=list.querySelector('.rrow:not(.done):not(.running)'); if(!row)return; var age=row.querySelector('.age'); row.classList.add('running'); age.textContent='researching…'; run.disabled=true;
+      setTimeout(function(){ row.classList.remove('running'); row.classList.add('done'); age.textContent='done ✓'; list.appendChild(row); run.disabled=false; },1100); });
+  })();
+
+  /* telegram chat */
+  (function(){ var tg=document.getElementById('tg'); if(!tg) return; var body=document.getElementById('tgbody'),chips=document.getElementById('tgchips'),replay=document.getElementById('tgreplay'),timers=[];
+    function clr(){ timers.forEach(clearTimeout); timers=[]; body.innerHTML=''; chips.innerHTML=''; }
+    function add(cls,html){ var d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+    function typing(){ var d=document.createElement('div'); d.className='typing'; d.innerHTML='<span></span><span></span><span></span>'; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+    function chip(){ chips.innerHTML=''; [["It's Marco's call","Marco"],["That's me","you"]].forEach(function(pr){ var b=document.createElement('button'); b.className='tgc'; b.textContent=pr[0];
+      b.onclick=function(){ chips.innerHTML=''; add('me',pr[0]); var t=typing(); timers.push(setTimeout(function(){ t.remove(); add('scout','Got it — saved to the graph. I won’t ask again. ✓'); },800)); };
+      chips.appendChild(b); }); }
+    function play(){ clr();
+      if(reduce){ var m=add('scout','Morning briefing: <b>3 need you</b>, 1 contradiction surfaced.'); add('scout','One thing I can’t tell from your tools — who owns the migration decision, you or Marco?'); chip(); return; }
+      timers.push(setTimeout(function(){ var t=typing(); timers.push(setTimeout(function(){ t.remove(); var m=add('scout','Morning briefing: <b>3 need you</b>, 1 contradiction surfaced.');
+        m.innerHTML+='<div class="react"><button data-r="up">👍</button><button data-r="down">👎</button></div>';
+        m.querySelectorAll('.react button').forEach(function(b){ b.onclick=function(){ m.querySelectorAll('.react button').forEach(function(x){x.classList.remove('picked');}); b.classList.add('picked'); }; }); },900)); },400));
+      timers.push(setTimeout(function(){ var t=typing(); timers.push(setTimeout(function(){ t.remove(); add('scout','One thing I can’t tell from your tools — who owns the migration decision, you or Marco?'); chip(); },1000)); },2200));
+    }
+    if(replay)replay.addEventListener('click',play);
+    var started=false,tio=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;play();tio.disconnect();} });},{threshold:.4}); tio.observe(tg);
+  })();
+
+  /* review queue confirm/reject (delegated) */
+  (function(){ var h=document.getElementById('held'); if(!h) return; var lbl=document.getElementById('heldlbl'),claim=document.getElementById('heldclaim'),acts=document.getElementById('heldacts');
+    var openHTML='<button class="a y" data-act="confirm">✓ confirm</button><button class="a n" data-act="reject">✕ reject</button>';
+    acts.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; var a=b.getAttribute('data-act');
+      if(a==='confirm'){h.setAttribute('data-state','confirmed');lbl.textContent='✓ added to the graph';lbl.style.color='var(--ok)';claim.innerHTML='Linked to the existing <b>Alex</b> — your call, not a guess.';acts.innerHTML='<button class="pbtn reset" data-act="reset">↻ reset</button>';}
+      else if(a==='reject'){h.setAttribute('data-state','rejected');lbl.textContent='✕ discarded';lbl.style.color='var(--red)';claim.innerHTML='Left out of the graph — nothing silently corrupted.';acts.innerHTML='<button class="pbtn reset" data-act="reset">↻ reset</button>';}
+      else {h.setAttribute('data-state','open');lbl.textContent='⏸ held for review';lbl.style.color='';claim.innerHTML='Is <b>"A. Rivera"</b> a new person, or the Alex already in your graph? One source, can’t tell.';acts.innerHTML=openHTML;} });
+  })();
 })();</script>
 </body>
 </html>
