@@ -46,6 +46,10 @@ class KBError(ScoutError):
     exit_code = 20
 
 
+class KBSchemaError(KBError):
+    """Raised when the knowledge-base schema YAML is missing or malformed."""
+
+
 class ActionItemError(ScoutError):
     """Action-item operation failure (no-match, ambiguous, write error)."""
 

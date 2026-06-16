@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shlex
 import subprocess
 
 from textual.app import ComposeResult
@@ -43,30 +42,21 @@ def build_prompt(item: ActionItem) -> str:
 
 
 def spawn_session(item: ActionItem) -> str:
-    """Spawn a Claude Code session in a new terminal window.
+    """Spawn a Claude Code session in a new Terminal window (macOS).
 
-    Returns the command that was launched.
+    Returns the shell command that was launched. Blocking (fork+exec); call
+    off the UI thread — see SpawnConfirmScreen.action_confirm.
     """
+    from scout.tui.spawn_cmd import build_terminal_applescript
+
     prompt = build_prompt(item)
-    safe_title = item.title[:50].replace('"', '\\"')
-
-    # Use osascript to open a new Terminal.app window with claude
-    cmd = f'claude --name "scout-action-{safe_title[:30]}" -p {shlex.quote(prompt)}'
-
-    # Open in a new Terminal window via osascript
-    apple_script = f"""
-    tell application "Terminal"
-        activate
-        do script "cd ~/Scout && {cmd}"
-    end tell
-    """
+    cmd, apple_script = build_terminal_applescript(title=item.title, prompt=prompt)
 
     subprocess.Popen(
         ["osascript", "-e", apple_script],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-
     return cmd
 
 
@@ -116,7 +106,9 @@ class SpawnConfirmScreen(ModalScreen[bool]):
             yield Label("[Enter] Launch in new terminal  [Esc] Cancel", id="spawn-hint")
 
     def action_confirm(self) -> None:
-        spawn_session(self.item)
+        # osascript fork+exec blocks ~tens of ms; run it off the Textual event
+        # loop so the UI doesn't freeze, then dismiss (#52).
+        self.run_worker(lambda: spawn_session(self.item), thread=True)
         self.dismiss(True)
 
     def action_cancel(self) -> None:

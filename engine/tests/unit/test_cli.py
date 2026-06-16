@@ -147,3 +147,21 @@ def test_main_preserves_systemexit(monkeypatch: pytest.MonkeyPatch) -> None:
         cli.main()
 
     assert exc_info.value.code == 2
+
+
+def test_bootstrap_upgrade_malformed_config_exits_configerror(tmp_path, monkeypatch):
+    """A malformed scout-config.yaml on the upgrade path must exit with
+    ConfigError's code (10), not an internal-error code (#45)."""
+    from typer.testing import CliRunner
+
+    from scout.cli import app
+    from scout.errors import ConfigError
+
+    vault = tmp_path / "Scout"
+    vault.mkdir()
+    (vault / "scout-config.yaml").write_text("instance: [unclosed\n")  # invalid YAML
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(vault))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["bootstrap", "upgrade"])
+    assert result.exit_code == ConfigError.exit_code, result.stdout + result.stderr

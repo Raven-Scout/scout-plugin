@@ -225,3 +225,18 @@ def test_parser_does_not_extract_midtitle_tag(tmp_path: Path) -> None:
     items = parse_file(f)
     assert len(items) == 1
     assert items[0].short_prefix is None
+
+
+def test_parse_lines_matches_parse_file(tmp_path):
+    """parse_lines(text.splitlines()) yields the same items as parse_file."""
+    from scout.action_items.parser import parse_file, parse_lines
+
+    md = "# T\n\n## 🔴 Urgent\n\n- [ ] alpha\n- [x] beta\n"
+    f = tmp_path / "action-items-2026-06-15.md"
+    f.write_text(md, encoding="utf-8")
+
+    from_file = parse_file(f)
+    from_lines = parse_lines(md.splitlines())
+    assert [(i.title, i.status, i.line_number) for i in from_lines] == [
+        (i.title, i.status, i.line_number) for i in from_file
+    ]

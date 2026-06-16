@@ -19,6 +19,7 @@ Hooks must NEVER raise — main() catches all exceptions and returns 0.
 from __future__ import annotations
 
 import fnmatch
+import os
 import re
 import sys
 from datetime import datetime
@@ -177,7 +178,7 @@ def parse_date(s: str) -> datetime | None:
 
     for fmt in DATE_FORMATS:
         try:
-            return datetime.strptime(cleaned, fmt)
+            return datetime.strptime(cleaned, fmt).replace(tzinfo=ET)
         except ValueError:
             continue
     return None
@@ -194,32 +195,36 @@ def discover_kb_files(scout_dir: Path) -> list[Path]:
         return []
 
     candidates: list[Path] = []
-    for p in kb_root.rglob("*.md"):
-        if not p.is_file():
-            continue
-        rel_posix = p.relative_to(scout_dir).as_posix()
+    for dirpath, _dirnames, filenames in os.walk(kb_root, followlinks=False):
+        for fname in filenames:
+            if not fname.endswith(".md"):
+                continue
+            p = Path(dirpath) / fname
+            if not p.is_file():
+                continue
+            rel_posix = p.relative_to(scout_dir).as_posix()
 
-        # Find-level exclusions: */ontology/*, *archive*, */personal/*
-        if "/ontology/" in rel_posix:
-            continue
-        if "archive" in rel_posix:
-            continue
-        if "/personal/" in rel_posix:
-            continue
+            # Find-level exclusions: */ontology/*, *archive*, */personal/*
+            if "/ontology/" in rel_posix:
+                continue
+            if "archive" in rel_posix:
+                continue
+            if "/personal/" in rel_posix:
+                continue
 
-        # Per-file basename exact-match skip
-        name = p.name
-        if name in SKIP_BASENAMES:
-            continue
-        # Per-file basename glob skip
-        if any(fnmatch.fnmatchcase(name, g) for g in SKIP_BASENAME_GLOBS):
-            continue
-        # Per-file rel-path skip: */people/*.md (entity files; top-level
-        # people.md is allowed because there's no subdir segment)
-        if "/people/" in rel_posix:
-            continue
+            # Per-file basename exact-match skip
+            name = p.name
+            if name in SKIP_BASENAMES:
+                continue
+            # Per-file basename glob skip
+            if any(fnmatch.fnmatchcase(name, g) for g in SKIP_BASENAME_GLOBS):
+                continue
+            # Per-file rel-path skip: */people/*.md (entity files; top-level
+            # people.md is allowed because there's no subdir segment)
+            if "/people/" in rel_posix:
+                continue
 
-        candidates.append(p)
+            candidates.append(p)
 
     candidates.sort()
     return candidates
@@ -241,13 +246,13 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
         return ("NO_DATE", {"rel": rel})
 
     # Bash interprets the wall-clock date in ET via `date -j -f` then subtracts
-    # UTC-epoch seconds. We must do the same: attach ET to the parsed wall-clock
-    # date, attach ET to `now` if naive, then subtract via .timestamp() to get
-    # UTC-elapsed seconds (NOT wall-clock seconds — same-zone aware subtraction
-    # in Python returns wall-clock delta, which drifts 1h across DST boundaries).
-    parsed_et = parsed.replace(tzinfo=ET)
+    # UTC-epoch seconds. We must do the same: parse_date now returns an ET-aware
+    # datetime; attach ET to `now` if naive, then subtract via .timestamp() to
+    # get UTC-elapsed seconds (NOT wall-clock seconds — same-zone aware
+    # subtraction in Python returns wall-clock delta, which drifts 1h across DST
+    # boundaries).
     now_et = now if now.tzinfo is not None else now.replace(tzinfo=ET)
-    age_seconds = now_et.timestamp() - parsed_et.timestamp()
+    age_seconds = now_et.timestamp() - parsed.timestamp()
     age_hours = int(age_seconds // 3600)
     budget = freshness_hours_for(path)
 

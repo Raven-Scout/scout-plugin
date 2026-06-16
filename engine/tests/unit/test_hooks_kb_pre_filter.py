@@ -8,6 +8,7 @@ $SCOUT_DATA_DIR/.scout-cache/kb-filter.md.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -518,3 +519,42 @@ def test_main_default_session_type(tmp_path, monkeypatch):
     assert rc == 0
     out_path = tmp_path / ".scout-cache" / "kb-filter.md"
     assert "(dreaming)" in out_path.read_text()
+
+
+# -- #53 fixes ----------------------------------------------------------------
+
+
+def test_parse_date_returns_tz_aware_et():
+    """#53: parse_date must return an ET-aware datetime so callers can't drift
+    across DST by forgetting to attach tzinfo."""
+    from scout.hooks.kb_pre_filter import ET, parse_date
+
+    dt = parse_date("2026-06-15")
+    assert dt is not None
+    assert dt.tzinfo is not None
+    assert dt.utcoffset() == ET.utcoffset(dt.replace(tzinfo=None))
+
+
+def test_discover_kb_files_does_not_follow_symlink_loop(tmp_path):
+    """#53: a symlink loop in the KB dir must not hang discovery."""
+    from scout.hooks.kb_pre_filter import discover_kb_files
+
+    kb = tmp_path / "knowledge-base"
+    kb.mkdir()
+    (kb / "real.md").write_text("# real\n")
+    (kb / "loop").symlink_to(kb, target_is_directory=True)  # self-referential loop
+
+    result: list = []
+    error: list = []
+
+    def run():
+        try:
+            result.append(discover_kb_files(tmp_path))
+        except Exception as e:  # noqa: BLE001
+            error.append(e)
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(timeout=10)
+    assert not t.is_alive(), "discover_kb_files hung on a symlink loop"
+    assert not error, f"discover_kb_files raised: {error}"
