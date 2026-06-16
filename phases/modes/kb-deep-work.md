@@ -45,6 +45,17 @@ grep -rn '//==<<' {{SCOUT_DIR}} --include='*.md'
 
 These inline comments are high-priority — they represent explicit {{USER_NAME}} feedback embedded in the source files. Treat them with the same urgency as messaging reactions/replies.
 
+**Batch-comment triage mode (threshold N=5).** The resolve-each behavior above assumes a handful of markers per run. When a sweep finds **more than N=5 unprocessed `//==<<` markers** (a large batch dropped in one sitting), trying to resolve them all in one run produces shallow work. Switch from *resolve* mode to **triage mode**:
+
+1. **Do not attempt to resolve them all.** Stay high-level.
+2. **Inventory** every marker (file, gist, line) into a single dated index: `knowledge-base/comment-triage-YYYY-MM-DD.md`.
+3. **Categorize** each: KB-staleness · vault-org/structure · system/self-improvement feature · search-depth/coverage miss · cruft · verify · approval/decision-gated · process-directive.
+4. **Route** each to the right queue with a back-link (research-queue, wishlist, mistake-audit, review-queue, the vault-reorg plan, the idea-capture page, or `dreaming-proposals/` for governance).
+5. **Leave the markers in place** — they mark the spot; strip one only when its underlying request is *resolved* (the REM-cleanup pruning duty then removes processed ones).
+6. **Surface** the triage index + any approval-gated or 🔴 items in the wrap notification, so the batch is visibly captured and routed.
+
+Below N=5, keep the resolve-each behavior above.
+
 ### Step 2-ontology: Knowledge Graph Integrity Check
 
 Before scoring individual files, run the knowledge graph parser for structural checks:
@@ -59,6 +70,11 @@ cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py stats
 - **Invalid relationship types** — correct the relationship type to match `schema.yaml`
 - **Orphaned entities** — entities with no relationships at all. If they should have relationships, add them. If they're stubs, either enrich or note for future work.
 - **Broken wikilink targets** — relationship targets that don't resolve to an entity file. Either create the missing entity file or fix the target name.
+
+**Audits remediate or hand off — never just report.** Applies to this KG-integrity check and to any standing audit (Linear-state, action-item-health, graph-health). After the audit produces findings, split them into `auto-remediable` vs `backlog` and **act** — a report with no downstream actor is a slow leak that reads as noise:
+- **Auto-remediable → fix this run** (or hand to the next run as an explicit *must-action* queue, not a passive note): a Linear-state claim the KB has wrong → re-query the issue + flip the row; a personnel/status label past its own dated window (e.g. a "leave imminent" flag whose start date has passed) → correct it + bump the verified date; a dangling relationship target that resolves to an existing entity under a slug → fix the target to the slug/wikilink form.
+- **Backlog → leave as backlog, do NOT auto-create:** genuinely-missing entities, judgment calls, structural decisions.
+- The audit's notification/report then states **what it fixed**, not only what's wrong.
 
 **Personal task staleness detection:**
 

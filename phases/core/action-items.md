@@ -158,6 +158,8 @@ Whenever you flip an item from `[ ]` to `[x]` — or process a {{USER_NAME}}-aut
 
 **Inline `//==<<` close-out directives are first-class delete instructions** — acknowledging one in the next DM is insufficient; the file must be physically updated (check box → write completed entry → delete origin row → remove the marker).
 
+**Batch exception (threshold N=5).** If a run encounters **more than 5 unprocessed `//==<<` markers** across the vault (a large batch dropped at once), do NOT try to resolve them all this run — switch to **triage mode**: inventory + categorize + route them into a dated `knowledge-base/comment-triage-YYYY-MM-DD.md` index and the right queues, leaving the markers in place, and surface the index in the wrap notification. Full rule in the KB-deep-work phase (Step 2-pre).
+
 **Pre-commit audit** — no `[x]` rows may sit outside the Recently Completed section:
 
 ```bash
@@ -265,6 +267,8 @@ Search for evidence that {{USER_NAME}} completed or progressed the item:
 - Session history showing work done with AI tools
 
 If evidence of completion exists, mark the item ✅ Done with a citation to the evidence.
+
+**No unverified negatives.** Before asserting a *negative* completion-state — "not done yet", "still your move", "awaiting X", "unsent", "not created" — where the completion would be **observable on a connector**, you MUST query that connector this run. A "nothing happened" is a claim, not the default: an unverified negative is the easiest thing to assert lazily and the hardest to notice is wrong, and telling {{USER_NAME}} that completed work was ignored erodes trust. If you can't query (connector down, out of scope), write the claim `[unverified — not queried this run]`, never as fact. (Repo-creation items are the classic trap — verify with `gh repo list`, not a PR scan; see the GitHub Repository Activity phase.)
 
 ### 2. Do a targeted topic search
 Search specifically for the topic keywords across all available connectors. Don't rely on the broad scan — do a focused search for this specific item. This catches context that a general sweep might miss.

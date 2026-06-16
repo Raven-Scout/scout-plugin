@@ -99,6 +99,14 @@ For repos in `{{GITHUB_REPOS}}`, check for significant activity:
 - Branch protection changes
 - New contributors or team changes
 
+**Also scan for recently-created/updated repos** — repo-creation and repo-push activity is invisible to the PR scans above (a brand-new repo has no PR):
+
+```bash
+gh repo list {{GITHUB_USERNAME}} --limit 30 --json name,createdAt,updatedAt --jq 'sort_by(.updatedAt)|reverse'
+```
+
+A newly-created repo here may **close an open "stand up repo X" action item** — check it before carrying that item as "not done." Match on a fuzzy/listing basis, not an exact provisional name (an item might say `scout-ios` while the real repo is `scout-iOS-app`). Use `gh repo list`, never `gh search prs`, to verify a repo-creation item.
+
 ---
 phase: connector
 name: github

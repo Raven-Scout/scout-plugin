@@ -233,6 +233,13 @@ Sources checked: N CC sessions · N vault/git commits · N Slack threads · N Li
 
 Only count sources you genuinely queried this run. A "quiet window" claim must be paired with non-zero scan counts — otherwise it reads as "didn't look," not "nothing happened."
 
+### DM Legibility (no bare shortcodes; link the list)
+
+Applies to every wrap DM. Two parts:
+
+1. **No bare internal `#SHORTCODE` tags in the user-facing DM.** Action-items use `#SHORTCODE` tags as an *internal* continuity-keying convention (they match an item across daily files); they mean nothing to the reader as bare tokens. Either **expand inline** — `*semantic-layer weekly update* (#TAG)` or just the plain-English label — or **drop the tag from the DM**. A DM line whose only handle on an item is a bare `#CODE` is forbidden: the reader must understand it from plain English. The file-side `#SHORTCODE` machinery is untouched — this is presentation-layer only.
+2. **Link the action-items file.** Any wrap DM that references "today's list" / action items must include a clickable link to today's file — an Obsidian URI `obsidian://open?vault={{INSTANCE_NAME}}&file=action-items%2Faction-items-<YYYY-MM-DD>` and/or a `file://{{SCOUT_DIR}}/action-items/action-items-<YYYY-MM-DD>.md` — so a tap opens the list.
+
 ### Notification Rules
 
 - Never include sensitive details in the notification — just summaries and counts.
