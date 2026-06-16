@@ -306,6 +306,25 @@
   /* ===== interactive: review queue ===== */
   .held .a{cursor:pointer;}
   .held[data-state="confirmed"]{border-color:#bfe0cb;} .held[data-state="rejected"]{border-color:#eccbc4;}
+
+  /* ===== detail pass: prominent system names + richer day cards ===== */
+  .vtext .sysnum{font-size:12px;letter-spacing:.04em;font-weight:500;}
+  .vtext .sysname{font-family:var(--sans);font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.12;color:var(--ink);margin:8px 0 9px;}
+  .vtext .syslede{font-family:var(--serif);font-style:italic;font-size:18px;line-height:1.35;color:var(--acc-2);margin:0 0 11px;}
+  .vtext .sysbody{font-family:var(--sans);font-size:15px;line-height:1.62;color:var(--ink-2);margin:0;max-width:46ch;}
+  .vtext .sysbody b{color:var(--ink);font-weight:600;} .vtext .sysbody code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px 5px;border-radius:5px;color:var(--ink-2);}
+  @media (min-width:1080px){ .vtext .sysname{font-size:31px;} .vtext .syslede{font-size:19px;} .vtext .sysbody{font-size:16px;} }
+
+  .scene .card{justify-content:flex-start;}
+  .scene .card .cic{width:42px;height:42px;border-radius:12px;background:var(--acc-wash);color:var(--acc-2);display:grid;place-items:center;} .scene .card .cic svg{width:22px;height:22px;}
+  .scene .card .cmeta{display:flex;align-items:baseline;gap:11px;margin:16px 0 9px;flex-wrap:wrap;}
+  .scene .card .cmeta h3{font-family:var(--serif);font-size:25px;font-weight:600;margin:0;color:var(--ink);}
+  .scene .card .cmeta .freq{font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+  .scene .card p{font-family:var(--serif);font-size:15.5px;line-height:1.6;color:var(--ink-2);margin:0;}
+  .scene .card .io{margin-top:15px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.7;}
+  .scene .card .io span{color:var(--acc-2);font-weight:500;} .scene .card .io .ar{color:var(--ink-4);padding:0 4px;}
+  @media (min-width:900px){ .day-sticky{height:min(74vh,560px);} .scene .card p{font-size:16px;} }
+  @media (max-width:860px){ .day-sticky{flex-direction:column;height:auto;} .clock{flex-direction:row;justify-content:space-between;padding:0 0 12px;gap:6px;} .clock .rail{display:none;} .clock .phase{flex-direction:column;gap:6px;text-align:center;} .clock .phase .t{width:auto;} .scene{min-height:300px;} .scene .card{position:relative;} .scene .card:not(.on){display:none;} }
 </style>
 </head>
 <body>
@@ -409,7 +428,7 @@
     <div class="partlabel"><p class="k reveal">Part II — It runs &amp; improves itself</p><h2 class="reveal">The part nothing else does. Six loops it runs on its own.</h2></div>
 
     <div class="vrow">
-      <div class="vtext reveal"><p class="sysnum">01 — Mistake audit</p><h3>It keeps a model of its own mistakes.</h3><p>Flag something wrong and it logs a pattern. If a "fixed" one comes back, it flips to <b>regression</b> — so a fix that didn't hold can't quietly rot. <em>Scout shouldn't be limited by me; it should improve itself.</em></p></div>
+      <div class="vtext reveal"><p class="sysnum">System 01 · self-knowledge</p><h3 class="sysname">The mistake audit</h3><p class="syslede">It keeps a model of its own mistakes.</p><p class="sysbody">Every time it's wrong and you flag it, it logs a numbered pattern — the error, the root cause, the fix — and tracks whether that fix actually held. A "fixed" one that recurs flips to <b>regression</b>, so nothing rots quietly. Over a hundred patterns in, the same class of error keeps getting rarer.</p></div>
       <div class="vvis reveal"><div class="pcard" id="pcard" tabindex="0" role="button" aria-label="Apply the fix">
         <div class="head"><span class="id">Pattern #58</span><span class="pill regress" id="ppill">regression</span></div>
         <div class="ln"><span class="k">error</span><span>relied on a transcript for a name</span></div>
@@ -421,7 +440,7 @@
     </div>
 
     <div class="vrow flip">
-      <div class="vtext reveal"><p class="sysnum">02 — Dreaming proposals</p><h3>It rewrites its own instructions, in the open.</h3><p>Small fixes apply directly. Bigger ones wait and <b>auto-apply unless you reject them</b>. Every change is a git commit you can revert — transparency, not a gate on every step.</p></div>
+      <div class="vtext reveal"><p class="sysnum">System 02 · self-modification</p><h3 class="sysname">Dreaming proposals</h3><p class="syslede">It rewrites its own instructions — in the open.</p><p class="sysbody">Each night it decides what to change about itself. Small, additive fixes it just applies; anything bigger it proposes and <b>auto-applies in a few days unless you reject it</b>. Every change is a separate git commit you can read and <code>revert</code> — transparency instead of a gate on every step.</p></div>
       <div class="vvis reveal"><div class="prop" id="prop" data-state="pending">
         <div class="phead"><span class="pid">proposal · resolve-names-via-graph</span><span class="ptimer" id="ptimer">auto-applies in 3d</span></div>
         <div class="ptext">Resolve people against the knowledge graph, never the transcript. <span class="ptgt">→ edits SKILL.md</span></div>
@@ -431,7 +450,7 @@
     </div>
 
     <div class="vrow">
-      <div class="vtext reveal"><p class="sysnum">03 — The wishlist</p><h3>It drives its own roadmap.</h3><p>It keeps a wishlist and ships from it on its own — including the tools it built <b>for itself</b>. You're not the only one filing feature requests.</p></div>
+      <div class="vtext reveal"><p class="sysnum">System 03 · self-direction</p><h3 class="sysname">The wishlist</h3><p class="syslede">It drives its own roadmap.</p><p class="sysbody">It keeps a running wishlist of improvements and works it down on its own — picking an item, building it across however many nights it takes, and shipping it. The Mac app, the terminal UI, the research mode: <b>features it built for itself.</b> You're not the only one filing requests.</p></div>
       <div class="vvis reveal"><div class="chk" id="chk">
         <div class="it done"><span class="box"></span><span>macOS Control Center app</span><span class="tg">shipped</span></div>
         <div class="it done"><span class="box"></span><span>Terminal action-items UI</span><span class="tg">shipped</span></div>
@@ -442,7 +461,7 @@
     </div>
 
     <div class="vrow flip">
-      <div class="vtext reveal"><p class="sysnum">04 — Research queue</p><h3>It goes and finds what it's missing.</h3><p>It researches what's gone stale and rotates across your projects. Leave a note in the vault and it jumps to the top of the queue.</p></div>
+      <div class="vtext reveal"><p class="sysnum">System 04 · self-expansion</p><h3 class="sysname">The research queue</h3><p class="syslede">It goes and finds what it's missing.</p><p class="sysbody">Between briefings it scores which parts of your knowledge base have gone stale or thin, <b>rotates across your projects</b> so nothing's forgotten, and digs — web, docs, your tools — to fill the gaps. Drop a note in the vault and it jumps to the top of the queue.</p></div>
       <div class="vvis reveal"><div class="rq" id="rq">
         <div class="pin"><span class="mono">//==&lt;&lt;</span><span class="x"><b>look into the competitor’s launch</b> — your note, jumped to the top</span></div>
         <div class="rqlist" id="rqlist">
@@ -459,7 +478,7 @@
     </div>
 
     <div class="vrow">
-      <div class="vtext reveal"><p class="sysnum">05 — Enrichment questions</p><h3>It asks you only what it can't find.</h3><p>Targeted, low-stakes, with a link and a one-line gist so you can answer in seconds — and <b>never the same question twice</b>.</p></div>
+      <div class="vtext reveal"><p class="sysnum">System 05 · asking for help</p><h3 class="sysname">Enrichment questions</h3><p class="syslede">It asks you only what it can't find.</p><p class="sysbody">Some facts no tool can see — who really owns a decision, why something stalled. So it occasionally surfaces one <b>targeted, low-stakes question</b>, always with a link and a one-line gist so you can answer in seconds. Your answer routes straight into the graph, and it never asks twice.</p></div>
       <div class="vvis reveal" style="padding:0;background:none;border:none;box-shadow:none;">
         <div class="tg" id="tg">
           <div class="tghead"><span class="tav"><svg width="14" height="14" viewBox="0 0 40 40" fill="none"><path d="M12 26 L20 10 L28 26 M15 21 H25" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="tgnm">Scout</div><div class="tgst">bot · online</div></div><span class="tgreplay" id="tgreplay" title="replay">↻</span></div>
@@ -470,7 +489,7 @@
     </div>
 
     <div class="vrow flip">
-      <div class="vtext reveal"><p class="sysnum">06 — Review queue</p><h3>It refuses to guess about people.</h3><p>Anything uncertain — especially merging or naming a person — is <b>held for you to confirm</b>, instead of silently corrupting the graph.</p></div>
+      <div class="vtext reveal"><p class="sysnum">System 06 · knowing its limits</p><h3 class="sysname">The review queue</h3><p class="syslede">It refuses to guess about people.</p><p class="sysbody">The most dangerous edit a knowledge system can make is mistaking one person for another. Anything it isn't sure of — <b>especially identities</b> — it holds for you to confirm or reject, instead of silently corrupting the graph.</p></div>
       <div class="vvis reveal"><div class="held" id="held" data-state="open">
         <span class="lbl" id="heldlbl">⏸ held for review</span>
         <div class="claim" id="heldclaim">Is <b>"A. Rivera"</b> a new person, or the Alex already in your graph? One source, can't tell.</div>
@@ -491,10 +510,30 @@
           <div class="phase" data-i="3"><span class="t">21:30</span><span class="dot"></span></div>
         </div>
         <div class="scene">
-          <div class="card" data-i="0"><div class="ic">☀️</div><h3>Morning Briefing</h3><p>A full cold start — it reads the whole knowledge base, queries every tool, cross-checks, and hands you today's short list.</p></div>
-          <div class="card" data-i="1"><div class="ic">🔄</div><h3>Consolidation</h3><p>Lightweight delta scans through the day — what changed, what's newly done, what needs reconciling.</p></div>
-          <div class="card" data-i="2"><div class="ic">🔭</div><h3>Research</h3><p>It goes outward — expanding what it knows about the people, projects and topics you care about.</p></div>
-          <div class="card" data-i="3"><div class="ic">🌙</div><h3>Dreaming</h3><p>Self-improvement — it processes your feedback, deepens the knowledge base, and learns from its own mistakes.</p></div>
+          <div class="card" data-i="0">
+            <span class="cic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg></span>
+            <div class="cmeta"><h3>Morning Briefing</h3><span class="freq">07:00 · daily</span></div>
+            <p>A full cold start. It reads the entire knowledge base, queries every connected tool, and <b>cross-checks every finding against the others</b> before it writes a single thing — then hands you today's short, trustworthy list.</p>
+            <div class="io"><span>reads</span> every tool + the whole KB <span class="ar">→</span> <span>writes</span> today's action items</div>
+          </div>
+          <div class="card" data-i="1">
+            <span class="cic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 3v4h-4"/></svg></span>
+            <div class="cmeta"><h3>Consolidation</h3><span class="freq">midday + afternoon · a few times</span></div>
+            <p>Light delta scans. It looks only at <b>what changed since the last run</b> — a new reply, a shipped ticket, a meeting that moved — and reconciles each open item against the fresh data, flagging anything that's gone stale or now contradicts.</p>
+            <div class="io"><span>reads</span> what's new since last run <span class="ar">→</span> <span>writes</span> updated, reconciled items</div>
+          </div>
+          <div class="card" data-i="2">
+            <span class="cic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>
+            <div class="cmeta"><h3>Research</h3><span class="freq">afternoon · when there's budget</span></div>
+            <p>It goes outward. It scores which parts of the knowledge base have <b>gone stale or thin</b>, rotates across your projects so none gets ignored, and deep-dives with web search and docs to fill the gaps it found — folding what it learns back into the graph.</p>
+            <div class="io"><span>reads</span> the web + your tools <span class="ar">→</span> <span>writes</span> a deeper knowledge graph</div>
+          </div>
+          <div class="card" data-i="3">
+            <span class="cic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5Z"/></svg></span>
+            <div class="cmeta"><h3>Dreaming</h3><span class="freq">21:30 · nightly</span></div>
+            <p>Self-improvement, while you're offline. It processes the day's feedback, <b>logs its own mistakes</b>, prunes what no longer matters, and rewrites its own instructions so tomorrow's runs are a little sharper than today's.</p>
+            <div class="io"><span>reads</span> your feedback + its mistakes <span class="ar">→</span> <span>writes</span> better instructions</div>
+          </div>
         </div>
       </div>
       <div class="day-steps">
