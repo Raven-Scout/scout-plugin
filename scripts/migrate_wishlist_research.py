@@ -160,23 +160,45 @@ def migrate_wishlist_file(src: Path, out_dir: Path, in_done_file: bool,
     return count
 
 
+def _heading_area(heading: str) -> str | None:
+    """Slugified area from a heading: leading emoji stripped, and a trailing
+    *status* suffix after a ` — `/` – `/` - ` separator dropped. Only a
+    status-looking suffix is dropped (one that begins with a status emoji or a
+    done/wip word); a content suffix like `— Productionize + release Scout` is
+    kept. A generic `Queue` heading yields no area."""
+    core = heading.strip()
+    core = re.sub(r"^(🔴|🟡|🟢|🔵|🛌|✅|🎯)\s*", "", core).strip()
+    # Drop a trailing status suffix (` — ✅ done …`, ` — wip …`, etc.) but keep
+    # a real content suffix (` — Productionize + release Scout`).
+    parts = re.split(r"\s+(?:—|–|-)\s+", core, maxsplit=1)
+    if len(parts) == 2 and re.match(
+            r"^(🔴|🟡|🟢|🔵|🛌|✅|🎯|done\b|wip\b|in[\s-]?progress\b)",
+            parts[1].strip(), re.I):
+        core = parts[0].strip()
+    if core.lower() == "queue":
+        return None
+    return slugify(core) or None
+
+
 def split_research_items(text: str):
-    """Yield (line, area) for each `- [ ]`/`- [x]` line under `## Queue` and its
-    `###` subsections. area = slugified nearest `###` heading."""
-    area = None
-    in_queue = False
+    """Yield (line, area) for every `- [ ]`/`- [x]` checklist line in the file.
+    The whole research-queue is the work list; `area` is the nearest `###`
+    subsection, else the enclosing `##` section (cleaned). Generic `## Queue`
+    yields no area."""
+    h2_area = None
+    h3_area = None
     for line in text.splitlines():
         h2 = re.match(r"^##\s+(.+)$", line)
         h3 = re.match(r"^###\s+(.+)$", line)
         if h2:
-            in_queue = h2.group(1).strip().lower().startswith("queue")
-            area = None
+            h2_area = _heading_area(h2.group(1))
+            h3_area = None
             continue
         if h3:
-            area = slugify(h3.group(1))
+            h3_area = _heading_area(h3.group(1))
             continue
-        if in_queue and re.match(r"^[-*]\s*\[( |x|X)\]", line):
-            yield line, area
+        if re.match(r"^[-*]\s*\[( |x|X)\]", line):
+            yield line, (h3_area or h2_area)
 
 
 def migrate_research_file(src: Path, out_dir: Path, default_date: str) -> int:

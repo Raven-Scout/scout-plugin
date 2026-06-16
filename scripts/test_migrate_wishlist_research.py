@@ -113,3 +113,15 @@ def test_migrate_wishlist_file_writes_one_file_per_bullet(tmp_path):
     assert "priority: high" in alpha and "status: open" in alpha
     beta = (out_dir / "2026-06-16-beta-thing.md").read_text()
     assert "status: in-progress" in beta
+
+from migrate_wishlist_research import split_research_items
+
+def test_split_research_captures_all_h2_sections_with_clean_area():
+    text = ("## Queue\n- [ ] 🟡 **Q item** body\n\n"
+            "## 🟡 Standing lane — Productionize + release Scout\n- [ ] 🟢 **Standing item** body\n\n"
+            "### 🔵 KG gap analysis — ✅ done 2026-06-02\n- [x] **G1 thing** done\n")
+    rows = list(split_research_items(text))
+    assert len(rows) == 3
+    assert rows[0] == ("- [ ] 🟡 **Q item** body", None)               # generic Queue → no area
+    assert rows[1][1] == "standing-lane-productionize-release-scout"   # H2 area, suffix dropped
+    assert rows[2][1] == "kg-gap-analysis"                             # H3 area, ✅-done suffix dropped
