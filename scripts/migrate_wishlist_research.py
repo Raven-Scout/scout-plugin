@@ -22,7 +22,7 @@ class Item:
     area: str | None = None
 
 
-def _strip_markers(text: str):
+def _strip_markers(text: str) -> tuple[str, str, str]:
     """Pull leading `[in progress]`/`[done]` state + `HIGH`/`MEDIUM` priority
     off the start of a wishlist title segment. Returns (status, priority, rest)."""
     status = "open"
@@ -60,6 +60,7 @@ def parse_wishlist_item(bullet: str, in_done_file: bool = False) -> Item:
         src = re.sub(r"^\d{4}-\d{2}-\d{2}\s*(—|-|–)?\s*", "", paren).strip()
         source = src or None
         rest = rest[pm.end():]
+        rest = rest.lstrip(". \t")
     body = rest.strip()
     return Item(title=title, status=status, priority=priority,
                 date=date, source=source, body=body)
@@ -108,14 +109,19 @@ def filename_for(item: Item, default_date: str = "2026-06-16") -> str:
     return f"{date}-{slugify(item.title)}.md"
 
 
+def _yq(s: str) -> str:
+    """Double-quote a YAML scalar so colons/brackets/quotes are safe."""
+    return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
 def render_item(item: Item) -> str:
-    fm = ["---", f"title: {item.title}", f"status: {item.status}",
+    fm = ["---", f"title: {_yq(item.title)}", f"status: {item.status}",
           f"priority: {item.priority}"]
     if item.date:
         fm.append(f"date: {item.date}")
     if item.source:
-        fm.append(f"source: {item.source}")
+        fm.append(f"source: {_yq(item.source)}")
     if item.area:
-        fm.append(f"area: {item.area}")
+        fm.append(f"area: {_yq(item.area)}")
     fm.append("---")
     return "\n".join(fm) + f"\n\n# {item.title}\n\n{item.body}\n"

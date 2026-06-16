@@ -71,11 +71,11 @@ def test_render_item_emits_frontmatter_and_body():
                 date="2026-06-10", source="Jordan DM", body="The gate overruns.")
     out = render_item(item)
     assert out.startswith("---\n")
-    assert "title: Tighten the budget gate" in out
+    assert 'title: "Tighten the budget gate"' in out
     assert "status: open" in out
     assert "priority: high" in out
     assert "date: 2026-06-10" in out
-    assert "source: Jordan DM" in out
+    assert 'source: "Jordan DM"' in out
     assert out.rstrip().endswith("The gate overruns.")
     assert "\n# Tighten the budget gate\n" in out
 
@@ -85,3 +85,9 @@ def test_render_omits_absent_optional_fields():
     assert "source:" not in out
     assert "area:" not in out
     assert "date:" not in out
+
+def test_render_item_quotes_titles_with_colons_for_valid_yaml():
+    item = Item(title="Build a config: key/value store", status="open",
+                priority="medium", date=None, source=None, body="b")
+    out = render_item(item)
+    assert 'title: "Build a config: key/value store"' in out
