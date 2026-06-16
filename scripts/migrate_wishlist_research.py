@@ -91,3 +91,28 @@ def parse_research_item(line: str, area: str | None = None) -> Item:
         date = dm.group(1)
     return Item(title=title, status=status, priority=priority,
                 date=date, source=None, body=rest.strip(), area=area)
+
+
+def slugify(title: str, max_words: int = 8) -> str:
+    s = title.lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)          # drop punctuation/emoji/·
+    words = [w for w in re.split(r"[\s-]+", s) if w]
+    return "-".join(words[:max_words])
+
+
+def filename_for(item: Item, default_date: str = "2026-06-16") -> str:
+    date = item.date or default_date
+    return f"{date}-{slugify(item.title)}.md"
+
+
+def render_item(item: Item) -> str:
+    fm = ["---", f"title: {item.title}", f"status: {item.status}",
+          f"priority: {item.priority}"]
+    if item.date:
+        fm.append(f"date: {item.date}")
+    if item.source:
+        fm.append(f"source: {item.source}")
+    if item.area:
+        fm.append(f"area: {item.area}")
+    fm.append("---")
+    return "\n".join(fm) + f"\n\n# {item.title}\n\n{item.body}\n"

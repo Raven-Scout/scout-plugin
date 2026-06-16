@@ -44,3 +44,39 @@ def test_research_green_low():
     item = parse_research_item(line)
     assert item.priority == "low"
     assert item.title == "G6 · CEE conference entities"
+
+from migrate_wishlist_research import slugify, render_item, filename_for, Item
+
+def test_slugify_basic():
+    assert slugify("Upgrade the graph system Scout relies on!") == "upgrade-the-graph-system-scout-relies-on"
+    assert slugify("G6 · CEE conference entities") == "g6-cee-conference-entities"
+
+def test_filename_uses_date_then_slug():
+    item = Item(title="Tighten the budget gate", status="open", priority="high",
+                date="2026-06-10", source=None, body="b")
+    assert filename_for(item) == "2026-06-10-tighten-the-budget-gate.md"
+
+def test_filename_falls_back_to_default_date_when_none():
+    item = Item(title="No date here", status="open", priority="medium",
+                date=None, source=None, body="b")
+    assert filename_for(item, default_date="2026-06-16") == "2026-06-16-no-date-here.md"
+
+def test_render_item_emits_frontmatter_and_body():
+    item = Item(title="Tighten the budget gate", status="open", priority="high",
+                date="2026-06-10", source="Jordan DM", body="The gate overruns.")
+    out = render_item(item)
+    assert out.startswith("---\n")
+    assert "title: Tighten the budget gate" in out
+    assert "status: open" in out
+    assert "priority: high" in out
+    assert "date: 2026-06-10" in out
+    assert "source: Jordan DM" in out
+    assert out.rstrip().endswith("The gate overruns.")
+    assert "\n# Tighten the budget gate\n" in out
+
+def test_render_omits_absent_optional_fields():
+    item = Item(title="t", status="open", priority="low", date=None, source=None, body="b")
+    out = render_item(item)
+    assert "source:" not in out
+    assert "area:" not in out
+    assert "date:" not in out
