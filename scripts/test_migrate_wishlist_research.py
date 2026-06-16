@@ -91,3 +91,25 @@ def test_render_item_quotes_titles_with_colons_for_valid_yaml():
                 priority="medium", date=None, source=None, body="b")
     out = render_item(item)
     assert 'title: "Build a config: key/value store"' in out
+
+from migrate_wishlist_research import migrate_wishlist_file, split_bullets
+
+def test_split_bullets_separates_top_level_items():
+    text = "intro\n\n* **A** body a\n* **[done] B** body b\n\n## Section\n* **C** c"
+    bullets = split_bullets(text)
+    assert len(bullets) == 3
+    assert bullets[0].startswith("**A**")
+
+def test_migrate_wishlist_file_writes_one_file_per_bullet(tmp_path):
+    src = tmp_path / "Wishlist.md"
+    src.write_text("# Wishlist\n\n* **HIGH — Alpha thing** (2026-06-10 — DM) do alpha.\n"
+                   "* **[in progress] MEDIUM — Beta thing** do beta.\n")
+    out_dir = tmp_path / "wishlist"
+    n = migrate_wishlist_file(src, out_dir, in_done_file=False, default_date="2026-06-16")
+    assert n == 2
+    files = sorted(p.name for p in out_dir.glob("*.md"))
+    assert files == ["2026-06-10-alpha-thing.md", "2026-06-16-beta-thing.md"]
+    alpha = (out_dir / "2026-06-10-alpha-thing.md").read_text()
+    assert "priority: high" in alpha and "status: open" in alpha
+    beta = (out_dir / "2026-06-16-beta-thing.md").read_text()
+    assert "status: in-progress" in beta

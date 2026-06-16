@@ -125,3 +125,88 @@ def render_item(item: Item) -> str:
         fm.append(f"area: {_yq(item.area)}")
     fm.append("---")
     return "\n".join(fm) + f"\n\n# {item.title}\n\n{item.body}\n"
+
+
+def split_bullets(text: str) -> list[str]:
+    """Each top-level `* `/`- ` bullet as a block (indented/blank continuation
+    lines fold in). Headings and non-bullet prose are skipped."""
+    items: list[str] = []
+    cur: list[str] | None = None
+    for line in text.splitlines():
+        if re.match(r"^[*-]\s+\S", line):
+            if cur is not None:
+                items.append("\n".join(cur).strip())
+            cur = [re.sub(r"^[*-]\s+", "", line)]
+        elif cur is not None and (line.startswith((" ", "\t")) or line.strip() == ""):
+            cur.append(line)
+        elif cur is not None:
+            items.append("\n".join(cur).strip())
+            cur = None
+    if cur is not None:
+        items.append("\n".join(cur).strip())
+    return [i for i in items if i]
+
+
+def migrate_wishlist_file(src: Path, out_dir: Path, in_done_file: bool,
+                          default_date: str) -> int:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for bullet in split_bullets(src.read_text()):
+        item = parse_wishlist_item(bullet, in_done_file=in_done_file)
+        if not item.title:
+            continue
+        (out_dir / filename_for(item, default_date)).write_text(render_item(item))
+        count += 1
+    return count
+
+
+def split_research_items(text: str):
+    """Yield (line, area) for each `- [ ]`/`- [x]` line under `## Queue` and its
+    `###` subsections. area = slugified nearest `###` heading."""
+    area = None
+    in_queue = False
+    for line in text.splitlines():
+        h2 = re.match(r"^##\s+(.+)$", line)
+        h3 = re.match(r"^###\s+(.+)$", line)
+        if h2:
+            in_queue = h2.group(1).strip().lower().startswith("queue")
+            area = None
+            continue
+        if h3:
+            area = slugify(h3.group(1))
+            continue
+        if in_queue and re.match(r"^[-*]\s*\[( |x|X)\]", line):
+            yield line, area
+
+
+def migrate_research_file(src: Path, out_dir: Path, default_date: str) -> int:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for line, area in split_research_items(src.read_text()):
+        item = parse_research_item(line, area=area)
+        if not item.title:
+            continue
+        (out_dir / filename_for(item, default_date)).write_text(render_item(item))
+        count += 1
+    return count
+
+
+def migrate(vault: Path, default_date: str) -> dict:
+    counts = {"wishlist": 0}
+    wl = vault / "docs" / "wishlist"
+    for name, done in [("Wishlist.md", False), ("Wishlist-in-progress.md", False),
+                       ("Wishlist-done.md", True)]:
+        src = vault / "docs" / name
+        if src.exists():
+            counts["wishlist"] += migrate_wishlist_file(src, wl, done, default_date)
+    rq_src = vault / "knowledge-base" / "research-queue.md"
+    rq_dir = vault / "knowledge-base" / "research-queue"
+    counts["research"] = migrate_research_file(rq_src, rq_dir, default_date) if rq_src.exists() else 0
+    return counts
+
+
+if __name__ == "__main__":
+    import sys
+    vault = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Scout")
+    default_date = sys.argv[2] if len(sys.argv) > 2 else "2026-06-16"
+    print(migrate(vault, default_date))
