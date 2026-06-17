@@ -6,15 +6,39 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-17
+
+
 ### Added
+- **User-extensible connector probes (#97)** — custom connector probes now live in `~/Scout/connector-probes.local.yaml` (same schema as the shipped registry), merged over the shipped probes with the overlay winning on key collision. The overlay lives in your vault and survives plugin updates — the previous behavior silently wiped custom probes on every update. New `scoutctl connectors probe-registry [--json]` emits the merged registry, and `/scout-setup` now reads it instead of the raw shipped file. A malformed overlay fails loudly (naming the file), never silently dropped.
+- **`scoutctl action-items mark-done --undo`** — reopens a completed task (the reopen path the scout-app UI invokes; previously the only action-item operation with no working path). Supports `--by-id` and `--subject` like the other mutators (#116).
 - **DM legibility rule** (`phases/connectors/slack.md`) — wrap DMs must never surface a bare internal `#SHORTCODE` tag (expand inline or drop) and must include a clickable link to the day's action-items file (Obsidian URI / `file://` path). Presentation-layer only; the file-side tag-keying machinery is untouched.
 - **No-unverified-negatives discipline** (`phases/core/action-items.md`) — before asserting a negative completion-state ("not done", "still your move", "not created") on a connector-observable item, the run must query that connector or mark the claim `[unverified — not queried this run]`.
 - **Repo-creation verification** (`phases/connectors/github.md`) — the GitHub scan now lists recently-created/updated repos via `gh repo list`, since a brand-new repo has no PR and is invisible to the PR scans; verify "stand up repo X" items this way before carrying them as not-done.
 - **Batch-comment triage mode** (`phases/modes/kb-deep-work.md` Step 2-pre, with a pointer in `phases/core/action-items.md`) — when an inline-comment sweep finds more than N=5 unprocessed `//==<<` markers, switch from resolve-each to inventory/categorize/route into a dated `comment-triage-YYYY-MM-DD.md` index, leaving markers in place and surfacing the index.
 - **Research priority preemption** (`phases/research/research-targets.md`) — target selection runs 🔴/`START IMMEDIATELY`/user-directed queue items before the staleness-rotation or opportunistic pick, and surfaces a >1-run-open 🔴 directive as overdue.
+- **MIT License** (#135).
 
 ### Changed
 - **Audits remediate or hand off, never just report** (`phases/modes/kb-deep-work.md` Step 2-ontology) — after producing findings, audits split them `auto-remediable` (fix in-run or hand to the next run as a must-action queue) vs `backlog` (leave; don't auto-create), and the notification states what was *fixed*, not only what's wrong.
+
+### Fixed
+- **Concurrent bootstrap could double-acquire the pipeline lock** — `acquire_lock`'s stale-lock pre-check removed the empty lock a racing winner leaves between its `O_EXCL` create and its PID write, letting two callers both "win". Stale recovery now happens only on the create conflict and only for a confirmed-dead PID (#36 residual).
+- **`render.parse()` now strips the leading `[#TAG]` prefix** from `subject`/`plain_subject`, matching the Swift reference parser so `--subject` matching and click-to-copy needles agree across scout-plugin and scout-app (#114).
+- **`mark-done`/reopen accept uppercase `[X]`** — a task completed as `[X]` is now reopenable, not just `[x]` (#56).
+- **launchd plist re-install is idempotent** — `bootout` before `bootstrap` so `/scout-update` no longer emits `Bootstrap failed: 5: Input/output error` and leaves the old job loaded (#23, #48).
+- **`bootstrap upgrade` can't hang forever** — `git merge-file` runs with a 30s timeout (#47).
+- **Same-day runner backups are never clobbered** — a second `/scout-update` the same day writes `<name>.bak.<DATE>-1/-2/…` instead of overwriting the first run's backup and losing that hand-edit (#62).
+- **`bootstrap upgrade` survives a non-UTF-8 or malformed `scout-config.yaml`** — read as UTF-8 with a typed error (exit 10) instead of an internal-error crash (#45).
+- **A customized/missing KB schema no longer crashes** the `KnowledgeGraph` constructor (and the TUI) — typed `KBSchemaError`, and `validate()` tolerates entity types with no `properties:` key (#46).
+- **TUI session spawner** — action-item titles can no longer break the AppleScript literal or inject shell (correct escaping + sanitized session name), and `osascript` runs off the Textual event loop so the UI doesn't freeze (#52).
+- **KB freshness dates are DST-correct and discovery can't hang** — `parse_date` returns timezone-aware values, and KB-file discovery no longer follows symlinks (a symlink loop previously hung session startup) (#53).
+- **Malformed/unreadable connectors YAML** surfaces a typed `ConfigError` instead of a raw `OSError` traceback (#43).
+- **Action-item prefix backfill is corruption-safe** — it parses the same bytes it edits (closing a TOCTOU window) and registers each prefix as it writes, so a mid-run failure can't desync the id-map and re-mint live prefixes (#41, #42).
+- **Plugin-side parser-corpus checksum guard** keeps the cross-language contract corpus byte-identical with scout-app (#115); the test suite is now hermetic against a live `~/Scout` vault.
+
+### Performance
+- **No per-file Python cold starts in the KB pre-filter** — `kb-pre-filter` now delegates to `scoutctl hook kb-pre-filter` instead of spawning a `python3 -c` interpreter per KB file via its date-parse fallback; this was the last per-session script still shelling out to Python (#74).
 
 ## [0.6.0] - 2026-06-07
 
