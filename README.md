@@ -415,6 +415,27 @@ The heartbeat system opportunistically triggers extra sessions (dreaming or rese
 **My scheduled runs aren't firing.**
 On macOS, check `launchctl list | grep scout`. Make sure your machine is awake at scheduled times — launchd won't fire if the lid is closed. Verify the plist is loaded with `launchctl list`. Check logs in `.scout-logs/` for errors from the last attempted run.
 
+**My runs keep getting skipped because of budget.**
+If a session log ends with `=== Budget check: skipping this run ===`, the budget check is stopping it before Claude even starts. Diagnose with:
+
+```
+scoutctl budget check --verbose
+```
+
+This prints what you've spent in the current window and the threshold it's comparing against, e.g.:
+
+```
+[budget-check] budget OK — $4.10 spent (threshold: $16.88)
+[budget-check] window: 3h, daily: $150.00, window budget: $18.75, skip at: $16.88
+```
+
+The threshold is derived from `daily_budget_estimate_usd` in `scout-config.yaml`:
+
+- **window budget** = `daily_budget_estimate_usd` × (`rate_limit_window_hours` ÷ 24) — the spend allowed in one rolling window (default: $150 × 3/24 = $18.75)
+- **skip at** = window budget × (`skip_threshold_pct` ÷ 100) — sessions are skipped once window spend crosses this (default: 90% = $16.88)
+
+With sessions averaging ~$4 each, the default leaves room for ~4 sessions per 3-hour window. If your schedule packs more sessions into a window than that — or you simply want more headroom — raise `daily_budget_estimate_usd` (e.g. $150 → $200 lifts the skip threshold to $22.50). Re-run `scoutctl budget check --verbose` to confirm the new numbers. The change takes effect on the next scheduled run; no reassemble needed.
+
 **A connector stopped working.**
 Re-authenticate the MCP connector in Claude Code settings. Run `/scout-status` to see which tools are currently available and which are returning errors.
 
@@ -443,4 +464,4 @@ Each person runs their own Scout instance with their own KB. Scout is designed a
 Pull the latest version of the plugin repo. Then run `/scout-setup` and choose Reassemble to regenerate your skill files with the latest phase module improvements. Your configuration and KB are preserved.
 
 **What about costs?**
-Run `/scout-status` to see the budget tracking section. The usage tracker logs every session's cost. The budget check automatically skips sessions when the daily budget estimate is exceeded. You can adjust thresholds in `scout-config.yaml`.
+Run `/scout-status` to see the budget tracking section. The usage tracker logs every session's cost. The budget check automatically skips sessions when the rolling-window spend crosses the skip threshold. To inspect or adjust the limits, see *"My runs keep getting skipped because of budget"* above — the key knobs are `daily_budget_estimate_usd`, `rate_limit_window_hours`, and `skip_threshold_pct` in `scout-config.yaml`.
