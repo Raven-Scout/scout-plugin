@@ -34,6 +34,7 @@ VARS = {
 
 # ---------- retemplatize ----------
 
+
 def test_retemplatize_reverses_safe_vars():
     lines = ["Email alex@example.com and repo alexdev live here."]
     out, risky = retemplatize(lines, VARS)
@@ -59,6 +60,7 @@ def test_retemplatize_clean_line_has_no_risky_hits():
 
 # ---------- diff_hunks ----------
 
+
 def test_diff_hunks_finds_added_block_with_anchor():
     snapshot = "## Heading\n\nfirst line\nsecond line\n"
     live = "## Heading\n\nfirst line\nINSERTED LINE\nsecond line\n"
@@ -75,8 +77,10 @@ def test_diff_hunks_empty_when_identical():
 
 # ---------- plan_backport (locate + retemplatize + round-trip) ----------
 
+
 def _section(raw_body: str) -> RenderedSection:
     from scout.scripts.phase_assembly import render_template
+
     return RenderedSection(
         phase_file=Path("phases/modes/kb-deep-work.md"),
         section_name="Step 2-pre",
@@ -144,6 +148,7 @@ def test_plan_backport_needs_review_when_anchor_ambiguous():
 
 # ---------- build_rendered_sections (assembly selection + provenance) ----------
 
+
 def _write_phase(root: Path, rel: str, frontmatter: str, body: str) -> Path:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,8 +158,18 @@ def _write_phase(root: Path, rel: str, frontmatter: str, body: str) -> Path:
 
 def test_build_rendered_sections_selects_renders_and_keeps_provenance(tmp_path):
     phases = tmp_path / "phases"
-    _write_phase(phases, "core/a.md", "phase: core\nname: A\nslot: s\nmode: [briefing, consolidation]\nrequires: null", "Body for {{USER_NAME}}.")
-    _write_phase(phases, "connectors/slack.md", "phase: connector\nname: Slack\nslot: s\nmode: [briefing]\nrequires: slack", "Slack body.")
+    _write_phase(
+        phases,
+        "core/a.md",
+        "phase: core\nname: A\nslot: s\nmode: [briefing, consolidation]\nrequires: null",
+        "Body for {{USER_NAME}}.",
+    )
+    _write_phase(
+        phases,
+        "connectors/slack.md",
+        "phase: connector\nname: Slack\nslot: s\nmode: [briefing]\nrequires: slack",
+        "Slack body.",
+    )
     secs = build_rendered_sections(phases, "SKILL", VARS, {"slack"})
     by_name = {s.section_name: s for s in secs}
     assert set(by_name) == {"A", "Slack"}
@@ -165,7 +180,12 @@ def test_build_rendered_sections_selects_renders_and_keeps_provenance(tmp_path):
 def test_build_rendered_sections_excludes_disabled_connector(tmp_path):
     phases = tmp_path / "phases"
     _write_phase(phases, "core/a.md", "phase: core\nname: A\nslot: s\nmode: [briefing]\nrequires: null", "Core body.")
-    _write_phase(phases, "connectors/slack.md", "phase: connector\nname: Slack\nslot: s\nmode: [briefing]\nrequires: slack", "Slack body.")
+    _write_phase(
+        phases,
+        "connectors/slack.md",
+        "phase: connector\nname: Slack\nslot: s\nmode: [briefing]\nrequires: slack",
+        "Slack body.",
+    )
     secs = build_rendered_sections(phases, "SKILL", VARS, set())  # slack NOT enabled
     assert {s.section_name for s in secs} == {"A"}
 
@@ -186,6 +206,7 @@ def test_build_rendered_sections_filters_by_mode(tmp_path):
 
 # ---------- apply_section_edits (multiple inserts in one section) ----------
 
+
 def test_apply_section_edits_applies_multiple_inserts():
     raw = "h1\nbody a\nh2\nbody b"
     edits = [("h1", ["after one"]), ("h2", ["after two"])]
@@ -194,6 +215,7 @@ def test_apply_section_edits_applies_multiple_inserts():
 
 
 # ---------- apply_to_phase_text (write-back) ----------
+
 
 def test_apply_to_phase_text_replaces_body_preserving_frontmatter():
     file_text = "---\nphase: core\nname: A\n---\nline one\nline two\n"
@@ -208,10 +230,12 @@ def test_apply_to_phase_text_raises_when_body_absent():
 
 # ---------- end-to-end round-trip ----------
 
+
 def test_end_to_end_backport_roundtrip(tmp_path):
     phases = tmp_path / "phases"
     pf = _write_phase(
-        phases, "core/kb.md",
+        phases,
+        "core/kb.md",
         "phase: core\nname: KB\nslot: s\nmode: [briefing]\nrequires: null",
         "### Step\n\nScan under {{SCOUT_DIR}}.\nScore files.",
     )

@@ -1211,9 +1211,7 @@ def _register_phases() -> None:
                 typer.echo(f"{k}: skip — missing {missing} file", err=True)
                 continue
             sections = build_rendered_sections(phases_root, k, vars_, cfg.enabled_connectors)
-            results = plan_backport(
-                snap.read_text(encoding="utf-8"), live.read_text(encoding="utf-8"), sections, vars_
-            )
+            results = plan_backport(snap.read_text(encoding="utf-8"), live.read_text(encoding="utf-8"), sections, vars_)
             applied = [r for r in results if r.status == "applied"]
             review = [r for r in results if r.status == "needs-review"]
             unmapped = [r for r in results if r.status == "unmapped"]
@@ -1236,6 +1234,10 @@ def _register_phases() -> None:
                 sec_by_key = {(s.phase_file, s.section_name): s for s in sections}
                 by_file: dict[Path, list] = {}
                 for r in applied:
+                    # applied hunks always round-tripped into a fragment, so
+                    # phase_file is set; narrow the Path | None for the type checker.
+                    if r.phase_file is None:
+                        continue
                     by_file.setdefault(r.phase_file, []).append(r)
                 for pf, rs in by_file.items():
                     text = pf.read_text(encoding="utf-8")

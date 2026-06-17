@@ -75,7 +75,7 @@ class RenderedSection:
 
     phase_file: Path
     section_name: str
-    raw_body: str       # source body, with {{VARS}}
+    raw_body: str  # source body, with {{VARS}}
     rendered_body: str  # what assembly produced (vars substituted)
 
 
@@ -113,7 +113,7 @@ def retemplatize(
     out: list[str] = []
     for line in lines:
         for name, value in safe_pairs:
-            line = line.replace(value, "{{%s}}" % name)
+            line = line.replace(value, f"{{{{{name}}}}}")
         out.append(line)
     risky_hits = [k for k in risky if vars_.get(k) and any(vars_[k] in ln for ln in out)]
     return out, risky_hits
@@ -133,7 +133,7 @@ def build_rendered_sections(
     try:
         src_dirs, modes = _ASSEMBLY_MAP[kind]
     except KeyError:
-        raise ValueError(f"unknown brain-file kind: {kind!r} (expected SKILL/DREAMING/RESEARCH)")
+        raise ValueError(f"unknown brain-file kind: {kind!r} (expected SKILL/DREAMING/RESEARCH)") from None
     out: list[RenderedSection] = []
     for dirname in src_dirs:
         src = phases_root / dirname
@@ -189,9 +189,7 @@ def _unique_anchor_index(anchor: str, body: str) -> int | None:
     return hits[0] if len(hits) == 1 else None
 
 
-def insert_after_anchor(
-    raw_body: str, rendered_body: str, anchor: str, new_lines: list[str]
-) -> str:
+def insert_after_anchor(raw_body: str, rendered_body: str, anchor: str, new_lines: list[str]) -> str:
     """Insert ``new_lines`` into ``raw_body`` after the line matching ``anchor``.
 
     The anchor is located in the *rendered* body; because ``render_template``
@@ -204,9 +202,7 @@ def insert_after_anchor(
     return "\n".join(raw_lines[: idx + 1] + new_lines + raw_lines[idx + 1 :])
 
 
-def plan_backport(
-    snapshot: str, live: str, sections: list[RenderedSection], vars_: dict[str, str]
-) -> list[HunkResult]:
+def plan_backport(snapshot: str, live: str, sections: list[RenderedSection], vars_: dict[str, str]) -> list[HunkResult]:
     """Map each divergence hunk to a phase section and classify its outcome.
 
     Status:
@@ -217,14 +213,10 @@ def plan_backport(
     results: list[HunkResult] = []
     for hunk in diff_hunks(snapshot, live):
         if not hunk.anchor:
-            results.append(
-                HunkResult("needs-review", hunk.added, reason="no anchor (insertion at section start)")
-            )
+            results.append(HunkResult("needs-review", hunk.added, reason="no anchor (insertion at section start)"))
             continue
 
-        matches = [
-            s for s in sections if _unique_anchor_index(hunk.anchor, s.rendered_body) is not None
-        ]
+        matches = [s for s in sections if _unique_anchor_index(hunk.anchor, s.rendered_body) is not None]
         if not matches:
             results.append(
                 HunkResult("unmapped", hunk.added, reason="anchor not found in any phase section (vault-only drift?)")
@@ -241,9 +233,13 @@ def plan_backport(
         if risky:
             results.append(
                 HunkResult(
-                    "needs-review", hunk.added,
-                    phase_file=sec.phase_file, section_name=sec.section_name, anchor=hunk.anchor,
-                    retemplatized=retempl, risky_hits=risky,
+                    "needs-review",
+                    hunk.added,
+                    phase_file=sec.phase_file,
+                    section_name=sec.section_name,
+                    anchor=hunk.anchor,
+                    retemplatized=retempl,
+                    risky_hits=risky,
                     reason="risky template var(s) in added text — genericize before writing",
                 )
             )
@@ -253,25 +249,31 @@ def plan_backport(
         if "\n".join(hunk.added) in render_template(edited_raw, vars_):
             results.append(
                 HunkResult(
-                    "applied", hunk.added,
-                    phase_file=sec.phase_file, section_name=sec.section_name, anchor=hunk.anchor,
-                    retemplatized=retempl, reason="round-trip ✓",
+                    "applied",
+                    hunk.added,
+                    phase_file=sec.phase_file,
+                    section_name=sec.section_name,
+                    anchor=hunk.anchor,
+                    retemplatized=retempl,
+                    reason="round-trip ✓",
                 )
             )
         else:
             results.append(
                 HunkResult(
-                    "needs-review", hunk.added,
-                    phase_file=sec.phase_file, section_name=sec.section_name, anchor=hunk.anchor,
-                    retemplatized=retempl, reason="round-trip mismatch — would not re-assemble to the vault line",
+                    "needs-review",
+                    hunk.added,
+                    phase_file=sec.phase_file,
+                    section_name=sec.section_name,
+                    anchor=hunk.anchor,
+                    retemplatized=retempl,
+                    reason="round-trip mismatch — would not re-assemble to the vault line",
                 )
             )
     return results
 
 
-def apply_section_edits(
-    raw_body: str, rendered_body: str, edits: list[tuple[str, list[str]]]
-) -> str:
+def apply_section_edits(raw_body: str, rendered_body: str, edits: list[tuple[str, list[str]]]) -> str:
     """Apply multiple ``(anchor, new_lines)`` inserts to one section's raw body.
 
     Inserts are applied in descending anchor-index order so each insertion does
