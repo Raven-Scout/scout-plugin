@@ -6,6 +6,16 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **DM legibility rule** (`phases/connectors/slack.md`) — wrap DMs must never surface a bare internal `#SHORTCODE` tag (expand inline or drop) and must include a clickable link to the day's action-items file (Obsidian URI / `file://` path). Presentation-layer only; the file-side tag-keying machinery is untouched.
+- **No-unverified-negatives discipline** (`phases/core/action-items.md`) — before asserting a negative completion-state ("not done", "still your move", "not created") on a connector-observable item, the run must query that connector or mark the claim `[unverified — not queried this run]`.
+- **Repo-creation verification** (`phases/connectors/github.md`) — the GitHub scan now lists recently-created/updated repos via `gh repo list`, since a brand-new repo has no PR and is invisible to the PR scans; verify "stand up repo X" items this way before carrying them as not-done.
+- **Batch-comment triage mode** (`phases/modes/kb-deep-work.md` Step 2-pre, with a pointer in `phases/core/action-items.md`) — when an inline-comment sweep finds more than N=5 unprocessed `//==<<` markers, switch from resolve-each to inventory/categorize/route into a dated `comment-triage-YYYY-MM-DD.md` index, leaving markers in place and surfacing the index.
+- **Research priority preemption** (`phases/research/research-targets.md`) — target selection runs 🔴/`START IMMEDIATELY`/user-directed queue items before the staleness-rotation or opportunistic pick, and surfaces a >1-run-open 🔴 directive as overdue.
+
+### Changed
+- **Audits remediate or hand off, never just report** (`phases/modes/kb-deep-work.md` Step 2-ontology) — after producing findings, audits split them `auto-remediable` (fix in-run or hand to the next run as a must-action queue) vs `backlog` (leave; don't auto-create), and the notification states what was *fixed*, not only what's wrong.
+
 ## [0.6.0] - 2026-06-07
 
 ### Added
