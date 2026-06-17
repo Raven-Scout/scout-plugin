@@ -1,167 +1,30 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # kb-pre-filter.sh — Pre-filter KB files by staleness before a {{INSTANCE_NAME}} session.
-# Outputs a compact summary of which files need reading vs. which are fresh.
-# Runner scripts call this before invoking Claude; {{INSTANCE_NAME}} reads the cache
-# file instead of re-scanning every KB file from inside the session.
+# Writes .scout-cache/kb-filter.md — a compact markdown list of which files are
+# stale vs. fresh — so the session reads the cache instead of re-scanning every
+# KB file from inside Claude.
 #
 # Usage: ./hooks/kb-pre-filter.sh [session-type]
 #   session-type: briefing | consolidation | dreaming
 #
-# Output: Writes to .scout-cache/kb-filter.md — a compact markdown list
-# that skills can read instead of opening every KB file.
+# This is a thin wrapper around `scoutctl hook kb-pre-filter` — the logic lives
+# in scout.hooks.kb_pre_filter so the runner pays one Python cold start instead
+# of the per-KB-file `python3 -c '...'` the previous bash version spawned via its
+# BSD-`date` parse fallback (one interpreter per file on Linux). See issue #74.
 
-set -eu
+set -euo pipefail
 
-SESSION_TYPE="${1:-dreaming}"
-SCOUT_DIR="${SCOUT_DIR:-{{SCOUT_DIR}}}"
-CACHE_DIR="$SCOUT_DIR/.scout-cache"
-OUTPUT="$CACHE_DIR/kb-filter.md"
-mkdir -p "$CACHE_DIR"
-
-NOW_EPOCH=$(date +%s)
-NOW_LOCAL=$(TZ={{TIMEZONE}} date '+%Y-%m-%d %H:%M %Z')
-
-# Freshness standards (in hours) by file pattern and priority
-# 🔴 projects = 72h (3 days), 🟡 = 168h (7 days), 🟢 = 336h (14 days)
-# Special files: linear-issues = 6h, knowledge-base.md = 6h, people = 168h, channels = 336h
-get_freshness_hours() {
-  local filepath="$1"
-  local basename
-  basename=$(basename "$filepath")
-
-  case "$basename" in
-    linear-issues.md|issues.md|knowledge-base.md) echo 6 ;;
-    people.md) echo 168 ;;
-    channels.md) echo 336 ;;
-    ai-costs.md|ai-landscape.md) echo 168 ;;
-    *)
-      # For project files, check priority from YAML frontmatter or inline marker
-      local priority
-      priority=$(head -25 "$filepath" 2>/dev/null | grep -i 'priority:' | head -1 | sed 's/.*priority: *//' | tr -d '"' || true)
-      case "$priority" in
-        *🔴*) echo 72 ;;
-        *🟡*) echo 168 ;;
-        *🟢*) echo 336 ;;
-        *) echo 168 ;; # default
-      esac
-      ;;
-  esac
-}
-
-# Parse a date string into epoch seconds (best-effort across macOS/Linux).
-parse_date_to_epoch() {
-  local datestr="$1"
-  # Strip markdown bold markers, "at", timezone suffixes, parenthetical notes
-  datestr=$(echo "$datestr" | sed 's/\*\*//g' | sed 's/ at / /g' | sed 's/ ET.*//I' | sed 's/ EDT.*//I' | sed 's/ EST.*//I' | sed 's/ UTC.*//I' | sed 's/(.*//g' | sed 's/^ *//;s/ *$//')
-
-  # Try BSD date parsing (macOS)
-  if date -j -f "%B %d, %Y %I:%M %p" "$datestr" +%s 2>/dev/null; then return; fi
-  if date -j -f "%B %d, %Y %H:%M" "$datestr" +%s 2>/dev/null; then return; fi
-  if date -j -f "%B %d, %Y" "$datestr" +%s 2>/dev/null; then return; fi
-
-  # Fallback: python3 (portable)
-  python3 -c "
-import sys
-from datetime import datetime
-s = '''$datestr'''.strip()
-for fmt in ['%B %d, %Y %I:%M %p', '%B %d, %Y %H:%M', '%B %d, %Y', '%Y-%m-%d %H:%M', '%Y-%m-%d']:
-    try:
-        dt = datetime.strptime(s, fmt)
-        print(int(dt.timestamp()))
-        sys.exit(0)
-    except ValueError:
-        continue
-print(0)
-" 2>/dev/null || echo 0
-}
-
-STALE_FILES=()
-FRESH_FILES=()
-NO_DATE_FILES=()
-
-while IFS= read -r filepath; do
-  rel="${filepath#$SCOUT_DIR/}"
-  basename_f=$(basename "$filepath")
-
-  # Skip archives, drafts, and queue files — they have their own freshness semantics
-  case "$basename_f" in
-    review-queue.md|archived.md|*-archive*|*-draft*|*-prompt*) continue ;;
-  esac
-
-  # Entity files under people/ and ontology/ have YAML frontmatter, not "Last updated" lines
-  case "$rel" in
-    */people/*.md|*/ontology/*) continue ;;
-  esac
-
-  datestr=$(head -25 "$filepath" 2>/dev/null | grep -i 'last updated\|last verified' | head -1 \
-    | sed 's/\*\*//g' \
-    | sed 's/^[^:]*: *//' \
-    | sed 's/\. Source.*//I' \
-    | sed 's/\. Verified.*//I' \
-    | sed 's/ (.*//g' \
-    | sed 's/^ *//;s/ *$//' \
-    || true)
-
-  if [ -z "$datestr" ]; then
-    NO_DATE_FILES+=("$rel")
-    continue
-  fi
-
-  file_epoch=$(parse_date_to_epoch "$datestr")
-  if [ "$file_epoch" -eq 0 ] 2>/dev/null; then
-    NO_DATE_FILES+=("$rel")
-    continue
-  fi
-
-  freshness_hours=$(get_freshness_hours "$filepath")
-  age_hours=$(( (NOW_EPOCH - file_epoch) / 3600 ))
-
-  if [ "$age_hours" -gt "$freshness_hours" ]; then
-    STALE_FILES+=("$rel|${age_hours}h|${freshness_hours}h|$datestr")
-  else
-    FRESH_FILES+=("$rel|${age_hours}h|$datestr")
-  fi
-done < <(find "$SCOUT_DIR/knowledge-base" -name '*.md' \
-  -not -path '*/ontology/*' \
-  -not -path '*archive*' \
-  -not -path '*/personal/*' \
-  2>/dev/null | sort)
-
-cat > "$OUTPUT" <<HEADER
-# KB Pre-Filter — $NOW_LOCAL ($SESSION_TYPE)
-
-HEADER
-
-if [ ${#STALE_FILES[@]} -gt 0 ]; then
-  echo "## STALE — Need reading/audit" >> "$OUTPUT"
-  for entry in "${STALE_FILES[@]}"; do
-    IFS='|' read -r path age standard lastdate <<< "$entry"
-    echo "- **$path** — ${age} old (standard: ${standard}) — last: $lastdate" >> "$OUTPUT"
-  done
-  echo "" >> "$OUTPUT"
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "kb-pre-filter.sh: scoutctl not found (looked at ${SCOUTCTL_BIN})" >&2
+        exit 1
+    fi
 fi
 
-if [ ${#NO_DATE_FILES[@]} -gt 0 ]; then
-  echo "## NO DATE — Need checking" >> "$OUTPUT"
-  for path in "${NO_DATE_FILES[@]}"; do
-    echo "- $path" >> "$OUTPUT"
-  done
-  echo "" >> "$OUTPUT"
-fi
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
 
-echo "## FRESH — Skip unless feedback signals" >> "$OUTPUT"
-# Guard the expansion: under `set -u`, macOS system bash (3.2) throws
-# "FRESH_FILES[@]: unbound variable" when the array is empty. The STALE/
-# NO_DATE loops above are already guarded — this one was the lone gap.
-if [ ${#FRESH_FILES[@]} -gt 0 ]; then
-  for entry in "${FRESH_FILES[@]}"; do
-    IFS='|' read -r path age lastdate <<< "$entry"
-    echo "- $path (${age} old)" >> "$OUTPUT"
-  done
-fi
-
-echo "" >> "$OUTPUT"
-echo "---" >> "$OUTPUT"
-echo "Stale: ${#STALE_FILES[@]} | No date: ${#NO_DATE_FILES[@]} | Fresh: ${#FRESH_FILES[@]}" >> "$OUTPUT"
-
-echo "KB pre-filter written to $OUTPUT (${#STALE_FILES[@]} stale, ${#FRESH_FILES[@]} fresh, ${#NO_DATE_FILES[@]} undated)"
+exec "$SCOUTCTL_BIN" hook kb-pre-filter --session-type "${1:-dreaming}"
