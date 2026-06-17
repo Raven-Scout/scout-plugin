@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`scoutctl phases backport`** — reverse-maps vault brain-file edits (`SKILL`/`DREAMING`/`RESEARCH.md`) back into their source `phases/` fragments, so a future `/scout-update` re-render carries them forward instead of sidecaring (closes the manual half of the back-port gap). Diffs each brain file against its `.scout-state/last-assembled/` snapshot, locates each divergence in its fragment by anchor matching, conservatively re-templatizes (only long/unique vars auto-reverse; short ones like the instance/user name are flagged, never auto-written — so instance data can't leak into the engine), and **only writes hunks that round-trip** (re-assembly reproduces the vault line). Default is a read-only report (`--apply` writes; `--kind`, `--vault` flags). Never commits/pushes/opens a PR. New module `scout.scripts.phase_backport` (pure, unit-tested) + `phases` CLI sub-app. Design: `docs/superpowers/specs/2026-06-16-scoutctl-phases-backport-design.md`.
+
 ## [0.6.0] - 2026-06-07
 
 ### Added

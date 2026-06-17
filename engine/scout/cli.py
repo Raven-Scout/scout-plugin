@@ -1139,6 +1139,130 @@ def _register_bootstrap() -> None:
 _register_bootstrap()
 
 
+def _register_phases() -> None:
+    phases_app = typer.Typer(help="Phase-fragment operations (back-port vault edits into phases/).")
+    app.add_typer(phases_app, name="phases")
+
+    @phases_app.command("backport")
+    def cli_phases_backport(
+        kind: str = typer.Option("all", "--kind", help="SKILL | DREAMING | RESEARCH | all"),
+        apply: bool = typer.Option(
+            False, "--apply", help="Write the round-trip-verified edits into phases/ (default: dry-run report)"
+        ),
+        vault_opt: str = typer.Option("", "--vault", help="Vault path (default: the resolved Scout data dir)"),
+    ) -> None:
+        """Back-port vault brain-file edits into their source phase fragments.
+
+        Diffs each vault SKILL/DREAMING/RESEARCH against its last-assembled
+        snapshot, maps each divergence to a phase fragment, conservatively
+        re-templatizes it, and — only for hunks that round-trip — writes it back
+        so a future /scout-update re-render carries it forward instead of
+        sidecaring. Default is a read-only report; --apply writes the ✓ hunks.
+        Never commits, pushes, or opens a PR — the operator does that.
+        """
+        import yaml as _yaml
+
+        from scout import __version__
+        from scout import paths as _paths
+        from scout.scripts.bootstrap import BootstrapConfig, _template_vars
+        from scout.scripts.phase_backport import (
+            apply_section_edits,
+            apply_to_phase_text,
+            build_rendered_sections,
+            plan_backport,
+        )
+
+        vault = Path(vault_opt).expanduser() if vault_opt else _paths.data_dir()
+        cfg_path = vault / "scout-config.yaml"
+        if not cfg_path.exists():
+            typer.echo(f"no vault at {vault} — run /scout-setup", err=True)
+            raise typer.Exit(code=2)
+        try:
+            existing = _yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        except (_yaml.YAMLError, UnicodeDecodeError) as e:
+            typer.echo(f"scout-config.yaml is malformed: {e}", err=True)
+            raise typer.Exit(code=ConfigError.exit_code) from e
+
+        instance = existing.get("instance", {})
+        user = existing.get("user", {})
+        cfg = BootstrapConfig(
+            vault=vault,
+            plugin_root=Path(__file__).parent.parent.parent,
+            instance_name=instance.get("name", "Scout"),
+            instance_name_lower=instance.get("name_lower", "scout"),
+            user_name=user.get("name", ""),
+            user_email=user.get("email", ""),
+            timezone=existing.get("timezone", "America/New_York"),
+            platform=existing.get("platform", "macos"),
+            plugin_version=__version__,
+            enabled_connectors=set(existing.get("connectors", {}).get("enabled") or []),
+            connector_inputs=existing.get("connectors", {}).get("inputs", {}),
+        )
+        vars_ = _template_vars(cfg)
+        phases_root = cfg.plugin_root / "phases"
+        snapshot_dir = vault / ".scout-state" / "last-assembled"
+
+        kinds = ["SKILL", "DREAMING", "RESEARCH"] if kind == "all" else [kind.upper()]
+        total_applied = 0
+        for k in kinds:
+            snap, live = snapshot_dir / f"{k}.md", vault / f"{k}.md"
+            if not snap.exists() or not live.exists():
+                missing = "snapshot" if not snap.exists() else "live"
+                typer.echo(f"{k}: skip — missing {missing} file", err=True)
+                continue
+            sections = build_rendered_sections(phases_root, k, vars_, cfg.enabled_connectors)
+            results = plan_backport(
+                snap.read_text(encoding="utf-8"), live.read_text(encoding="utf-8"), sections, vars_
+            )
+            applied = [r for r in results if r.status == "applied"]
+            review = [r for r in results if r.status == "needs-review"]
+            unmapped = [r for r in results if r.status == "unmapped"]
+
+            typer.echo(
+                f"\nphases backport — {k} ({len(results)} hunk(s): "
+                f"{len(applied)} applied · {len(review)} needs-review · {len(unmapped)} unmapped)"
+            )
+            for r in applied:
+                typer.echo(f"  ✓ applied      {r.phase_file}  «{r.section_name}»  (+{len(r.added)} line(s))")
+            for r in review:
+                where = f"{r.phase_file} «{r.section_name}»" if r.phase_file else "—"
+                extra = f" [risky: {', '.join(r.risky_hits)}]" if r.risky_hits else ""
+                typer.echo(f"  ⚠ needs-review {where} — {r.reason}{extra}")
+            for r in unmapped:
+                snippet = (r.added[0][:60] + "…") if r.added else ""
+                typer.echo(f"  ✗ unmapped     {r.reason}  «{snippet}»")
+
+            if apply and applied:
+                sec_by_key = {(s.phase_file, s.section_name): s for s in sections}
+                by_file: dict[Path, list] = {}
+                for r in applied:
+                    by_file.setdefault(r.phase_file, []).append(r)
+                for pf, rs in by_file.items():
+                    text = pf.read_text(encoding="utf-8")
+                    by_section: dict[str, list] = {}
+                    for r in rs:
+                        by_section.setdefault(r.section_name, []).append(r)
+                    for section_name, srs in by_section.items():
+                        sec = sec_by_key[(pf, section_name)]
+                        edits = [(r.anchor, r.retemplatized) for r in srs]
+                        edited_body = apply_section_edits(sec.raw_body, sec.rendered_body, edits)
+                        text = apply_to_phase_text(text, sec.raw_body, edited_body)
+                    pf.write_text(text, encoding="utf-8")
+                    typer.echo(f"  → wrote {pf}")
+                total_applied += len(applied)
+
+        if apply:
+            typer.echo(
+                f"\nApplied {total_applied} hunk(s) to phases/. "
+                "Review the diff, run the phase-assembly tests, commit, and open a PR."
+            )
+        else:
+            typer.echo("\n(dry-run — re-run with --apply to write the ✓ applied hunks into phases/)")
+
+
+_register_phases()
+
+
 self_update_app = typer.Typer(help="Plugin self-update (check only in v0.4).")
 app.add_typer(self_update_app, name="self-update")
 
