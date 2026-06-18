@@ -10,7 +10,7 @@ requires: null
 
 This is the substantive knowledge-base improvement phase. Score every KB file, pick a work mode, execute deep improvements, and leave the KB meaningfully better than you found it.
 
----
+***
 
 ### Step 2-cache: Read the Pre-Session Caches
 
@@ -24,7 +24,7 @@ Before doing anything else, read the caches that the runner script generated bef
 
 Prefer these caches over live tool calls during scoring. Fall back to live queries only when a cache is missing, obviously stale, or you need deeper detail (e.g., full PR diff, full session transcript).
 
----
+***
 
 ### Step 2-pre: Scan for Inline Comments
 
@@ -150,7 +150,7 @@ Based on findings from Phase 1 (feedback processing). If Phase 1 was skipped (no
 
 Record the scoring table for the session log.
 
----
+***
 
 ### Step 2b: Pick Work Mode
 
@@ -176,7 +176,7 @@ Based on the scoring distribution, select a work mode:
 
 **Blended**: You can combine modes within a single run. For example, deep-dive one file and then do a quick structural pass on related files. Use judgment based on the scoring distribution.
 
----
+***
 
 ### Step 2c: Execute
 
@@ -187,7 +187,7 @@ Perform the selected work. During execution:
 - **Update "Last verified" dates** on every file you touch, noting which sources were checked.
 - **Do not duplicate daytime work.** If a consolidation run already updated a file today, focus on areas that run did not cover rather than re-verifying the same data.
 
----
+***
 
 ### Step 2d: Depth Self-Check (HARD GATE)
 
@@ -207,7 +207,7 @@ Real work means: new facts verified from live sources, stale information correct
 
 This gate exists because the easiest failure mode of an automated KB system is busywork that looks productive but adds no value. Do not pass this gate unless the work is substantive.
 
----
+***
 
 ### Step 2e: Commit
 
@@ -217,7 +217,7 @@ git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]:
 
 The summary should describe what was improved: e.g., "deep dive on project-alpha (verified 12 claims, updated status, added 3 decisions)" or "gap hunt: added 4 missing people, created channel entries for 2 new channels."
 
----
+***
 
 ### Step 2f: Track Work
 
@@ -233,7 +233,7 @@ Include:
 - Any wishlist items completed
 - The scoring table or at least the top-3 scored files and their totals
 
----
+***
 
 ### Step 2g: Scout Digest
 
@@ -264,7 +264,7 @@ If today's action items file exists (`action-items/action-items-YYYY-MM-DD.md`),
 - Keep it scannable — no walls of text. Link to KB files for details.
 - If a digest already exists from an earlier session today, **update it** (don't duplicate)
 
----
+***
 
 ### Step 2h: Complement Daytime Runs
 

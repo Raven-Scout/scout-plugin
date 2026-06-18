@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -273,11 +274,17 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
         for phase_file in sorted(src_dir.glob("*.md")):
             try:
                 sections = parse_phase_file(phase_file)
-            except (ValueError, yaml.YAMLError):
-                # Phase file failed to parse — skip rather than abort the assembly.
-                # Known limitation: phase_assembly.parse_phase_file is fooled by bare
-                # '---' horizontal rules in markdown bodies (e.g., kb-management.md).
-                # Tracked as a Plan 8 followup to harden A5's parser.
+            except (ValueError, yaml.YAMLError) as e:
+                # Phase file failed to parse — skip it (graceful degradation) but warn
+                # loudly so the dropped phase can't vanish invisibly. The bundled phase
+                # files all parse today; body horizontal rules use '***' (not bare '---',
+                # which parse_phase_file treats as a frontmatter delimiter). This guard
+                # exists to surface any future regression instead of silently dropping
+                # a whole phase from the assembled SKILL/DREAMING/RESEARCH.
+                print(
+                    f"warning: skipping unparseable phase file {phase_file}: {e}",
+                    file=sys.stderr,
+                )
                 continue
             kept = select_sections(
                 sections,

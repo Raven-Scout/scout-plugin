@@ -10,7 +10,7 @@ requires: null
 
 Process items from {{USER_NAME}}'s wishlist — feature requests, improvements, and ideas that {{USER_NAME}} wants {{INSTANCE_NAME}} to implement during dreaming runs.
 
----
+***
 
 ### Step 3a: Read the Wishlist
 
@@ -29,7 +29,7 @@ Read every `*.md` file in `docs/wishlist/`. Each file is one item: YAML frontmat
 
 State lives in the frontmatter `status:` — there is no file-moving. Scout.app and this phase both filter by it. Identify all items and their current state before proceeding.
 
----
+***
 
 ### Step 3b: Identify Actionable Items
 
@@ -41,7 +41,7 @@ Scan for items with `status: open`. For each, assess feasibility:
 
 **Too ambiguous:** The item is unclear enough that attempting it risks wasted work or incorrect implementation. Examples: "make Scout smarter", "improve the KB." Skip these — they need clarification from {{USER_NAME}} before work begins. Do not guess at intent.
 
----
+***
 
 ### Step 3c: Maximize Wishlist Progress
 
@@ -62,7 +62,7 @@ Select actionable items and push as far as possible. Don't artificially limit yo
 
 **Scope guard**: If an item turns out to be larger than expected mid-implementation, stop at a clean checkpoint. Set its frontmatter `status: in-progress` with a note (in the body) about what was completed and what remains. Do not leave half-finished work in an inconsistent state.
 
----
+***
 
 ### Step 3d: Update the Wishlist
 
@@ -82,7 +82,7 @@ After executing (or deciding to skip), update each item file's frontmatter `stat
 
 **For a brand-new wishlist item:** create `docs/wishlist/<YYYY-MM-DD>-<slug>.md` with the frontmatter schema above (`status: open`).
 
----
+***
 
 ### Step 3e: Commit
 

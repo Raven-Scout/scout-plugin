@@ -10,7 +10,7 @@ requires: slack
 
 This is the self-improvement loop. Harvest feedback from {{USER_NAME}}'s reactions and replies to {{INSTANCE_NAME}}'s messages, classify signals, update the mistake audit, and apply or propose improvements.
 
----
+***
 
 ### Step 1a: Harvest Feedback from Slack
 
@@ -30,7 +30,7 @@ Read the bot's DM conversation with {{USER_NAME}} using `slack_read_channel` wit
 
 Skip messages not authored by {{INSTANCE_NAME}}. Only harvest feedback on the bot's own outputs.
 
----
+***
 
 ### Step 1b: Classify Feedback Signals
 
@@ -48,7 +48,7 @@ Categorize every piece of harvested feedback into one of these signal types:
 - If the same message has conflicting signals from different people, note the conflict but weight {{USER_NAME}}'s signal highest.
 - If a reaction is ambiguous (e.g., a thinking-face emoji), do not classify it as positive or negative. Skip it.
 
----
+***
 
 ### Step 1c: Cross-Reference with Mistake Audit
 
@@ -73,7 +73,7 @@ Read `knowledge-base/scout-mistake-audit.md`. For every negative or correction s
   - If status is `Open` and the positive signal shows the fix is working, change to `Fixed` with evidence (date + the positive feedback).
   - If status is already `Fixed`, add the positive signal as corroborating evidence.
 
----
+***
 
 ### Step 1d: Determine and Apply Improvements
 
@@ -96,7 +96,7 @@ Based on the classified signals and mistake audit updates, determine what change
 - For KB content fixes, always cite the feedback that triggered the change: "Corrected per {{USER_NAME}} feedback on [date]: [brief description]."
 - If a correction contradicts information from a live connector, investigate before changing. The correction may be about interpretation, not raw data.
 
----
+***
 
 ### Step 1e: Handle Proposals
 
@@ -128,7 +128,7 @@ For each improvement that targets `SKILL.md` (from Step 1d):
 
 **Quality bar for proposals:** Every proposal must be specific enough that a future dreaming run can apply it mechanically without ambiguity. "Make Scout better at X" is not a proposal. "In SKILL.md section Y, change line Z from 'always do A' to 'do A only when B, otherwise do C'" is a proposal.
 
----
+***
 
 ### Step 1f: Commit
 

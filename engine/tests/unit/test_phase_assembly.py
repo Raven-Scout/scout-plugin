@@ -160,3 +160,19 @@ def test_parse_raises_on_list_requires(tmp_path):
     p.write_text("---\nphase: connector\nname: x\nslot: setup\nmode: []\nrequires: [slack, gmail]\n---\n\nbody\n")
     with pytest.raises(ValueError, match="'requires'"):
         parse_phase_file(p)
+
+
+def test_all_shipped_phase_files_parse():
+    """Every bundled phase fragment must parse — a phase that fails parse_phase_file
+    is silently dropped from assembly (regression guard for the bare-'---'-HR bug)."""
+    from scout.scripts.phase_assembly import parse_phase_file
+
+    phases_root = Path(__file__).parent.parent.parent.parent / "phases"
+    failures = []
+    for pf in sorted(phases_root.rglob("*.md")):
+        try:
+            sections = parse_phase_file(pf)
+            assert sections, f"{pf} parsed to zero sections"
+        except Exception as e:  # noqa: BLE001
+            failures.append(f"{pf.relative_to(phases_root)}: {type(e).__name__}: {e}")
+    assert not failures, "Unparseable phase files:\n" + "\n".join(failures)
