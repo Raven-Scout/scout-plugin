@@ -50,7 +50,7 @@ These inline comments are high-priority — they represent explicit {{USER_NAME}
 1. **Do not attempt to resolve them all.** Stay high-level.
 2. **Inventory** every marker (file, gist, line) into a single dated index: `knowledge-base/comment-triage-YYYY-MM-DD.md`.
 3. **Categorize** each: KB-staleness · vault-org/structure · system/self-improvement feature · search-depth/coverage miss · cruft · verify · approval/decision-gated · process-directive.
-4. **Route** each to the right queue with a back-link (research-queue, wishlist, mistake-audit, review-queue, the vault-reorg plan, the idea-capture page, or `dreaming-proposals/` for governance).
+4. **Route** each to the right queue with a back-link (research-queue/, wishlist/, mistake-audit, review-queue, the vault-reorg plan, the idea-capture page, or `dreaming-proposals/` for governance).
 5. **Leave the markers in place** — they mark the spot; strip one only when its underlying request is *resolved* (the REM-cleanup pruning duty then removes processed ones).
 6. **Surface** the triage index + any approval-gated or 🔴 items in the wrap notification, so the batch is visibly captured and routed.
 
