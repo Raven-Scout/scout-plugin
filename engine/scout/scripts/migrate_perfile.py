@@ -52,11 +52,11 @@ def _strip_markers(text: str) -> tuple[str, str, str]:
     m = re.match(r"^\[(in progress|done)\]\s*", t, re.I)
     if m:
         status = "in-progress" if m.group(1).lower() == "in progress" else "done"
-        t = t[m.end():]
+        t = t[m.end() :]
     m = re.match(r"^(HIGH|MEDIUM|LOW)\b\s*(—|-|–)?\s*", t)
     if m:
         priority = m.group(1).lower()
-        t = t[m.end():]
+        t = t[m.end() :]
     return status, priority, t.strip()
 
 
@@ -78,11 +78,10 @@ def parse_wishlist_item(bullet: str, in_done_file: bool = False) -> Item:
             date = dm.group(1)
         src = re.sub(r"^\d{4}-\d{2}-\d{2}\s*(—|-|–)?\s*", "", paren).strip()
         source = src or None
-        rest = rest[pm.end():]
+        rest = rest[pm.end() :]
         rest = rest.lstrip(". \t")
     body = rest.strip()
-    return Item(title=title, status=status, priority=priority,
-                date=date, source=source, body=body)
+    return Item(title=title, status=status, priority=priority, date=date, source=source, body=body)
 
 
 def parse_research_item(line: str, area: str | None = None) -> Item:
@@ -91,7 +90,7 @@ def parse_research_item(line: str, area: str | None = None) -> Item:
     status = "open"
     if m:
         status = "done" if m.group(1).lower() == "x" else "open"
-        t = t[m.end():]
+        t = t[m.end() :]
     priority = "medium"
     if t.startswith("🔴"):
         priority = "urgent"
@@ -110,8 +109,7 @@ def parse_research_item(line: str, area: str | None = None) -> Item:
     dm = DATE_RE.search(rest)
     if dm:
         date = dm.group(1)
-    return Item(title=title, status=status, priority=priority,
-                date=date, source=None, body=rest.strip(), area=area)
+    return Item(title=title, status=status, priority=priority, date=date, source=None, body=rest.strip(), area=area)
 
 
 def slugify(title: str, max_words: int = 8) -> str:
@@ -144,12 +142,11 @@ def _unique_path(out_dir: Path, name: str) -> Path:
 
 
 def _yq(s: str) -> str:
-    return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def render_item(item: Item) -> str:
-    fm = ["---", f"title: {_yq(item.title)}", f"status: {item.status}",
-          f"priority: {item.priority}"]
+    fm = ["---", f"title: {_yq(item.title)}", f"status: {item.status}", f"priority: {item.priority}"]
     if item.date:
         fm.append(f"date: {item.date}")
     if item.source:
@@ -202,9 +199,7 @@ def _heading_area(heading: str) -> str | None:
     core = heading.strip()
     core = re.sub(r"^(🔴|🟡|🟢|🔵|🛌|✅|🎯)\s*", "", core).strip()
     parts = re.split(r"\s+(?:—|–|-)\s+", core, maxsplit=1)
-    if len(parts) == 2 and re.match(
-            r"^(🔴|🟡|🟢|🔵|🛌|✅|🎯|done\b|wip\b|in[\s-]?progress\b)",
-            parts[1].strip(), re.I):
+    if len(parts) == 2 and re.match(r"^(🔴|🟡|🟢|🔵|🛌|✅|🎯|done\b|wip\b|in[\s-]?progress\b)", parts[1].strip(), re.I):
         core = parts[0].strip()
     if core.lower() == "queue":
         return None
@@ -329,9 +324,7 @@ def migrate_perfile(vault: Path, default_date: str | None = None) -> dict:
 
     # Migrate wishlist files (count items across all that exist).
     wishlist_count = 0
-    for name, in_done_file in (("Wishlist.md", False),
-                               ("Wishlist-in-progress.md", False),
-                               ("Wishlist-done.md", True)):
+    for name, in_done_file in (("Wishlist.md", False), ("Wishlist-in-progress.md", False), ("Wishlist-done.md", True)):
         src = docs / name
         if src.exists():
             wishlist_count += migrate_wishlist_file(src, wishlist_out, in_done_file, default_date)

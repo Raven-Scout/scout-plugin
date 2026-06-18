@@ -103,9 +103,7 @@ def test_last_verified_defaults_when_absent(tmp_path: Path) -> None:
 
     (docs / "Wishlist.md").write_text("* **Just one thing** with no parenthetical.\n")
     # research-queue.md with a Queue item but NO Last-verified paragraph.
-    (kb / "research-queue.md").write_text(
-        "# Research Queue\n\n## Queue\n\n- [ ] **Look into something** later.\n"
-    )
+    (kb / "research-queue.md").write_text("# Research Queue\n\n## Queue\n\n- [ ] **Look into something** later.\n")
 
     assert needs_migration(vault) is True
     migrate_perfile(vault, default_date="2026-06-16")

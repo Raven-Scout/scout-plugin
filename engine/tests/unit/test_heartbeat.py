@@ -158,9 +158,7 @@ def _write_queue_item(vault: Path, name: str, status: str) -> Path:
     queue_dir = vault / "knowledge-base" / "research-queue"
     queue_dir.mkdir(parents=True, exist_ok=True)
     item = queue_dir / name
-    item.write_text(
-        f"---\ntitle: {name}\nstatus: {status}\npriority: high\ndate: 2026-06-10\n---\n\n# {name}\nbody\n"
-    )
+    item.write_text(f"---\ntitle: {name}\nstatus: {status}\npriority: high\ndate: 2026-06-10\n---\n\n# {name}\nbody\n")
     return item
 
 
