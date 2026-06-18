@@ -1246,7 +1246,10 @@ def _register_phases() -> None:
                         by_section.setdefault(r.section_name, []).append(r)
                     for section_name, srs in by_section.items():
                         sec = sec_by_key[(pf, section_name)]
+                        # applied hunks always carry a resolved anchor + retemplatized
+                        # body; assert the invariant so it's explicit (and type-safe).
                         edits = [(r.anchor, r.retemplatized) for r in srs]
+                        assert all(a is not None and t is not None for a, t in edits)
                         edited_body = apply_section_edits(sec.raw_body, sec.rendered_body, edits)
                         text = apply_to_phase_text(text, sec.raw_body, edited_body)
                     pf.write_text(text, encoding="utf-8")

@@ -67,6 +67,7 @@ class Hunk:
 
     added: list[str]
     anchor: str | None  # nearest non-empty preceding line — the insertion anchor
+    is_replace: bool = False  # True if the diff opcode was 'replace' (a modified line), not a pure 'insert'
 
 
 @dataclass
@@ -169,7 +170,13 @@ def apply_to_phase_text(file_text: str, old_body: str, new_body: str) -> str:
 
 
 def diff_hunks(snapshot: str, live: str) -> list[Hunk]:
-    """Return the added/changed line blocks in ``live`` relative to ``snapshot``."""
+    """Return the added/changed line blocks in ``live`` relative to ``snapshot``.
+
+    ``insert`` and ``replace`` opcodes are returned (the latter flagged via
+    ``Hunk.is_replace``); ``delete`` opcodes are intentionally ignored — the
+    back-port only carries forward *added* guidance, never removals (vault-side
+    deletions are out of scope by design).
+    """
     a = snapshot.splitlines()
     b = live.splitlines()
     sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
@@ -178,7 +185,7 @@ def diff_hunks(snapshot: str, live: str) -> list[Hunk]:
         if tag not in ("insert", "replace"):
             continue
         anchor = next((ln for ln in reversed(b[:j1]) if ln.strip()), None)
-        hunks.append(Hunk(added=b[j1:j2], anchor=anchor))
+        hunks.append(Hunk(added=b[j1:j2], anchor=anchor, is_replace=(tag == "replace")))
     return hunks
 
 
@@ -206,8 +213,8 @@ def plan_backport(snapshot: str, live: str, sections: list[RenderedSection], var
     """Map each divergence hunk to a phase section and classify its outcome.
 
     Status:
-      - ``applied``      — mapped to one section, no risky vars, round-trip ✓
-      - ``needs-review`` — ambiguous anchor, risky var present, or round-trip miss
+      - ``applied``      — pure insertion, mapped to one section, no risky vars, round-trip ✓
+      - ``needs-review`` — modified line (diff 'replace'), ambiguous anchor, risky var present, or round-trip miss
       - ``unmapped``     — anchor in no phase section (vault-only drift)
     """
     results: list[HunkResult] = []
@@ -229,6 +236,24 @@ def plan_backport(snapshot: str, live: str, sections: list[RenderedSection], var
             continue
 
         sec = matches[0]
+        if hunk.is_replace:
+            # 'replace' = a modified line, not a pure insertion. The inserter
+            # only adds lines after the anchor, so back-porting a replace would
+            # leave the OLD line in the fragment alongside the new one (and the
+            # containment round-trip check wouldn't catch it). Surface it for a
+            # manual edit instead of corrupting the fragment.
+            results.append(
+                HunkResult(
+                    "needs-review",
+                    hunk.added,
+                    phase_file=sec.phase_file,
+                    section_name=sec.section_name,
+                    anchor=hunk.anchor,
+                    reason="modified line (diff 'replace') — edit the fragment manually so old text isn't left behind",
+                )
+            )
+            continue
+
         retempl, risky = retemplatize(hunk.added, vars_)
         if risky:
             results.append(

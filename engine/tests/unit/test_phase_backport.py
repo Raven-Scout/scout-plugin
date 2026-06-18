@@ -75,6 +75,14 @@ def test_diff_hunks_empty_when_identical():
     assert diff_hunks(text, text) == []
 
 
+def test_diff_hunks_tags_replace_vs_insert():
+    # A pure insertion is is_replace=False; a modified line is is_replace=True.
+    insert_hunks = diff_hunks("a\nb\nc\n", "a\nb\nNEW\nc\n")
+    assert len(insert_hunks) == 1 and insert_hunks[0].is_replace is False
+    replace_hunks = diff_hunks("a\nb\nc\n", "a\nB-CHANGED\nc\n")
+    assert len(replace_hunks) == 1 and replace_hunks[0].is_replace is True
+
+
 # ---------- plan_backport (locate + retemplatize + round-trip) ----------
 
 
@@ -119,6 +127,23 @@ def test_plan_backport_needs_review_when_risky_value_present():
     results = plan_backport(snapshot, live, [sec], VARS)
     assert results[0].status == "needs-review"
     assert "USER_NAME" in results[0].risky_hits
+
+
+def test_plan_backport_needs_review_for_modified_line_not_pure_insert():
+    # A 'replace' hunk (a modified vault line) must NOT be auto-applied: the
+    # inserter only adds after the anchor, so applying it would leave the OLD
+    # line in the fragment alongside the new one (corruption). It is downgraded
+    # to needs-review even though it's clean (no risky vars) and well-anchored.
+    raw = "### Step 2-pre\n\nScan markers under {{SCOUT_DIR}}.\nThen score files."
+    sec = _section(raw)
+    snapshot = sec.rendered_body
+    live = sec.rendered_body.replace("Then score files.", "Then score every file generically.")
+    results = plan_backport(snapshot, live, [sec], VARS)
+    assert len(results) == 1
+    r = results[0]
+    assert r.status == "needs-review"
+    assert "replace" in r.reason
+    assert r.retemplatized is None  # never prepared a write for a replace hunk
 
 
 def test_plan_backport_unmapped_when_anchor_in_no_section():
