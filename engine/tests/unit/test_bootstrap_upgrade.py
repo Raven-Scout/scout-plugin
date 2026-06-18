@@ -285,3 +285,52 @@ def test_unique_backup_path_never_clobbers_same_day(tmp_path, monkeypatch):
     assert second.read_text() == "B\n"
     # First path keeps the familiar dated name.
     assert first.name == "run-scout.sh.bak.2026-06-15"
+
+
+def test_upgrade_migrates_legacy_wishlist_and_research(tmp_path):
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+
+    # Simulate a pre-migration (legacy-format) vault: plant the old single files.
+    (vault / "docs" / "Wishlist.md").write_text(
+        "# Wishlist\n\n"
+        "* **HIGH — Alpha thing** (2026-06-10 — Jordan DM) do alpha.\n"
+        "* **[in progress] MEDIUM — Beta thing** do beta.\n"
+    )
+    (vault / "knowledge-base" / "research-queue.md").write_text(
+        "# Research Queue\n\n**Last verified:** 2026-06-01 — baseline.\n\n"
+        "## Queue\n- [ ] 🔴 **START IMMEDIATELY — Gamma topic** research gamma.\n"
+    )
+
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.plugin_version = "0.4.1"
+    upgrade(cfg)
+
+    # Wishlist migrated to per-file; old file gone.
+    wl = sorted((vault / "docs" / "wishlist").glob("*.md"))
+    assert len(wl) == 2
+    assert not (vault / "docs" / "Wishlist.md").exists()
+    # Research migrated to per-file; research-queue.md reduced to thin run-log.
+    rq_items = sorted((vault / "knowledge-base" / "research-queue").glob("*.md"))
+    assert len(rq_items) == 1
+    rq_log = (vault / "knowledge-base" / "research-queue.md").read_text()
+    assert "## Queue" not in rq_log and "- [ ]" not in rq_log
+    assert "run log" in rq_log  # thin run-log header
+    assert "Last verified" in rq_log  # continuity note preserved
+
+
+def test_upgrade_migration_idempotent_second_run(tmp_path):
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+    (vault / "docs" / "Wishlist.md").write_text("# Wishlist\n\n* **Alpha** do alpha.\n")
+
+    cfg = _config(vault, plugin_root=plugin)
+    upgrade(cfg)
+    first = sorted((vault / "docs" / "wishlist").glob("*.md"))
+    assert len(first) == 1
+    # Second upgrade must not duplicate or alter migrated items.
+    upgrade(_config(vault, plugin_root=plugin))
+    second = sorted((vault / "docs" / "wishlist").glob("*.md"))
+    assert [p.name for p in second] == [p.name for p in first]
