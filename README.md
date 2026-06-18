@@ -295,7 +295,7 @@ scout-plugin/
     hooks/                  -- Pre-session hooks (kb-pre-filter)
     scripts/                -- Budget tracking + pre-session data gathering
     action-items/           -- MD-to-HTML dashboard renderer + file watcher
-    docs/                   -- Wishlist templates (active / in-progress / done)
+    docs/wishlist/          -- Wishlist item directory seed (per-file)
     knowledge-base/         -- KB scaffold and ontology
     inbox.md.tmpl           -- Quick-capture template
     meetings/               -- Meeting registry template
@@ -338,7 +338,8 @@ scout-plugin/
     people/                 -- Person entity files
     personal/               -- Personal task and family entity files
     projects/               -- Project files
-    research-queue.md       -- Queued research topics
+    research-queue/         -- Queued research topics (one file per topic)
+    research-queue.md       -- Research run log (thin)
     scout-mistake-audit.md  -- Error-pattern log written by dreaming
     review-queue.md         -- Claims waiting on user verification
   action-items/             -- Daily action items
@@ -347,9 +348,7 @@ scout-plugin/
     render.py               -- Optional MD → HTML dashboard
     watch.sh                -- Auto-re-render HTML on MD change (fswatch)
   docs/
-    Wishlist.md             -- New feature requests
-    Wishlist-in-progress.md -- Active work, with sub-task checkboxes
-    Wishlist-done.md        -- Completed items archive
+    wishlist/               -- One file per wishlist item (state in frontmatter status:)
   .scout-cache/             -- Hook outputs (gitignored, regenerated every run)
   .scout-logs/              -- Run logs and usage-tracker.jsonl (gitignored)
 ```
@@ -362,7 +361,7 @@ The assembled skill files are self-contained — they don't reference the plugin
 - **Change schedule**: Edit the launchd plist or cron entries, or re-run `/scout-setup` to reconfigure timing.
 - **Add KB files**: Create new project folders following the convention `projects/<name>/<name>.md`. Scout will pick them up on the next run.
 - **Extend the ontology**: Add new entity types and relationships in `knowledge-base/ontology/schema.yaml`. The parser validates against this schema.
-- **Queue research topics**: Add items to `knowledge-base/research-queue.md` for Scout to investigate during research sessions.
+- **Queue research topics**: Add a file to `knowledge-base/research-queue/` (e.g. `knowledge-base/research-queue/<date>-<topic-slug>.md`) with frontmatter (`title`, `status: open`, `priority`, `date`) describing what to research. Scout picks it up during research sessions.
 - **Adjust cross-checks**: The cross-check logic in `SKILL.md` scales with connectors — add or remove verification points as needed.
 - **Re-assemble**: After plugin updates, run `/scout-setup` and choose Reassemble to regenerate skill files with new improvements while preserving your configuration.
 
@@ -428,7 +427,7 @@ Run `/scout-setup` and choose Reconfigure. The wizard will re-detect available t
 Edit `SKILL.md`, `DREAMING.md`, or `RESEARCH.md` directly in your Scout directory. Your changes persist until you explicitly run Reassemble from `/scout-setup`. The plugin never overwrites your skill files without asking.
 
 **How do I queue research topics?**
-Add items to `knowledge-base/research-queue.md` as unchecked checkboxes: `- [ ] Topic — what to look for`. Scout picks them up during the next research session.
+Add a file to `knowledge-base/research-queue/` (e.g. `knowledge-base/research-queue/<date>-<topic-slug>.md`) with frontmatter (`title`, `status: open`, `priority`, `date`) describing what to research. Scout picks it up during the next research session.
 
 **How do I add personal tasks?**
 Create a file in `knowledge-base/personal/task-<name>.md` with YAML frontmatter including `type: task`, `domain: personal`, `status: open`, and optionally `deadline`, `priority`, and `completion_signal`. Scout will surface these in daily action items.

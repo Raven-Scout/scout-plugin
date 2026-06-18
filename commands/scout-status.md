@@ -102,11 +102,11 @@ Count how many Pending and Approved proposals exist.
 
 ### 3d. Wishlist
 
-Read `SCOUT_DIR/docs/Wishlist.md` and `SCOUT_DIR/docs/Wishlist-in-progress.md` (if either exists). The three-file split (Wishlist / Wishlist-in-progress / Wishlist-done) means active items can live in either of the first two files.
+Read every `*.md` file in `SCOUT_DIR/docs/wishlist/` (if the directory exists). Each file is one item with YAML frontmatter — the `status:` field is the state (`open` | `in-progress` | `done` | `dropped`).
 
-Collect all items that are NOT marked `[done]`. An item is done if the line starts with `- [done]` or is marked with `~~strikethrough~~`. Items marked `[in progress]` or with no status marker are considered active.
+Collect the active items: `status: open` (new) and `status: in-progress`. Exclude `done` and `dropped`.
 
-Count items in each file separately so the dashboard can report: "3 new, 2 in progress."
+Count `open` vs `in-progress` so the dashboard can report e.g. "3 new, 2 in progress."
 
 ### 3e. Scheduler Health (macOS only)
 
@@ -305,12 +305,12 @@ If none:
 If there are active (non-done) wishlist items, list them:
 
 ```
-  • [in progress] Sharing the Scout skill with others internally
+  • [in-progress] Sharing the Scout skill with others internally
   • Custom GUI and TUI for working through action items
   • ...
 ```
 
-If all items are done or the file doesn't exist:
+If all items are done or the directory is empty or doesn't exist:
 
 ```
   Wishlist is clear.
