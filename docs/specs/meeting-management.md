@@ -104,7 +104,7 @@ A single file `inbox.md` for dumping anything, anytime:
    - Meeting-related note -> target meeting's home file under `## Next Session Notes`
    - Action item -> today's action-items file
    - Personal task -> create/update entity in `knowledge-base/personal/`
-   - Project idea/note -> relevant project file or `knowledge-base/research-queue.md`
+   - Project idea/note -> relevant project file, or create a per-file item in `knowledge-base/research-queue/<YYYY-MM-DD>-<slug>.md`
    - Ambiguous -> keeps in inbox with a `[needs context]` flag for {{USER_NAME}} to clarify
 3. Removes processed entries from inbox (git preserves history)
 4. If the inbox is empty, skip silently
