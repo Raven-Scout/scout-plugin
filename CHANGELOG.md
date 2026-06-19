@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Knowledge-graph traversal layer (`parser.py`)** — `traverse()` (BFS reachability returning each reachable entity with its hop distance, first-reached relationship, and shortest typed path), `path()` (shortest typed path between two entities), and `to_networkx()` (lazy optional bridge to a `MultiDiGraph` for centrality/components) on `KnowledgeGraph`, plus `traverse` / `path` CLI commands (`--name` source, `--to` target, `--hops`, `--rels` type filter). Pure-stdlib BFS with no third-party dependency; `to_networkx()` imports networkx lazily and raises a friendly error if it's absent, so the core commands never require it.
+
 ## [0.7.1] - 2026-06-19
 
 
