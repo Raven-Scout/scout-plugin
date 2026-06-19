@@ -19,7 +19,7 @@ Gating order (preserved from bash):
        * uncommitted changes in the vault git repo
   7. Pick runner:
        * research, if >=24 h since last research AND research-queue has
-         unchecked items AND ``run-research.sh`` exists
+         an open item AND ``run-research.sh`` exists
        * otherwise dreaming
   8. Launch the chosen runner detached, log the PID
 """
@@ -53,6 +53,7 @@ EXIT_ERROR = 1
 _TRACKER_FILENAME = "usage-tracker.jsonl"
 _CONFIG_FILENAME = ".scout-config.yaml"
 _RESEARCH_QUEUE_REL = "knowledge-base/research-queue.md"
+_RESEARCH_QUEUE_DIR_REL = "knowledge-base/research-queue"
 
 _CONFIG_LINE_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\s][^#]*?)\s*(?:#.*)?$")
 
@@ -220,6 +221,45 @@ def research_queue_has_unchecked(queue_path: Path) -> bool:
     except OSError:
         return False
     return False
+
+
+def _item_status(path: Path) -> str | None:
+    """Read the frontmatter ``status:`` of a per-file queue item (lowercased), or None."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.startswith("---"):
+        return None
+    # scan the leading frontmatter block (between the first two '---' fences)
+    lines = text.splitlines()
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        m = re.match(r"\s*status\s*:\s*(\S+)", line)
+        if m:
+            return m.group(1).strip().lower()
+    else:
+        return None  # no closing fence → malformed frontmatter, treat as no status
+    return None  # closing fence found, no status key
+
+
+def research_queue_has_open(vault: Path) -> bool:
+    """True iff the research queue has at least one open item.
+
+    Current per-file format: any ``knowledge-base/research-queue/*.md`` with
+    frontmatter ``status: open`` or ``in-progress``. Falls back to the legacy
+    single-file ``research-queue.md`` (``- [ ]`` lines) for pre-migration vaults.
+    """
+    queue_dir = vault / _RESEARCH_QUEUE_DIR_REL
+    if queue_dir.is_dir():
+        try:
+            items = sorted(queue_dir.glob("*.md"))
+        except OSError:
+            return False
+        return any(_item_status(i) in ("open", "in-progress") for i in items)
+    # Legacy single-file fallback (pre-migration vaults only):
+    return research_queue_has_unchecked(vault / _RESEARCH_QUEUE_REL)
 
 
 def run_budget_check(scoutctl_bin: str | None = None) -> int:
@@ -395,7 +435,6 @@ def run(
 
     research_runner = target / "run-research.sh"
     dreaming_runner = target / "run-dreaming.sh"
-    research_queue = target / _RESEARCH_QUEUE_REL
 
     decision = decide(
         stats=stats,
@@ -404,7 +443,7 @@ def run(
         budget_ok=run_budget_check(scoutctl_bin) == 0,
         session_already_running=scout_session_running(),
         uncommitted_vault_changes=vault_has_uncommitted_changes(target),
-        research_queue_open=research_queue_has_unchecked(research_queue),
+        research_queue_open=research_queue_has_open(target),
         research_runner=research_runner,
         dreaming_runner=dreaming_runner,
     )
@@ -452,6 +491,7 @@ __all__ = [
     "load_config",
     "main",
     "read_tracker_stats",
+    "research_queue_has_open",
     "research_queue_has_unchecked",
     "run",
     "run_budget_check",

@@ -180,7 +180,7 @@ The KB's value depends on its graph being connected. Rules:
 
 **Never use `index.md`.** The main file in any folder is named after the folder itself (e.g., `projects/projects.md`, `my-project/my-project.md`). If you need to create a new project or subfolder, follow this pattern. Always use `[[wikilinks]]` when referencing other files in the KB.
 
----
+***
 
 ## Source Priority Principle
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from scout.scripts.bootstrap_lock import (
     acquire_lock_with_wait,
     release_lock,
 )
+from scout.scripts.migrate_perfile import migrate_perfile
 from scout.scripts.phase_assembly import (
     parse_phase_file,
     render_template,
@@ -272,11 +274,17 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
         for phase_file in sorted(src_dir.glob("*.md")):
             try:
                 sections = parse_phase_file(phase_file)
-            except (ValueError, yaml.YAMLError):
-                # Phase file failed to parse — skip rather than abort the assembly.
-                # Known limitation: phase_assembly.parse_phase_file is fooled by bare
-                # '---' horizontal rules in markdown bodies (e.g., kb-management.md).
-                # Tracked as a Plan 8 followup to harden A5's parser.
+            except (ValueError, yaml.YAMLError) as e:
+                # Phase file failed to parse — skip it (graceful degradation) but warn
+                # loudly so the dropped phase can't vanish invisibly. The bundled phase
+                # files all parse today; body horizontal rules use '***' (not bare '---',
+                # which parse_phase_file treats as a frontmatter delimiter). This guard
+                # exists to surface any future regression instead of silently dropping
+                # a whole phase from the assembled SKILL/DREAMING/RESEARCH.
+                print(
+                    f"warning: skipping unparseable phase file {phase_file}: {e}",
+                    file=sys.stderr,
+                )
                 continue
             kept = select_sections(
                 sections,
@@ -576,6 +584,16 @@ def _is_legacy_vault(vault: Path) -> bool:
     return (vault / ".scout-state").exists() and not (vault / "scout-config.yaml").exists()
 
 
+def _stage_migrations(cfg: BootstrapConfig) -> None:
+    """Run idempotent data-format migrations on an existing vault.
+
+    Currently: convert a single-file Wishlist + research-queue into the
+    per-file format. ``migrate_perfile`` no-ops on already-migrated vaults,
+    so this is safe to run on every upgrade.
+    """
+    migrate_perfile(cfg.vault)
+
+
 def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
     """Run the upgrade pipeline. Refuses if no vault or if vault is legacy (pre-Plan-8)."""
     if not _vault_exists(cfg.vault):
@@ -591,6 +609,10 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
     lock.parent.mkdir(parents=True, exist_ok=True)
     acquire_lock_with_wait(lock)
     try:
+        # Migrations run FIRST so later stages (e.g. cat-4 assembly of
+        # DREAMING/RESEARCH) land on an already-migrated vault. Idempotent:
+        # no-ops on vaults that are already per-file or never had legacy files.
+        _stage_migrations(cfg)
         _stage_cat1_writes(cfg)
         # _stage_seed_schedule is idempotent (returns early if the file
         # exists) so it's safe to call on upgrade. Without it, vaults set

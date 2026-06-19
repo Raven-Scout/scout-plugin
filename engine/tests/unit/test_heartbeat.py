@@ -21,6 +21,7 @@ from scout.scripts.heartbeat import (
     in_off_peak,
     load_config,
     read_tracker_stats,
+    research_queue_has_open,
     research_queue_has_unchecked,
 )
 
@@ -148,6 +149,62 @@ def test_research_queue_has_unchecked_false(tmp_path: Path) -> None:
 
 def test_research_queue_has_unchecked_missing_file(tmp_path: Path) -> None:
     assert not research_queue_has_unchecked(tmp_path / "absent.md")
+
+
+# ----- research queue (per-file, status frontmatter) --------------------
+
+
+def _write_queue_item(vault: Path, name: str, status: str) -> Path:
+    queue_dir = vault / "knowledge-base" / "research-queue"
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    item = queue_dir / name
+    item.write_text(f"---\ntitle: {name}\nstatus: {status}\npriority: high\ndate: 2026-06-10\n---\n\n# {name}\nbody\n")
+    return item
+
+
+def test_research_queue_has_open_true_for_open_item(tmp_path: Path) -> None:
+    _write_queue_item(tmp_path, "2026-06-10-x.md", "open")
+    assert research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_true_for_in_progress_item(tmp_path: Path) -> None:
+    _write_queue_item(tmp_path, "2026-06-10-y.md", "in-progress")
+    assert research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_false_when_all_done_or_dropped(tmp_path: Path) -> None:
+    _write_queue_item(tmp_path, "2026-06-10-a.md", "done")
+    _write_queue_item(tmp_path, "2026-06-10-b.md", "dropped")
+    assert not research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_false_when_dir_empty(tmp_path: Path) -> None:
+    (tmp_path / "knowledge-base" / "research-queue").mkdir(parents=True)
+    assert not research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_falls_back_to_legacy_file(tmp_path: Path) -> None:
+    # No per-file dir; legacy single-file with an unchecked line.
+    (tmp_path / "knowledge-base").mkdir(parents=True)
+    (tmp_path / "knowledge-base" / "research-queue.md").write_text("# queue\n- [ ] todo\n")
+    assert research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_false_when_nothing_present(tmp_path: Path) -> None:
+    assert not research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_dir_open_item_wins_over_completed_legacy(tmp_path: Path) -> None:
+    _write_queue_item(tmp_path, "2026-06-10-z.md", "open")
+    (tmp_path / "knowledge-base" / "research-queue.md").write_text("# queue\n- [x] done\n")
+    assert research_queue_has_open(tmp_path)
+
+
+def test_research_queue_has_open_false_when_dir_resolved_despite_legacy_unchecked(tmp_path: Path) -> None:
+    # all per-file items resolved; legacy file still has an unchecked line — dir is authoritative
+    _write_queue_item(tmp_path, "2026-06-10-a.md", "done")
+    (tmp_path / "knowledge-base" / "research-queue.md").write_text("# queue\n- [ ] legacy todo\n")
+    assert not research_queue_has_open(tmp_path)
 
 
 # ----- decide() ----------------------------------------------------------

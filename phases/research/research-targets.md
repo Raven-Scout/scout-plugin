@@ -10,26 +10,23 @@ requires: null
 
 ## Step 1a: Check the Research Queue
 
-Read `knowledge-base/research-queue.md`. If {{USER_NAME}} has explicitly queued topics, those take priority.
+Read every `*.md` file in `knowledge-base/research-queue/` (the thin `knowledge-base/research-queue.md` is now just the run log — see the end of this step). Each file is one topic: YAML frontmatter (`title`, `status`, `priority`, `date`, optional `area`) plus a body with the research brief / findings.
 
-**Queue item format:**
-```markdown
-- [ ] Topic or entity name — why this matters / what to look for
-```
+`status: open` and `in-progress` are the work queue; `done` and `dropped` are resolved. If {{USER_NAME}} has explicitly queued topics, those take priority.
 
-Checked items (`- [x]`) are done. Unchecked items are the work queue.
+**Priority preemption (`priority: urgent` items run first).** Before the staleness-rotation guard or any opportunistic "work what this morning surfaced" pick, the run MUST:
 
-**Priority preemption (🔴 START-IMMEDIATELY items run first).** Before the staleness-rotation guard or any opportunistic "work what this morning surfaced" pick, the run MUST:
+1. **Scan the queue for any item with `priority: urgent` (the START-IMMEDIATELY directive) and run it first.** A user `urgent` directive is not just another queue item — it preempts the rotation and the day's incidental find.
+2. **Only fall through** to the rotation (Step 1b scoring) or an opportunistic lane when no `urgent` item is outstanding.
+3. **Surface as overdue:** any `urgent` item still `open` across **>1 research run** must be called out as **overdue** in the wrap notification, so a starved top priority can't go silent.
 
-1. **Scan the queue for any item marked 🔴 / `START IMMEDIATELY` / {{USER_NAME}}-directed-this-week and run it first.** A user 🔴 directive is not just another queue row — it preempts the rotation and the day's incidental find.
-2. **Only fall through** to the rotation (Step 1b scoring) or an opportunistic lane when no such item is outstanding.
-3. **Surface as overdue:** any 🔴 directive item still open across **>1 research run** must be called out as **overdue** in the wrap notification, so a starved top priority can't go silent.
+This does NOT stop the opportunistic lane (a good incidental find is still worth pursuing) — it fixes the **ordering** (`urgent` first). A "this is the top priority" intention stays inert until the picker mechanically honors it.
 
-This does NOT stop the opportunistic lane (a good incidental find is still worth pursuing) — it fixes the **ordering** (🔴 directive first). A "this is the top priority" intention stays inert until the picker mechanically honors it.
+After researching a topic, set its frontmatter `status: done` (or `in-progress`) and add findings to the body; write the run's "Last verified …" continuity note to `knowledge-base/research-queue.md` (the run log).
 
 ## Step 1b: Score Entities for Research Need
 
-If the queue is empty (or after completing queued items), score entities:
+If the queue is empty (no `open`/`in-progress` items, or after completing them), score entities:
 
 **Priority order:**
 1. Entities {{USER_NAME}} interacted with this week (from dreaming session logs)
