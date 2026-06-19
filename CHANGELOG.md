@@ -6,9 +6,16 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-19
+
+
 ### Added
+- **Per-file Wishlist & Research Queue (#144)** — the vault's Wishlist and Research Queue move from single markdown files to per-file directories (`docs/wishlist/`, `knowledge-base/research-queue/`), one file per item, so items are easier to edit, track, and reference individually. An **idempotent migration runs automatically during `/scout-update`**: it writes every existing item to the new per-file layout *before* removing the legacy files (no content loss; safe to re-run), and the heartbeat detects open research items in the new layout with a fallback to the legacy file during the transition.
 - **`scoutctl phases backport`** — reverse-maps vault brain-file edits (`SKILL`/`DREAMING`/`RESEARCH.md`) back into their source `phases/` fragments, so a future `/scout-update` re-render carries them forward instead of sidecaring (closes the manual half of the back-port gap). Diffs each brain file against its `.scout-state/last-assembled/` snapshot, locates each divergence in its fragment by anchor matching, conservatively re-templatizes (only long/unique vars auto-reverse; short ones like the instance/user name are flagged, never auto-written — so instance data can't leak into the engine), and **only auto-writes pure insertions that round-trip** (re-assembly reproduces the vault line); modified lines (diff `replace`) are downgraded to needs-review so the old text is never left behind. Default is a read-only report (`--apply` writes; `--kind`, `--vault` flags). Never commits/pushes/opens a PR. New module `scout.scripts.phase_backport` (pure, unit-tested) + `phases` CLI sub-app. Design: `docs/superpowers/specs/2026-06-16-scoutctl-phases-backport-design.md`.
 - **Engine back-port reminder** (`phases/modes/feedback-processing.md`, Step 1e) — after a run applies a `SKILL`/`DREAMING`/`RESEARCH` proposal, it surfaces a standing reminder (in the wrap notification + as a carried action item) that the engine back-port is owed until its PR merges, pointing at `scoutctl phases backport`. Explicitly **operator-triggered only — never auto-run** (it writes the shared engine). Closes the "applied edits silently never reach `phases/`" loop with a nudge instead of automation.
+
+### Documentation
+- **Budget-skip troubleshooting** (`README.md`) — guidance for diagnosing sessions skipped by the budget gate (#143).
 
 ## [0.7.0] - 2026-06-17
 
