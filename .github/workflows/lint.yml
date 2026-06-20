@@ -29,7 +29,41 @@ jobs:
       - name: Version sync guard
         run: .venv/bin/python -m scout.scripts.versioning check
         working-directory: engine
-      - name: Shellcheck scoutctl
+      - name: Shellcheck
+        working-directory: ${{ github.workspace }}
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck bin/scoutctl
+          # engine launcher — full severity (existing guard)
+          shellcheck engine/bin/scoutctl
+          # installer + release scripts — error severity
+          shellcheck -S error install.sh scripts/*.sh
+          # all shell templates seeded into user vaults (placeholders don't
+          # break shellcheck parsing) — error severity
+          find templates -name '*.sh.tmpl' -print0 | xargs -0 -r shellcheck -S error
+      - name: Validate plugin manifests
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Parse both manifests as JSON (the version-sync guard above uses
+          # regex, so a malformed manifest that still regex-matches its version
+          # would slip past it) and assert required keys are present.
+          python3 - <<'PY'
+          import json, sys
+
+          plugin = json.load(open(".claude-plugin/plugin.json"))
+          for key in ("name", "version"):
+              if key not in plugin:
+                  sys.exit(f"plugin.json missing required key: {key!r}")
+
+          market = json.load(open(".claude-plugin/marketplace.json"))
+          if "name" not in market:
+              sys.exit("marketplace.json missing required key: 'name'")
+          plugins = market.get("plugins")
+          if not isinstance(plugins, list) or not plugins:
+              sys.exit("marketplace.json 'plugins' must be a non-empty list")
+          for i, entry in enumerate(plugins):
+              for key in ("name", "source", "version"):
+                  if key not in entry:
+                      sys.exit(f"marketplace.json plugins[{i}] missing required key: {key!r}")
+
+          print("plugin manifests valid")
+          PY

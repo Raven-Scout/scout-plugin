@@ -14,6 +14,15 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Verify tag matches manifest version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          MANIFEST_VERSION="$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")"
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} (version ${TAG_VERSION}) does not match plugin.json version ${MANIFEST_VERSION}"
+            exit 1
+          fi
+          echo "tag matches manifest version: ${MANIFEST_VERSION}"
       - name: Extract changelog section for this tag
         id: notes
         run: |
@@ -24,6 +33,10 @@ jobs:
             grab {print}
           ' CHANGELOG.md > RELEASE_NOTES.md
           echo "Extracted notes for $VERSION:"; cat RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::no CHANGELOG section found for ${VERSION} — refusing to publish an empty release"
+            exit 1
+          fi
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
         env:
