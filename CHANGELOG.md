@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **CI hardening & test reliability (internal)** — shell templates (`templates/**/*.sh.tmpl`), `install.sh`, and the release scripts are now shellchecked in CI; plugin manifests are validated as parseable JSON with required keys (the version-sync guard is regex-based, so a malformed manifest could previously slip past); and the release workflow asserts the pushed tag matches the manifest version and refuses to publish empty release notes. Two CI flakes fixed: the `schedule_tick` event tests now freeze the clock (they relied on wall-clock and failed near 00:00 UTC), and the startup-latency tests take the best of N samples (a single noisy sample on a shared runner could breach the budget).
+
 ## [0.7.1] - 2026-06-19
 
 
