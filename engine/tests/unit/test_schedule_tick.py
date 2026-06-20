@@ -40,6 +40,12 @@ from scout.scripts.schedule_tick import (
     run as tick_run,
 )
 
+# Frozen clock for tick_run() tests: Mon 08:05 ET — well past a 00:01 slot, so
+# the slot is unambiguously due. Tests that exercise tick_run() against the real
+# clock flake when CI runs near the 00:00 boundary (the missed-window math is
+# time-of-day-dependent), so they patch schedule_tick._now to this value.
+_FROZEN_NOW = datetime(2026, 5, 11, 8, 5, tzinfo=ZoneInfo("America/New_York"))
+
 
 # Helper for synthesizing slots in tests.
 def _slot(
@@ -558,6 +564,7 @@ def test_run_skips_when_network_offline(tmp_path, monkeypatch):
         "    missed_window_hours: 24\n    on_miss: fire\n    cooldown_minutes: 5\n"
     )
     with (
+        patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
         patch("scout.scripts.schedule_tick._network_ready", return_value=False),
         patch("scout.scripts.schedule_tick.subprocess.Popen") as mock_popen,
     ):
@@ -603,6 +610,7 @@ def test_slot_fired_event_has_full_payload_per_v0_5_spec(tmp_path, monkeypatch):
         "    missed_window_hours: 24\n    on_miss: fire\n    cooldown_minutes: 5\n"
     )
     with (
+        patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
         patch("scout.scripts.schedule_tick._network_ready", return_value=True),
         patch("scout.scripts.schedule_tick.subprocess.Popen") as mock_popen,
     ):
@@ -631,7 +639,10 @@ def test_slot_skipped_event_has_slot_type_and_target_local(tmp_path, monkeypatch
         "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
         "    missed_window_hours: 24\n    on_miss: skip\n    cooldown_minutes: 5\n"
     )
-    with patch("scout.scripts.schedule_tick._network_ready", return_value=True):
+    with (
+        patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
+        patch("scout.scripts.schedule_tick._network_ready", return_value=True),
+    ):
         tick_run()
     log = next((tmp_path / ".scout-logs").glob("schedule-events-*.jsonl"))
     rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
