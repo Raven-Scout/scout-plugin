@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scout.id_map import IdMap, IdMapEntry
 
 
@@ -92,6 +94,36 @@ def test_reattach_prefers_same_file_match(fake_data_dir: Path) -> None:
     found = m.reattach(title="Daily standup", file="tuesday.md")
     assert found is not None
     assert found.short_prefix == "BBBB"
+
+
+def test_load_missing_file_returns_empty_map_no_toctou(fake_data_dir: Path) -> None:
+    """#54: missing id-map.json must return an empty map without exists()/open() TOCTOU."""
+    # Ensure the file does not exist
+    path = fake_data_dir / ".scout-state" / "id-map.json"
+    if path.exists():
+        path.unlink()
+    m = IdMap.load(fake_data_dir)
+    assert list(m.iter_entries()) == []
+
+
+def test_load_corrupt_json_raises_value_error(fake_data_dir: Path) -> None:
+    """#54: a corrupt or zero-byte id-map.json must raise ValueError (not json.JSONDecodeError)."""
+    import json
+
+    path = fake_data_dir / ".scout-state" / "id-map.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not valid json", encoding="utf-8")
+    with pytest.raises(ValueError, match="corrupt id-map"):
+        IdMap.load(fake_data_dir)
+
+
+def test_load_zero_byte_file_raises_value_error(fake_data_dir: Path) -> None:
+    """#54: a zero-byte id-map.json must raise ValueError, not a bare json.JSONDecodeError."""
+    path = fake_data_dir / ".scout-state" / "id-map.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    with pytest.raises(ValueError, match="corrupt id-map"):
+        IdMap.load(fake_data_dir)
 
 
 def test_save_creates_parent_directory(fake_data_dir: Path) -> None:
