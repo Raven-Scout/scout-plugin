@@ -58,7 +58,8 @@ def new_short_prefix(
     indicates the prefix space is approaching saturation, which would
     require widening to 5 chars (out of scope for v0.4).
     """
-    exclude = exclude or set()
+    if exclude is None:
+        exclude = set()
     for _ in range(max_attempts):
         candidate = "".join(secrets.choice(CROCKFORD_ALPHABET) for _ in range(SHORT_PREFIX_LEN))
         # Require >=1 letter so the mint always satisfies the recognition
