@@ -741,7 +741,7 @@ def _do_tick(
         winner_target = cand_index[winner_key].target
         try:
             pid = _spawn_runner(vault, winner_key, winner_slot)
-        except (FileNotFoundError, OSError) as exc:
+        except (FileNotFoundError, OSError, ConfigError) as exc:
             _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
@@ -892,7 +892,7 @@ def fire_now(slot_key: str) -> Event:
         target_utc = _target_utc_iso(now)
         try:
             pid = _spawn_runner(vault, slot_key, slot)
-        except (FileNotFoundError, OSError) as exc:
+        except (FileNotFoundError, OSError, ConfigError) as exc:
             return _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
