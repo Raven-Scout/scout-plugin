@@ -679,3 +679,59 @@ def test_fire_macos_notification_noop_on_empty(monkeypatch):
     monkeypatch.setattr(chr_mod.subprocess, "run", lambda *a, **k: called.__setitem__("n", called["n"] + 1))
     fire_macos_notification([])
     assert called["n"] == 0
+
+
+# ----- #63: bracket-path glob fix -------------------------------------------
+
+
+def test_load_records_finds_files_under_bracket_path(tmp_path, monkeypatch):
+    """#63: glob.glob() silently skips paths containing '[' or ']' (treated as
+    character-class patterns). Path.glob() treats them literally. Verify that
+    records under a path with brackets are found."""
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    from scout.scripts.connector_health_report import load_records
+
+    # Create a log_dir whose path contains brackets
+    log_dir = tmp_path / "logs[test]"
+    log_dir.mkdir()
+
+    now = datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC)
+    rec = {
+        "ts": (now - timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        "session_id": "s1",
+        "mode": "morning-briefing",
+        "connector": "mcp:claude_ai_Slack",
+        "tool": "Bash",
+        "error": False,
+    }
+    fname = f"connector-calls-{(now - timedelta(hours=1)).date().isoformat()}.jsonl"
+    (log_dir / fname).write_text(json.dumps(rec) + "\n")
+
+    records = load_records(log_dir, window_days=14, now=now)
+    assert len(records) == 1, (
+        f"Expected 1 record from bracket-path log_dir; got {len(records)}. "
+        "glob.glob() would return 0 — Path.glob() fixes this."
+    )
+
+
+def test_cleanup_old_jsonl_works_under_bracket_path(tmp_path):
+    """#63: cleanup_old_jsonl also used glob.glob(); verify bracket paths work."""
+    import os
+    from datetime import UTC, datetime
+
+    from scout.scripts.connector_health_report import cleanup_old_jsonl
+
+    log_dir = tmp_path / "logs[brackets]"
+    log_dir.mkdir()
+
+    now = datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC)
+    old_file = log_dir / "connector-calls-2026-03-01.jsonl"
+    old_file.write_text("{}\n")
+
+    cleanup_old_jsonl(log_dir, retain_days=30, now=now)
+    # File is older than 30 days → must be deleted
+    assert not old_file.exists(), (
+        "cleanup_old_jsonl using glob.glob() silently misses files in bracket paths"
+    )
