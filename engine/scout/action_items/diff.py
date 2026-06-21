@@ -39,9 +39,16 @@ def _index_by_prefix(items: list[ActionItem]) -> dict[str, ActionItem]:
     return {i.short_prefix: i for i in items if i.short_prefix}
 
 
-def _index_by_section_title(items: list[ActionItem]) -> dict[tuple[str, str], ActionItem]:
+def _index_by_section_title(items: list[ActionItem]) -> dict[tuple[str, str], list[ActionItem]]:
     # Skip items that have a prefix — those match by prefix path only.
-    return {(i.section, i.title): i for i in items if not i.short_prefix}
+    # Maps each (section, title) key to a list so that N duplicates on each
+    # side can be paired 1:1 (consume one from the list per curr match).
+    index: dict[tuple[str, str], list[ActionItem]] = {}
+    for i in items:
+        if not i.short_prefix:
+            key = (i.section, i.title)
+            index.setdefault(key, []).append(i)
+    return index
 
 
 def diff(*, prev: list[ActionItem], curr: list[ActionItem]) -> list[ChangeEvent]:
@@ -49,10 +56,11 @@ def diff(*, prev: list[ActionItem], curr: list[ActionItem]) -> list[ChangeEvent]
     events: list[ChangeEvent] = []
 
     prev_by_prefix = _index_by_prefix(prev)
+    # Each key maps to a list of prev items; we pop (consume) one per curr match
+    # so that N identical (section, title) items on each side pair up 1:1.
     prev_by_st = _index_by_section_title(prev)
 
     matched_prev_prefix: set[str] = set()
-    matched_prev_st: set[tuple[str, str]] = set()
 
     # Walk curr in input order so the emitted events are in display order.
     for item in curr:
@@ -73,11 +81,11 @@ def diff(*, prev: list[ActionItem], curr: list[ActionItem]) -> list[ChangeEvent]
             )
             continue
 
-        # Unprefixed line: match by (section, title).
+        # Unprefixed line: match by (section, title), consuming one prev item.
         key = (item.section, item.title)
-        prev_match = prev_by_st.get(key)
-        if prev_match is not None:
-            matched_prev_st.add(key)
+        bucket = prev_by_st.get(key)
+        if bucket:
+            prev_match = bucket.pop(0)  # consume earliest prev for this key
             events.extend(_compare(prev_match, item))
             continue
 
@@ -101,8 +109,9 @@ def diff(*, prev: list[ActionItem], curr: list[ActionItem]) -> list[ChangeEvent]
                     section=item.section,
                 )
             )
-    for key, item in prev_by_st.items():
-        if key not in matched_prev_st:
+    # Any unconsumed prev items in the section-title index are "removed".
+    for _key, remaining in prev_by_st.items():
+        for item in remaining:
             events.append(
                 ChangeEvent(
                     kind="removed",
