@@ -64,11 +64,17 @@ def action_items_dir(data: Path | None = None) -> Path:
 
 
 def require_data_dir(data: Path | None = None) -> Path:
-    """Return the data dir, raising DataDirError if it does not exist."""
+    """Return the data dir, raising DataDirError if it does not exist or is not a directory.
+
+    Uses a single `is_dir()` check (False for both missing paths and non-dirs)
+    to eliminate the exists()/is_dir() TOCTOU window. The helpful message
+    distinguishes the two failure modes by reading `d.exists()` only inside
+    the failure branch.
+    """
     d = data or data_dir()
-    if not d.exists():
-        raise DataDirError(f"Scout data dir does not exist: {d}\nRun: scoutctl setup data-dir")
     if not d.is_dir():
+        if not d.exists():
+            raise DataDirError(f"Scout data dir does not exist: {d}\nRun: scoutctl setup data-dir")
         raise DataDirError(f"Scout data dir is not a directory: {d}")
     return d
 

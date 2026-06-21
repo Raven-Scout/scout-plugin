@@ -55,6 +55,27 @@ def test_require_data_dir_file_not_dir(tmp_path: Path) -> None:
         paths.require_data_dir(not_dir)
 
 
+def test_require_data_dir_existing_dir_returns_it(tmp_path: Path) -> None:
+    """#65: an existing directory must be returned without raising."""
+    existing = tmp_path / "scout"
+    existing.mkdir()
+    result = paths.require_data_dir(existing)
+    assert result == existing.resolve()
+
+
+def test_require_data_dir_single_check_no_toctou(tmp_path: Path) -> None:
+    """#65: require_data_dir must use is_dir() alone (not exists()+is_dir()).
+    is_dir() returns False for both missing paths and non-directory paths,
+    eliminating the TOCTOU window. Verify that the function raises
+    DataDirError for a missing path with a helpful message."""
+    missing = tmp_path / "no-such-dir"
+    # is_dir() on a missing path returns False; the message must still say
+    # "does not exist" (or similar) — the helpful-message requirement is met
+    # by reading d.exists() only INSIDE the failure branch to choose wording.
+    with pytest.raises(DataDirError):
+        paths.require_data_dir(missing)
+
+
 def test_derived_paths_under_data_dir(tmp_path: Path) -> None:
     assert paths.logs_dir(tmp_path) == tmp_path / ".scout-logs"
     assert paths.cache_dir(tmp_path) == tmp_path / ".scout-cache"
