@@ -36,11 +36,17 @@ fi
 echo $$ > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
+# Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
+# without SCOUT_FORCE_MODE set, default to "manual" — operators can still
+# fire the runner directly for debugging, and the Run Modes table tells the
+# model to fall back to a day-of-week + hour derivation in that case.
+MODE="${SCOUT_FORCE_MODE:-manual}"
+
 # The prompt instructs Claude to read SKILL.md and execute it
 PROMPT="You are {{INSTANCE_NAME}}, an autonomous knowledge management system. Your working directory is {{SCOUT_DIR}}.
 
 Step 1: Read {{SCOUT_DIR}}/SKILL.md in full.
-Step 2: Determine your mode based on the current hour (run 'date +%H').
+Step 2: Your run mode is \`$MODE\` (the dispatcher's slot key). Find the matching row of the Run Modes table near the top of SKILL.md and follow it. If the mode is \`manual\`, derive the closest mode from the current day and hour, then follow that row.
 Step 3: Execute the SKILL.md instructions completely — all steps/phases in order.
 Step 4: Commit results to git.
 Step 5: If anything material changed, send a brief Slack DM to {{USER_NAME}} (Slack ID: {{USER_SLACK_ID}}) summarizing what was found and changed.
@@ -53,12 +59,6 @@ Important:
 - Your output should focus on what you found and changed, not infrastructure steps."
 
 echo "=== {{INSTANCE_NAME}} run starting at $(date) ===" >> "$LOG_FILE"
-
-# Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
-# without SCOUT_FORCE_MODE set, default to "manual" — operators can still
-# fire the runner directly for debugging, and the prompt downstream will
-# pick a reasonable mode based on day-of-week + hour.
-MODE="${SCOUT_FORCE_MODE:-manual}"
 
 # Pre-session hooks — gather data before Claude starts (saves tool calls inside the session).
 # These write to .scout-cache/ for the skill files to consume.

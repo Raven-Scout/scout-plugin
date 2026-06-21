@@ -269,6 +269,98 @@ class KnowledgeGraph:
         candidates.sort(key=lambda c: (c["match_strength"] != "exact", -c["score"]))
         return candidates[:max_results]
 
+    # ------------------------------------------------------------------
+    # Graph traversal layer — pure-stdlib BFS over the entity graph.
+    # `traverse()`/`path()` carry no third-party dependency; `to_networkx()`
+    # imports networkx lazily so the core commands never require it. Inverse
+    # edges added by load() are already in self.relationships, so these walk
+    # the full reachability graph.
+    # ------------------------------------------------------------------
+
+    def _adjacency(self) -> dict[str, list[tuple[str, str]]]:
+        """Build + cache {source: [(rel_type, target), ...]} from relationships."""
+        adj = getattr(self, "_adj", None)
+        if adj is None:
+            adj = {}
+            for r in self.relationships:
+                adj.setdefault(r["source"], []).append((r["type"], r["target"]))
+            self._adj = adj
+        return adj
+
+    def traverse(
+        self, start: str, max_hops: int = 2, rel_types: Any = None
+    ) -> list[dict[str, Any]]:
+        """BFS from `start` up to `max_hops`. Returns each reachable entity with
+        its hop distance, the relationship it was first reached by (`via`), and
+        the shortest typed path. `rel_types` optionally restricts the walk to a
+        set of relationship types (e.g. {"works_with", "works_on"})."""
+        if start not in self.entities:
+            return []
+        adj = self._adjacency()
+        allow = set(rel_types) if rel_types else None
+        seen = {start}
+        queue: list[tuple[str, int, list]] = [(start, 0, [])]
+        out: list[dict[str, Any]] = []
+        while queue:
+            node, hops, path = queue.pop(0)
+            if hops >= max_hops:
+                continue
+            for rel_type, target in adj.get(node, []):
+                if allow is not None and rel_type not in allow:
+                    continue
+                if target in seen:
+                    continue
+                seen.add(target)
+                new_path = path + [(rel_type, target)]
+                out.append(
+                    {"entity": target, "hops": hops + 1, "via": rel_type, "path": new_path}
+                )
+                queue.append((target, hops + 1, new_path))
+        return out
+
+    def path(self, source: str, target: str, max_hops: int = 6) -> list | None:
+        """Shortest typed path from `source` to `target` (BFS). Returns a list of
+        (rel_type, node) steps from the first hop, [] if source == target, or
+        None if no path within `max_hops`."""
+        if source not in self.entities or target not in self.entities:
+            return None
+        if source == target:
+            return []
+        adj = self._adjacency()
+        seen = {source}
+        queue: list[tuple[str, list]] = [(source, [])]
+        while queue:
+            node, p = queue.pop(0)
+            if len(p) >= max_hops:
+                continue
+            for rel_type, nxt in adj.get(node, []):
+                if nxt in seen:
+                    continue
+                new_path = p + [(rel_type, nxt)]
+                if nxt == target:
+                    return new_path
+                seen.add(nxt)
+                queue.append((nxt, new_path))
+        return None
+
+    def to_networkx(self):
+        """Optional bridge to a networkx.MultiDiGraph for richer algorithms
+        (centrality, components). Imports lazily; raises a friendly RuntimeError
+        if networkx is absent so the core commands never carry a hard dependency."""
+        try:
+            import networkx as nx
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "networkx not installed — traverse()/path() work without it "
+                "(pure-stdlib BFS); only to_networkx() needs `pip install networkx`."
+            ) from exc
+        g = nx.MultiDiGraph()
+        for name, ent in self.entities.items():
+            g.add_node(name, type=ent.get("type"))
+        for r in self.relationships:
+            g.add_edge(r["source"], r["target"], type=r["type"])
+        return g
+
 
 def main():
     """CLI entry point — load graph and run a command."""
@@ -278,8 +370,11 @@ def main():
     default_kb = os.path.dirname(os.path.dirname(__file__))
 
     parser = argparse.ArgumentParser(description="SCOUT Knowledge Graph Parser")
-    parser.add_argument("command", choices=["validate", "export", "query", "entity", "related", "stats", "name_lookup"])
-    parser.add_argument("--name", help="Entity name (for entity/related commands)")
+    parser.add_argument("command", choices=["validate", "export", "query", "entity", "related", "stats", "name_lookup", "traverse", "path"])
+    parser.add_argument("--name", help="Entity name (for entity/related/traverse, and the source for path)")
+    parser.add_argument("--to", dest="to", help="Target entity name (for the path command)")
+    parser.add_argument("--hops", type=int, help="Max hops (traverse: default 2; path: default 6)")
+    parser.add_argument("--rels", help="Comma-separated relationship types to restrict a traverse (e.g. 'works_with,works_on')")
     parser.add_argument("--token", help="Name token to resolve against people/aliases (name_lookup)")
     parser.add_argument("--type", help="Entity type filter (for query command)")
     parser.add_argument("--status", help="Status filter (e.g. 'open', 'completed') — query command")
@@ -349,6 +444,33 @@ def main():
         for r in results:
             print(f"  [{r['match_strength']:5s}] {r['name']} (slug={r['slug']}, matched_field={r['matched_field']}, score={r['score']})")
         print(f"\n{len(results)} candidate(s).")
+
+    elif args.command == "traverse":
+        if not args.name:
+            print("Error: --name required for traverse command")
+            return
+        rel_types = [s.strip() for s in args.rels.split(",")] if args.rels else None
+        results = graph.traverse(args.name, max_hops=args.hops or 2, rel_types=rel_types)
+        if not results:
+            print(f"No entities reachable from '{args.name}'.")
+            return
+        for r in results:
+            print(f"  [{r['hops']} hop{'s' if r['hops'] != 1 else ''}] {r['entity']} (via {r['via']})")
+        print(f"\n{len(results)} reachable entit{'ies' if len(results) != 1 else 'y'}.")
+
+    elif args.command == "path":
+        if not args.name or not args.to:
+            print("Error: --name (source) and --to (target) required for path command")
+            return
+        steps = graph.path(args.name, args.to, max_hops=args.hops or 6)
+        if steps is None:
+            print(f"No path from '{args.name}' to '{args.to}'.")
+        elif not steps:
+            print(f"'{args.name}' and '{args.to}' are the same entity.")
+        else:
+            chain = args.name + "".join(f" --{t}--> {n}" for t, n in steps)
+            print(f"  {chain}")
+            print(f"\n{len(steps)} hop(s).")
 
     elif args.command == "query":
         filters = {}
