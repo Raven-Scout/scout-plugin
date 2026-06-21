@@ -486,6 +486,27 @@ def test_next_fires_default_schedule_returns_slots_within_24h():
 # ---------------------------------------------------------------------------
 
 
+def test_fires_at_local_single_digit_components_normalized(tmp_path):
+    """#69: fires_at_local: '7:5' must be stored as '07:05' (zero-padded HH:MM)."""
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  early-slot:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '7:5'\n"  # single-digit hour and minute
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    sched = load_schedule(yaml_file)
+    assert sched["early-slot"].fires_at_local == "07:05", (
+        f"Expected '07:05' but got {sched['early-slot'].fires_at_local!r}"
+    )
+
+
 def test_overlay_new_key_is_a_copy_not_alias(tmp_path, monkeypatch):
     """#55: merged[key] = dict(override) must not alias the overlay's raw dict.
 
