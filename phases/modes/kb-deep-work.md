@@ -174,7 +174,15 @@ Based on the scoring distribution, select a work mode:
 - **Knowledge graph integrity:** Run `python knowledge-base/ontology/parser.py validate` and fix any errors. Create missing entity files for people/projects that have relationships but no entity file. Add missing relationships to existing entity files.
 - Goal: make the KB navigable and trustworthy.
 
-**Blended**: You can combine modes within a single run. For example, deep-dive one file and then do a quick structural pass on related files. Use judgment based on the scoring distribution.
+**Validation Pass** (when the score distribution is flat — nothing critically stale, no strong feedback signal pointing at a specific gap). **This is the default idle-night mode.** Once the KB is large, the marginal dreaming hour is better spent confirming that what's already in it is still true than adding more — so when in doubt between Gap Hunt and Validation Pass, choose Validation Pass. The deliverable is **existing claims re-grounded against live sources — corrected, downgraded, or confirmed — NOT new sections or entities.**
+- Pick a set of the highest-stakes *existing* claims: verification-marker-free assertions in high-priority project files, people roles/titles, issue-tracker states (status/assignee/priority), pricing & cost figures, dated decisions, and any claim a downstream briefing leans on. Prefer claims that are (a) load-bearing for an active decision, (b) older than their file's freshness standard, or (c) single-sourced when first written.
+- For each, query the live source and compare. **Correct** the claim where the source disagrees; **downgrade** to `[stale]` / `[contradicted]` / `[single-source]` where you can't fully re-confirm; **confirm** (bump the verified date, optionally add a `[re-verified YYYY-MM-DD vs <source>]` note) where it still holds.
+- Route genuinely-uncertain claims to `review-queue.md` rather than asserting them.
+- Do **not** add new entities or expand thin sections in this mode — that's Gap Hunt / research. If you find a real gap, note it for a future run; don't fill it here.
+- **Verified-scope guard.** A "confirmed / 0-drift / re-verified" label applies ONLY to the specific claims you queried live *this run*. Any supporting or **derived** claim — especially comparative conclusions like *"X is the sole/only/first/last …"* that depend on the state of **sibling** entities — must either be queried live too, or be explicitly marked `[unverified — not queried this run]`. A derived conclusion inherits the verification status of its **weakest** input, not its strongest. Never re-state a sibling/comparative fact from carried text; re-derive it from the live source. The "N checked / K confirmed" count must equal the number of claims you actually queried.
+- Report the count: *N claims checked, M corrected/downgraded, K confirmed.* That count IS the run's deliverable.
+
+**Blended**: You can combine modes within a single run. For example, deep-dive one file and then do a quick structural pass on related files. Use judgment based on the scoring distribution. **Default lean:** on a quiet night with a flat score distribution, blend toward Validation Pass over Gap Hunt — confirm before you grow.
 
 ***
 
@@ -204,6 +212,8 @@ Before proceeding to commit, answer this question honestly:
 - Rephrase existing content without adding information? Not real work.
 
 Real work means: new facts verified from live sources, stale information corrected with current data, missing context filled in, genuinely broken navigation fixed.
+
+**Validation Pass exception:** genuinely re-grounding load-bearing claims against live sources is real work *even when nothing changed* — confirming a high-stakes, aging assertion is still true converts it from a carried claim into a freshly-verified one, which has value. A Validation Pass passes this gate on its honest "N checked / K confirmed" count, not on net-new content. The gate fails only if you neither added or corrected information **nor** genuinely re-verified anything (re-stamping "Last verified" without actually querying a source is still not real work).
 
 This gate exists because the easiest failure mode of an automated KB system is busywork that looks productive but adds no value. Do not pass this gate unless the work is substantive.
 
