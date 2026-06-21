@@ -11,8 +11,10 @@ from __future__ import annotations
 import threading
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import scout.hooks.kb_pre_filter as kpf
 from scout.events import Event
 from scout.hooks.kb_pre_filter import (
     classify,
@@ -543,9 +545,6 @@ def test_classify_reads_file_only_once_per_call(tmp_path):
     actually calls _read_head (for the priority frontmatter scan). Without the fix,
     this file gets read twice: once in extract_date_string and once in freshness_hours_for.
     """
-    from unittest.mock import patch
-    import scout.hooks.kb_pre_filter as kpf
-
     kb = _make_kb(tmp_path)
     # Use a file not in FRESHNESS_OVERRIDES so freshness_hours_for calls _read_head
     f = kb / "my-project.md"

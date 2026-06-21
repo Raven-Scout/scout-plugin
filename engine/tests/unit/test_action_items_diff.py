@@ -140,9 +140,7 @@ def test_duplicate_section_title_items_matched_pairwise() -> None:
     # With 2 prev and 2 curr, we expect 2 "completed" events (open→done,
     # in_progress→done). The old last-wins dict collapses to 1 match.
     completed = [e for e in events if e.kind == "completed"]
-    assert len(completed) == 2, (
-        f"Expected 2 'completed' events (one per paired dup); got {events}"
-    )
+    assert len(completed) == 2, f"Expected 2 'completed' events (one per paired dup); got {events}"
 
 
 def test_duplicate_section_title_extra_curr_becomes_added() -> None:

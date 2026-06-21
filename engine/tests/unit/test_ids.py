@@ -118,6 +118,7 @@ def test_new_short_prefix_empty_set_not_replaced() -> None:
     assert len(p_empty) == SHORT_PREFIX_LEN
     # Both must satisfy the recognition grammar
     from scout.ids import short_prefix_pattern
+
     rx = short_prefix_pattern()
     assert rx.fullmatch(f"[#{p_none}]")
     assert rx.fullmatch(f"[#{p_empty}]")
@@ -128,8 +129,6 @@ def test_new_short_prefix_none_exclude_uses_if_not_or() -> None:
     `if exclude is None: exclude = set()` preserves it. Verify via monkeypatching
     the internal `exclude` reference after entry — the provided set must be used
     as-is (not replaced) when passed as empty."""
-    import scout.ids as ids_mod
-
     # We monkeypatch secrets.choice to always return 'A' so the candidate is 'AAAA'.
     # AAAA has a letter so it passes the grammar check.
     # With `exclude or set()`, an empty set falsy → replaced with new set() → no excludes.

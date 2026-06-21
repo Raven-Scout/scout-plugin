@@ -109,12 +109,8 @@ def test_extract_frontmatter_inline_triple_dash_in_value_not_closing_fence(tmp_p
     # Use a minimal dummy schema to construct the graph
     g = KG(schema_path=str(schema), kb_root=str(tmp_path))
     fm = g._extract_frontmatter(md_file)
-    assert fm is not None, (
-        "_extract_frontmatter returned None — inline `---` in value was mistaken for closing fence"
-    )
-    assert fm.get("name") == "TestPerson", (
-        f"Frontmatter truncated; got: {fm}"
-    )
+    assert fm is not None, "_extract_frontmatter returned None — inline `---` in value was mistaken for closing fence"
+    assert fm.get("name") == "TestPerson", f"Frontmatter truncated; got: {fm}"
     assert fm.get("type") == "person"
 
 

@@ -718,7 +718,6 @@ def test_load_records_finds_files_under_bracket_path(tmp_path, monkeypatch):
 
 def test_cleanup_old_jsonl_works_under_bracket_path(tmp_path):
     """#63: cleanup_old_jsonl also used glob.glob(); verify bracket paths work."""
-    import os
     from datetime import UTC, datetime
 
     from scout.scripts.connector_health_report import cleanup_old_jsonl
@@ -732,6 +731,4 @@ def test_cleanup_old_jsonl_works_under_bracket_path(tmp_path):
 
     cleanup_old_jsonl(log_dir, retain_days=30, now=now)
     # File is older than 30 days → must be deleted
-    assert not old_file.exists(), (
-        "cleanup_old_jsonl using glob.glob() silently misses files in bracket paths"
-    )
+    assert not old_file.exists(), "cleanup_old_jsonl using glob.glob() silently misses files in bracket paths"

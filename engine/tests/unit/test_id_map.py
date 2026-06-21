@@ -108,8 +108,6 @@ def test_load_missing_file_returns_empty_map_no_toctou(fake_data_dir: Path) -> N
 
 def test_load_corrupt_json_raises_value_error(fake_data_dir: Path) -> None:
     """#54: a corrupt or zero-byte id-map.json must raise ValueError (not json.JSONDecodeError)."""
-    import json
-
     path = fake_data_dir / ".scout-state" / "id-map.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{not valid json", encoding="utf-8")
