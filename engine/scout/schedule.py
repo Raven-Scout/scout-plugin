@@ -173,7 +173,7 @@ def load_schedule(
             if key in merged:
                 merged[key] = {**merged[key], **override}
             else:
-                merged[key] = override
+                merged[key] = dict(override)
     slots: dict[str, Slot] = {}
     for key, raw in merged.items():
         slots[key] = _build_slot(key, raw)
