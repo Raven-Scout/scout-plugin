@@ -535,6 +535,39 @@ def test_parse_date_returns_tz_aware_et():
     assert dt.utcoffset() == ET.utcoffset(dt.replace(tzinfo=None))
 
 
+def test_classify_reads_file_only_once_per_call(tmp_path):
+    """#78: classify() must open each file only once, not twice (once for
+    freshness_hours_for and once for extract_date_string). Count _read_head calls.
+
+    Use a file whose basename is NOT in FRESHNESS_OVERRIDES so freshness_hours_for
+    actually calls _read_head (for the priority frontmatter scan). Without the fix,
+    this file gets read twice: once in extract_date_string and once in freshness_hours_for.
+    """
+    from unittest.mock import patch
+    import scout.hooks.kb_pre_filter as kpf
+
+    kb = _make_kb(tmp_path)
+    # Use a file not in FRESHNESS_OVERRIDES so freshness_hours_for calls _read_head
+    f = kb / "my-project.md"
+    f.write_text("---\npriority: 🔴\n---\n\n**Last Updated:** April 20, 2026 12:00 PM\n")
+    now = datetime(2026, 4, 28, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+
+    read_head_calls = []
+    real_read_head = kpf._read_head
+
+    def spy_read_head(path, n=kpf.HEAD_SCAN_LINES):
+        read_head_calls.append(path)
+        return real_read_head(path, n)
+
+    with patch.object(kpf, "_read_head", spy_read_head):
+        classify(f, now, tmp_path)
+
+    assert len(read_head_calls) == 1, (
+        f"classify() called _read_head {len(read_head_calls)} times for one file; "
+        f"expected exactly 1 (single read shared between freshness_hours_for and extract_date_string)"
+    )
+
+
 def test_discover_kb_files_does_not_follow_symlink_loop(tmp_path):
     """#53: a symlink loop in the KB dir must not hang discovery."""
     from scout.hooks.kb_pre_filter import discover_kb_files
