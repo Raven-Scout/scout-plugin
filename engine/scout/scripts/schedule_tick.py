@@ -711,8 +711,10 @@ def _do_tick(
     result = _TickResult()
 
     # Pre-spawn network check — only when at least one slot would fire.
+    # Use a reduced retry budget (2) so worst-case lock hold is ~10s, not ~48s
+    # (6 retries × 5s sleep). Two attempts: 1 sleep gap + 2 timeouts ≈ 11s max.
     fire_keys_pre = [k for k, d in decisions.items() if d.action == "fire"]
-    if fire_keys_pre and not _network_ready():
+    if fire_keys_pre and not _network_ready(retries=2):
         for k in fire_keys_pre:
             _emit_event(
                 log_dir,
