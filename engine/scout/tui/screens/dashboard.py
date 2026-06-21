@@ -204,7 +204,7 @@ class DashboardScreen(Screen):
 
     def action_cycle_filter(self) -> None:
         """Cycle through filter options."""
-        idx = FILTER_OPTIONS.index(self.filter_mode)
+        idx = FILTER_OPTIONS.index(self.filter_mode) if self.filter_mode in FILTER_OPTIONS else 0
         self.filter_mode = FILTER_OPTIONS[(idx + 1) % len(FILTER_OPTIONS)]
 
     def action_mark_done(self) -> None:
