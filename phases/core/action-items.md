@@ -289,3 +289,33 @@ Run every available cross-check (calendar, issue tracker, messaging, code host, 
 - Always include source citations showing which connectors confirmed the item
 
 After reconciliation is complete, refresh the `## 🪵 Run notes & connector availability` block at the **bottom** of the action items file — prepend this run's entry (timestamp, mode, counts, connector availability) as the newest line and trim the block to the last 3 runs. Do not write run metadata at the top of the file.
+
+## Scout Digest
+
+At the end of every briefing and consolidation run, append or update a **Scout Digest** section at the bottom of today's action-items file (`action-items/action-items-YYYY-MM-DD.md`), before the Sources line. This is the same digest the dreaming phase maintains — there is **one** digest per day, shared across all of today's sessions, so {{USER_NAME}} can catch up on what {{INSTANCE_NAME}} has been doing across runs without reading each one.
+
+**Format:**
+
+```markdown
+## Scout Digest — [Date] ([Time])
+
+**{{INSTANCE_NAME}} ran N sessions today** (breakdown by type). Here's what needs your attention:
+
+### Files to Review
+- **[[file]]** — what changed and why {{USER_NAME}} should look at it
+
+### Your Input Needed
+| Item | What {{INSTANCE_NAME}} needs | Priority |
+|------|-----------------|----------|
+| ... | ... | 🔴/🟡/🟢 |
+
+### KB Growth Today
+- Ontology stats, new entities, patterns added
+```
+
+**Rules:**
+- If a digest already exists from an earlier session today, **update it in place** (don't duplicate) — bump the time, fold in this run's changes.
+- Only include files that changed **substantively** (not just timestamp updates).
+- "Your Input Needed" lists ONLY items where {{USER_NAME}}'s action unblocks {{INSTANCE_NAME}} or a project.
+- Keep it scannable — no walls of text. Link to KB files for details.
+- On a `weekend-briefing` run, fold the **Monday Preview** into the digest rather than emitting it separately.
