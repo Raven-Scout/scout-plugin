@@ -6,6 +6,8 @@
 #   - "Unable to connect to API (ECONNRESET)"
 #   - "Unable to connect to API (ConnectionRefused)"
 #   - "Stream idle timeout - partial response received"
+#   - "Connection closed mid-response"             (socket torn down mid-stream,
+#                                                    e.g. machine slept overnight)
 #   - "529 Overloaded"                              (Anthropic upstream temp)
 #
 # Does NOT retry on:
@@ -46,7 +48,7 @@ if [ "${SCOUT_RETRY_DISABLE:-0}" = "1" ]; then
 fi
 
 # Pipe-separated grep -E regex. Keep narrow — anything matched here triggers a retry.
-TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|529 Overloaded'
+TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|Connection closed mid-response|529 Overloaded'
 
 attempt=1
 exit_code=0
