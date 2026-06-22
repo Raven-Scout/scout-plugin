@@ -99,18 +99,23 @@ def _read_head(path: Path, n: int = HEAD_SCAN_LINES) -> list[str]:
 # -- public API --------------------------------------------------------------
 
 
-def freshness_hours_for(path: Path) -> int:
+def freshness_hours_for(path: Path, *, lines: list[str] | None = None) -> int:
     """Compute the freshness budget (hours) for a KB file.
 
     Bash lines 28-50. Special-cased basenames take precedence; everything else
     falls back to YAML frontmatter `priority:` matching by emoji substring.
+
+    Optional `lines` parameter: when provided (pre-read by the caller), skips
+    the internal _read_head call. Pass `lines` from classify() to avoid reading
+    the file twice per classify (#78).
     """
     name = path.name
     if name in FRESHNESS_OVERRIDES:
         return FRESHNESS_OVERRIDES[name]
 
     # Look for priority in the first 25 lines.
-    for line in _read_head(path):
+    head = lines if lines is not None else _read_head(path)
+    for line in head:
         # Bash: grep -i 'priority:' | head -1 | sed 's/.*priority: *//' | tr -d '"'
         m = re.search(r"priority:\s*(.*)", line, re.IGNORECASE)
         if m:
@@ -122,7 +127,7 @@ def freshness_hours_for(path: Path) -> int:
     return DEFAULT_FRESHNESS_HOURS
 
 
-def extract_date_string(path: Path) -> str:
+def extract_date_string(path: Path, *, lines: list[str] | None = None) -> str:
     """Extract the cleaned date string from a "Last Updated" / "Last Verified" line.
 
     Bash lines 99-106 — heavy sed cleanup. Replicates:
@@ -132,8 +137,12 @@ def extract_date_string(path: Path) -> str:
       4. strip '. Source...' / '. Verified...' (case-insensitive)
       5. strip ' (...' parentheticals
       6. trim whitespace
+
+    Optional `lines` parameter: when provided (pre-read by the caller), skips
+    the internal _read_head call. Pass `lines` from classify() to avoid reading
+    the file twice per classify (#78).
     """
-    head = _read_head(path)
+    head = lines if lines is not None else _read_head(path)
     line = ""
     for raw in head:
         # Single space (not \s+) for strict bash parity — bash uses literal " ".
@@ -235,9 +244,14 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
 
     Returns (label, details). For STALE/FRESH, details has age_hours,
     budget_hours, datestr, rel. For NO_DATE, details has rel only.
+
+    Reads the file head once and passes the result to both extract_date_string
+    and freshness_hours_for to avoid opening the file twice per classify (#78).
     """
     rel = path.relative_to(scout_dir).as_posix()
-    datestr = extract_date_string(path)
+    # Read head lines once; share with both helpers to avoid double I/O (#78).
+    head_lines = _read_head(path)
+    datestr = extract_date_string(path, lines=head_lines)
     if not datestr:
         return ("NO_DATE", {"rel": rel})
 
@@ -254,7 +268,7 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
     now_et = now if now.tzinfo is not None else now.replace(tzinfo=ET)
     age_seconds = now_et.timestamp() - parsed.timestamp()
     age_hours = int(age_seconds // 3600)
-    budget = freshness_hours_for(path)
+    budget = freshness_hours_for(path, lines=head_lines)
 
     label = "STALE" if age_hours > budget else "FRESH"
     return (

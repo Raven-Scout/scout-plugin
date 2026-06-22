@@ -77,6 +77,43 @@ def test_malformed_schema_raises_kberror(tmp_path: Path) -> None:
         )
 
 
+def test_extract_frontmatter_inline_triple_dash_in_value_not_closing_fence(tmp_path: Path) -> None:
+    """#64: _extract_frontmatter must not close at `---` embedded mid-line in
+    a frontmatter value. Only a line-initial `\\n---` (on its own line) closes.
+
+    The bug: `text.find('---', 3)` matches the FIRST occurrence of `---`
+    anywhere, including mid-line in a YAML value. This causes the YAML slice
+    to be truncated before the closing fence, yielding a parse error or wrong
+    data. The fix: `text.find('\\n---', 3)` requires the fence on its own line.
+    """
+    schema = tmp_path / "schema.yaml"
+    schema.write_text("entity_types:\n  person:\n    properties:\n      required: [name, type]\n")
+
+    # The frontmatter value for `description` contains `---` mid-line.
+    # With the bug, find("---", 3) hits the `---` inside the description value
+    # and slices the YAML as `\nname: TestP` which is invalid → returns None.
+    md_file = tmp_path / "person-inline-dash.md"
+    md_file.write_text(
+        "---\n"
+        "name: TestPerson\n"
+        "type: person\n"
+        "description: 'range --- value'\n"  # inline --- in YAML value
+        "---\n"
+        "\n"
+        "Body text.\n"
+    )
+
+    # Direct test of _extract_frontmatter to isolate the bug
+    from scout.kb.ontology import KnowledgeGraph as KG
+
+    # Use a minimal dummy schema to construct the graph
+    g = KG(schema_path=str(schema), kb_root=str(tmp_path))
+    fm = g._extract_frontmatter(md_file)
+    assert fm is not None, "_extract_frontmatter returned None — inline `---` in value was mistaken for closing fence"
+    assert fm.get("name") == "TestPerson", f"Frontmatter truncated; got: {fm}"
+    assert fm.get("type") == "person"
+
+
 def test_validate_entity_type_without_properties_key(tmp_path: Path) -> None:
     """An entity type defined with no `properties:` key must not raise
     KeyError in validate() (#46)."""

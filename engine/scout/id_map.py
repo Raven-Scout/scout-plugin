@@ -51,10 +51,13 @@ class IdMap:
     @classmethod
     def load(cls, data_dir: Path) -> IdMap:
         path = paths.id_map_path(data_dir)
-        if not path.exists():
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except FileNotFoundError:
             return cls(data_dir, entries={})
-        with path.open("r", encoding="utf-8") as f:
-            raw = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"corrupt id-map at {path}: {e}") from e
         schema_version = raw.get("schema_version")
         if schema_version != 1:
             raise ValueError(f"id-map.json has unknown schema_version {schema_version!r}; expected 1")

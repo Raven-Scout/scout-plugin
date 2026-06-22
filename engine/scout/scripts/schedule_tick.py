@@ -711,8 +711,10 @@ def _do_tick(
     result = _TickResult()
 
     # Pre-spawn network check — only when at least one slot would fire.
+    # Use a reduced retry budget (2) so worst-case lock hold is ~10s, not ~48s
+    # (6 retries × 5s sleep). Two attempts: 1 sleep gap + 2 timeouts ≈ 11s max.
     fire_keys_pre = [k for k, d in decisions.items() if d.action == "fire"]
-    if fire_keys_pre and not _network_ready():
+    if fire_keys_pre and not _network_ready(retries=2):
         for k in fire_keys_pre:
             _emit_event(
                 log_dir,
@@ -739,7 +741,7 @@ def _do_tick(
         winner_target = cand_index[winner_key].target
         try:
             pid = _spawn_runner(vault, winner_key, winner_slot)
-        except (FileNotFoundError, OSError) as exc:
+        except (FileNotFoundError, OSError, ConfigError) as exc:
             _emit_event(
                 log_dir,
                 kind="slot.fire_failed",
@@ -890,7 +892,7 @@ def fire_now(slot_key: str) -> Event:
         target_utc = _target_utc_iso(now)
         try:
             pid = _spawn_runner(vault, slot_key, slot)
-        except (FileNotFoundError, OSError) as exc:
+        except (FileNotFoundError, OSError, ConfigError) as exc:
             return _emit_event(
                 log_dir,
                 kind="slot.fire_failed",

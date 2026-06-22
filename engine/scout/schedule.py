@@ -173,7 +173,7 @@ def load_schedule(
             if key in merged:
                 merged[key] = {**merged[key], **override}
             else:
-                merged[key] = override
+                merged[key] = dict(override)
     slots: dict[str, Slot] = {}
     for key, raw in merged.items():
         slots[key] = _build_slot(key, raw)
@@ -208,6 +208,8 @@ def _build_slot(key: str, raw: dict[str, Any]) -> Slot:
             time(int(hh), int(mm))  # validate via stdlib
         except (ValueError, AttributeError) as e:
             raise ConfigError(f"slot {key}: fires_at_local {fires_at_raw!r} is not HH:MM 24-hour") from e
+        # Normalize to zero-padded HH:MM so "7:5" is stored as "07:05".
+        fires_at_raw = f"{int(hh):02d}:{int(mm):02d}"
         on_miss = OnMissPolicy(raw["on_miss"])
         tz = raw.get("tz")
         if tz is not None:

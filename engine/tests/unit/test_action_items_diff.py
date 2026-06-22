@@ -122,6 +122,42 @@ def test_prefix_match_wins_over_title_match() -> None:
     assert events[0].kind == "title_changed"
 
 
+def test_duplicate_section_title_items_matched_pairwise() -> None:
+    """#58: two items with identical (section, title) on both prev and curr are
+    matched 1:1 (not collapsed/dropped). The diff engine must pair them up and
+    emit the right events rather than silently discarding duplicates."""
+    # Two items with the same (section, title) but different statuses in prev
+    prev = [
+        _item(title="dup task", section="In Progress", status="open"),
+        _item(title="dup task", section="In Progress", status="in_progress"),
+    ]
+    curr = [
+        _item(title="dup task", section="In Progress", status="done"),
+        _item(title="dup task", section="In Progress", status="done"),
+    ]
+    events = diff(prev=prev, curr=curr)
+    # Both items must be matched (no item silently dropped).
+    # With 2 prev and 2 curr, we expect 2 "completed" events (open→done,
+    # in_progress→done). The old last-wins dict collapses to 1 match.
+    completed = [e for e in events if e.kind == "completed"]
+    assert len(completed) == 2, f"Expected 2 'completed' events (one per paired dup); got {events}"
+
+
+def test_duplicate_section_title_extra_curr_becomes_added() -> None:
+    """#58: if curr has more duplicates than prev, extras are emitted as 'added'."""
+    prev = [
+        _item(title="dup task", section="In Progress", status="open"),
+    ]
+    curr = [
+        _item(title="dup task", section="In Progress", status="open"),
+        _item(title="dup task", section="In Progress", status="open"),
+    ]
+    events = diff(prev=prev, curr=curr)
+    added = [e for e in events if e.kind == "added"]
+    # The second curr item has no prev partner → "added"
+    assert len(added) == 1
+
+
 def test_change_event_has_section_for_display() -> None:
     """Renderers need the section for context — verify it survives diffing."""
     prev: list[ActionItem] = []

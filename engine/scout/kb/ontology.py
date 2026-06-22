@@ -81,7 +81,7 @@ class KnowledgeGraph:
         if not text.startswith("---"):
             return None
 
-        end = text.find("---", 3)
+        end = text.find("\n---", 3)
         if end == -1:
             return None
 

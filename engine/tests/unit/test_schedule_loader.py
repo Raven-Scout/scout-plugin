@@ -486,6 +486,102 @@ def test_next_fires_default_schedule_returns_slots_within_24h():
 # ---------------------------------------------------------------------------
 
 
+def test_fires_at_local_single_digit_components_normalized(tmp_path):
+    """#69: fires_at_local: '7:5' must be stored as '07:05' (zero-padded HH:MM)."""
+    yaml_file = tmp_path / "schedule.yaml"
+    yaml_file.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  early-slot:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '7:5'\n"  # single-digit hour and minute
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    sched = load_schedule(yaml_file)
+    assert sched["early-slot"].fires_at_local == "07:05", (
+        f"Expected '07:05' but got {sched['early-slot'].fires_at_local!r}"
+    )
+
+
+def test_overlay_new_key_is_a_copy_not_alias(tmp_path, monkeypatch):
+    """#55: merged[key] = dict(override) must not alias the overlay's raw dict.
+
+    The bug: `merged[key] = override` stores the same object reference.
+    If _build_slot (or any caller) adds/removes keys from `raw`, the caller's
+    dict is mutated in place. Fix: `merged[key] = dict(override)`.
+
+    We prove this by intercepting the `merged` dict at merge time:
+    capture the id() of the dict stored under the new-slot key and compare it
+    to the id() of the dict that came directly from `_load_yaml(overlay)`.
+    They must differ (copy), not be the same object (alias).
+    """
+    from scout import schedule as sched_mod
+
+    canonical = tmp_path / "schedule.yaml"
+    canonical.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  morning-briefing:\n"
+        "    type: briefing\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: fire\n"
+        "    cooldown_minutes: 60\n"
+    )
+    overlay = tmp_path / "schedule.local.yaml"
+    overlay.write_text(
+        "schema_version: 1\n"
+        "slots:\n"
+        "  new-slot:\n"
+        "    type: manual\n"
+        "    runner: run-scout.sh\n"
+        "    fires_at_local: '10:00'\n"
+        "    weekdays: [Mon]\n"
+        "    missed_window_hours: 4\n"
+        "    on_miss: skip\n"
+        "    cooldown_minutes: 0\n"
+    )
+
+    # Capture the raw dict object passed to _build_slot for "new-slot"
+    real_build_slot = sched_mod._build_slot
+    captured: dict[str, dict] = {}
+
+    def spy_build_slot(key, raw):
+        captured[key] = raw
+        return real_build_slot(key, raw)
+
+    monkeypatch.setattr(sched_mod, "_build_slot", spy_build_slot)
+
+    # Also capture the dict from _load_yaml for the overlay
+    real_load_yaml = sched_mod._load_yaml
+    overlay_raws: list[dict] = []
+
+    def spy_load_yaml(path):
+        result = real_load_yaml(path)
+        if path == overlay:
+            overlay_raws.append(result)
+        return result
+
+    monkeypatch.setattr(sched_mod, "_load_yaml", spy_load_yaml)
+
+    sched = load_schedule(canonical, overlay=overlay)
+    assert "new-slot" in sched
+    assert len(overlay_raws) == 1
+    overlay_new_slot_dict = overlay_raws[0]["slots"]["new-slot"]
+    built_new_slot_dict = captured["new-slot"]
+
+    # The fix: these must be different objects (a copy was made)
+    assert built_new_slot_dict is not overlay_new_slot_dict, (
+        "merged[key] = override aliases the overlay dict; must be dict(override)"
+    )
+
+
 def test_slot_runtime_defaults_to_local_when_absent(tmp_path):
     """YAML without a runtime key should produce Slot.runtime == LOCAL."""
     yaml_file = tmp_path / "schedule.yaml"

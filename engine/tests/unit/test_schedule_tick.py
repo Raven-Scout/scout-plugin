@@ -760,6 +760,90 @@ def test_spawn_runner_rejects_remote_runtime(tmp_path):
 # Regression test for issue #35 — cron/launchd had no way to diagnose failures.
 
 
+def test_remote_runtime_slot_emits_fire_failed_in_do_tick(tmp_path, monkeypatch):
+    """#61: ConfigError from _spawn_runner (runtime: remote) must be caught and
+    emit slot.fire_failed, not escape past the except clause as an uncaught crash."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched_path = tmp_path / ".scout-state" / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  remote-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: fire\n    cooldown_minutes: 5\n"
+        "    runtime: remote\n"
+    )
+    with (
+        patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
+        patch("scout.scripts.schedule_tick._network_ready", return_value=True),
+    ):
+        ev = tick_run()
+
+    # Must complete without raising and emit tick.completed (not crash)
+    assert ev.kind == "schedule.tick.completed"
+
+    # Must have emitted a slot.fire_failed event for the remote slot
+    log = next((tmp_path / ".scout-logs").glob("schedule-events-*.jsonl"), None)
+    assert log is not None
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+    fire_failed = [r for r in rows if r["kind"] == "slot.fire_failed"]
+    assert len(fire_failed) >= 1, f"Expected slot.fire_failed event; got: {[r['kind'] for r in rows]}"
+
+
+def test_remote_runtime_slot_emits_fire_failed_in_fire_now(tmp_path, monkeypatch):
+    """#61: ConfigError from _spawn_runner must be caught in fire_now too."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched = tmp_path / ".scout-state" / "schedule.yaml"
+    sched.write_text(
+        "schema_version: 1\nslots:\n  remote-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '08:00'\n"
+        "    weekdays: [Mon]\n    missed_window_hours: 4\n    on_miss: fire\n    cooldown_minutes: 60\n"
+        "    runtime: remote\n"
+    )
+    from scout.scripts.schedule_tick import fire_now
+
+    ev = fire_now("remote-slot")
+    assert ev.kind == "slot.fire_failed"
+
+
+def test_network_probe_called_with_reduced_retry_budget_in_do_tick(tmp_path, monkeypatch):
+    """#60: the in-lock network probe must use a reduced retry budget (< 6) so
+    worst-case lock hold is ~10s, not ~48s."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / ".scout-state").mkdir()
+    (tmp_path / ".scout-logs").mkdir()
+    sched_path = tmp_path / ".scout-state" / "schedule.yaml"
+    sched_path.write_text(
+        "schema_version: 1\nslots:\n  smoke-slot:\n"
+        "    type: briefing\n    runner: run-scout.sh\n    fires_at_local: '00:01'\n"
+        "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
+        "    missed_window_hours: 24\n    on_miss: fire\n    cooldown_minutes: 5\n"
+    )
+
+    probe_kwargs: list[dict] = []
+
+    def spy_network_ready(**kwargs):
+        probe_kwargs.append(kwargs)
+        return True  # succeed immediately
+
+    with (
+        patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
+        patch("scout.scripts.schedule_tick._network_ready", side_effect=spy_network_ready),
+        patch("scout.scripts.schedule_tick.subprocess.Popen") as mock_popen,
+    ):
+        mock_popen.return_value.pid = 12345
+        tick_run()
+
+    assert len(probe_kwargs) == 1, "network probe should be called exactly once"
+    retries_used = probe_kwargs[0].get("retries", 6)  # default 6 if not passed
+    assert retries_used < 6, (
+        f"In-lock network probe must use fewer than 6 retries to bound lock hold; got {retries_used}"
+    )
+
+
 def test_main_prints_traceback_to_stderr_when_run_raises(capsys):
     """Unhandled exceptions from run() must produce a traceback on stderr so
     cron/launchd logs capture the failure. Exit code stays 1."""

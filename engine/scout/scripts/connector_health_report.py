@@ -20,7 +20,6 @@ abbreviations match in EDT and become correct in EST (the bash silently rendered
 from __future__ import annotations
 
 import collections
-import glob
 import json
 import os
 import subprocess
@@ -93,7 +92,8 @@ def load_records(
     n = now or _default_now()
     cutoff = n - timedelta(days=window_days)
     records: list[dict[str, Any]] = []
-    for path in sorted(glob.glob(f"{log_dir}/connector-calls-*.jsonl")):
+    log_dir = Path(log_dir)
+    for path in sorted(log_dir.glob("connector-calls-*.jsonl")):
         try:
             with open(path, encoding="utf-8") as f:
                 for line in f:
@@ -129,9 +129,10 @@ def cleanup_old_jsonl(
     """
     n = now or _default_now()
     cutoff = n - timedelta(days=retain_days)
-    for path in glob.glob(f"{log_dir}/connector-calls-*.jsonl"):
+    log_dir = Path(log_dir)
+    for path in log_dir.glob("connector-calls-*.jsonl"):
         try:
-            date_str = os.path.basename(path).replace("connector-calls-", "").replace(".jsonl", "")
+            date_str = os.path.basename(str(path)).replace("connector-calls-", "").replace(".jsonl", "")
             fdate = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
             if fdate < cutoff:
                 os.remove(path)
