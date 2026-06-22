@@ -1,6 +1,6 @@
 [project]
 name = "scout-engine"
-version = "0.7.1"
+version = "0.7.2"
 description = "Scout engine: CLI, hooks, runners, and Python library for the Scout productivity system."
 readme = "README.md"
 requires-python = ">=3.11"
