@@ -14,6 +14,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - **CI hardening & test reliability (internal)** — shell templates (`templates/**/*.sh.tmpl`), `install.sh`, and the release scripts are now shellchecked in CI; plugin manifests are validated as parseable JSON with required keys (the version-sync guard is regex-based, so a malformed manifest could previously slip past); and the release workflow asserts the pushed tag matches the manifest version and refuses to publish empty release notes. Two CI flakes fixed: the `schedule_tick` event tests now freeze the clock (they relied on wall-clock and failed near 00:00 UTC), and the startup-latency tests take the best of N samples (a single noisy sample on a shared runner could breach the budget).
 
+### Fixed
+- **Audit-tail robustness sweep** — twelve small correctness/robustness fixes from the engine audit: `IdMap.load` guards corrupt/zero-byte JSON and drops an `exists()`/`open()` TOCTOU (#54); schedule-overlay new-key slots are copied, not aliased (#55); the action-items diff no longer silently drops duplicate `(section, title)` items — it pairs them 1:1 (#58); the TUI filter cycle guards `FILTER_OPTIONS.index` against a stale mode (#59); `schedule_tick` bounds its in-lock network probe to ~10s instead of ~48s (#60) and catches `ConfigError` from a `runtime: remote` spawn so it emits `slot.fire_failed` instead of crashing (#61); `connector_health_report` uses `Path.glob` so vault paths containing `[`/`]` still match (#63); KB frontmatter parsing uses a line-bounded `---` fence so a body rule can't truncate it (#64); `require_data_dir` collapses its exists()/is_dir() TOCTOU (#65); `new_short_prefix` distinguishes an empty exclude-set from `None` (#68); `fires_at_local` is normalized to zero-padded `HH:MM` (#69); and `kb_pre_filter` reads each KB file's head once per classify instead of twice (#78).
+
 ## [0.7.1] - 2026-06-19
 
 
