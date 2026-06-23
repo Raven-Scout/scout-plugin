@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Narrate the instance's own development** (`phases/connectors/claude-sessions.md`) — a rule upstreamed from accumulated instance experience: work *on the system itself* (commits/PRs against the engine/plugin or a companion app, sessions spent building the instance) is invisible to the standard connector scans, which target the user's work product. Sweep the instance's own dev repos' git deltas each run and narrate them, surfacing an instance-owned open/stale PR like any work-product PR. The repo set is **parameterized** — read from this instance's configuration; no hardcoded user paths or private-repo names.
+
 ## [0.7.2] - 2026-06-22
 
 
