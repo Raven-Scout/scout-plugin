@@ -216,12 +216,15 @@ Slightly more detail. Example format:
 
 ```
 Scout morning briefing ready.
+*Today's focus:* [the 1–2 things today is really about — the throughline from recent work to now]
 - Today's meetings: [count] ([first meeting time])
 - Action items: X urgent, Y to-do, Z watching
 - New since yesterday: [brief summary of new items]
 - KB areas updated: [list]
 - Review queue: [count] items pending your review
 ```
+
+**Lead the briefing DM with a continuity line.** A briefing wrap-DM must **open with a one-line "Today's Focus" continuity statement** that connects recent work to what matters today — *before* the counts and lists. Counts ("3 urgent, 5 to-do") tell {{USER_NAME}} *how much* without telling him *what to care about first*; the action-items file already carries this throughline, and the DM is where it most needs to surface. Lead with the one or two things today is really about, then the breakdown.
 
 ### Sources-Checked Footer
 
@@ -238,7 +241,7 @@ Only count sources you genuinely queried this run. A "quiet window" claim must b
 Applies to every wrap DM. Two parts:
 
 1. **No bare internal `#SHORTCODE` tags in the user-facing DM.** Action-items use `#SHORTCODE` tags as an *internal* continuity-keying convention (they match an item across daily files); they mean nothing to the reader as bare tokens. Either **expand inline** — `*semantic-layer weekly update* (#TAG)` or just the plain-English label — or **drop the tag from the DM**. A DM line whose only handle on an item is a bare `#CODE` is forbidden: the reader must understand it from plain English. The file-side `#SHORTCODE` machinery is untouched — this is presentation-layer only.
-2. **Link the action-items file.** Any wrap DM that references "today's list" / action items must include a clickable link to today's file — an Obsidian URI `obsidian://open?vault={{INSTANCE_NAME}}&file=action-items%2Faction-items-<YYYY-MM-DD>` and/or a `file://{{SCOUT_DIR}}/action-items/action-items-<YYYY-MM-DD>.md` — so a tap opens the list.
+2. **Link the action-items file — and write the link so Slack renders it.** Any wrap DM that references "today's list" / action items must include a clickable link to today's file. **Slack does not auto-linkify custom URL schemes** (`obsidian://`, `file://`) — a bare `obsidian://open?…` pasted into a DM renders as inert text, not a link. Wrap it in Slack mrkdwn angle-bracket syntax with a label: `<obsidian://open?vault={{INSTANCE_NAME}}&file=action-items%2Faction-items-<YYYY-MM-DD>|Today's list>` (or `<file://{{SCOUT_DIR}}/action-items/action-items-<YYYY-MM-DD>.md|Today's list>`). GitHub-flavored `[label](url)` **also** fails for custom schemes in the Slack renderer; only `http(s)://` / `mailto:` auto-link when bare. The principle generalizes: a "make it clickable" fix is only delivered when the link actually renders clickable in the **destination surface's markup dialect** — Slack mrkdwn ≠ GFM ≠ bare-URL auto-linking.
 
 ### Notification Rules
 
