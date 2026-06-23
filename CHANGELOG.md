@@ -8,6 +8,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **Email inbound-scan hardening** (`phases/connectors/email.md`) — three rules upstreamed from accumulated instance experience: **Automated-Alert Triage** (credential/token-expiry, quota/spend-threshold, usage, billing, and maintenance alerts are 🟢 Watching by default — promoted only on imminent functional impact, never on alarm-word tone); and **Drill Active Threads — Don't Trust the Snippet** (a search snippet previews one message, often not the latest — fetch the full thread before asserting "no reply"/"awaiting X"/"unanswered"; threads tied to an open item are mandatory drills).
+- **Action-items prioritization + task-query hardening** (`phases/core/action-items.md`) — two rules upstreamed from accumulated instance experience: a **Deadline-Distance Ceiling** (urgency is *capped* by deadline distance — 30+ days → 🟢 max, 7–30 → 🟡 max, <7 → eligible for 🔴, <3 → 🔴 when the next action is the user's; evaluate the real deadline, never the source's alarm-word tone; deprecation notices stay 🟢 until ~2–3 weeks out), and a **terminal-status filter on the ontology task query** (`query --type task --exclude-status "completed,cancelled"` instead of a bare query, so completed/cancelled task entities stop resurfacing as open work; documents the supported `--domain` / `--status` / `--deadline-before` filters).
 
 ## [0.7.2] - 2026-06-22
 
