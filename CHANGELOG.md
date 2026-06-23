@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Granola deliverable-invention gate** (`phases/connectors/granola.md`) — a rule upstreamed from accumulated instance experience: a dated commitment or deliverable extracted from a transcript needs a **verbatim source quote** or it's dropped — never attach an urgency marker ("due Friday", "committed to X") the transcript doesn't literally contain; ship without the marker or route to the review queue. Guards two invention traps: topic conflation (don't fuse two adjacent meeting topics into one dated item) and one-off-as-standing (a single mention is not a recurring cadence).
+
 ## [0.7.2] - 2026-06-22
 
 
