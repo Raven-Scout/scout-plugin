@@ -47,6 +47,8 @@ All GitHub operations use the `gh` CLI, which is authenticated and has full acce
 
 The sandbox/server clock may run in UTC. You **must** use the configured timezone for all time checks and timestamp generation throughout the run. Never use bare `date` — always prefix with `TZ={{TIMEZONE}}` (or the timezone specified in your config).
 
+**Convert ingested connector timestamps at write time.** Connector payloads frequently carry timestamps in UTC (a trailing `Z`, or `+00:00`) — never copy one verbatim into the KB, an action item, or a DM as if it were already in the display zone. A value ending in `Z` is UTC; rendered in `{{TIMEZONE}}` it can shift by several hours and even across a calendar-day boundary, so writing it through unconverted silently drifts every downstream surface — and the drift changes with daylight-saving. At write time, parse the source's zone and convert to `{{TIMEZONE}}` (a tz-aware datetime, or `TZ={{TIMEZONE}} date -d <iso>`), then label the result. If a connector timestamp's zone is ambiguous, resolve it before writing — don't assume it matches the display zone.
+
 ## Session Cost Reporting (Final Action)
 
 As the very last action before exit, log this session's cost:
