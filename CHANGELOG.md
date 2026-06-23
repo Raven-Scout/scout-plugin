@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Ingested-timestamp conversion rule** (`phases/core/git-setup.md`, Timezone Handling) — upstreamed from accumulated instance experience: connector payloads often carry UTC timestamps (trailing `Z` / `+00:00`); never copy one verbatim into the KB / action items / a DM as if it were already in the display zone. Parse the source zone and convert to `{{TIMEZONE}}` at write time (it can shift hours and cross a calendar-day boundary, and the drift changes with DST). Connector-agnostic; complements the existing "never use bare `date`" generation rule.
+
 ## [0.7.2] - 2026-06-22
 
 
