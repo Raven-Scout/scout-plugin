@@ -9,7 +9,7 @@
       "name": "scout",
       "source": "./",
       "description": "Autonomous knowledge management and daily briefing system for Claude Code",
-      "version": "0.7.2",
+      "version": "0.7.3",
       "author": {
         "name": "Jordan Burger"
       },
