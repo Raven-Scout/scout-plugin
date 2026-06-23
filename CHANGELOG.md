@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Slack notification refinements** (`phases/connectors/slack.md`) — two rules upstreamed from accumulated instance experience: **lead the briefing wrap-DM with a "Today's Focus" continuity line** (open with the throughline from recent work to today, before the counts — counts say *how much*, not *what to care about first*); and a **Slack-renderable link refinement** to the existing DM-legibility rule (Slack does not auto-linkify custom URL schemes like `obsidian://` / `file://` — wrap them in mrkdwn angle-bracket form `<url|label>`; GFM `[label](url)` also fails for custom schemes — a clickable-link fix only lands when the link renders in the destination's markup dialect).
+
 ## [0.7.2] - 2026-06-22
 
 
