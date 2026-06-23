@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **KB-management hardening** (`phases/core/kb-management.md`) — three rules upstreamed from accumulated instance experience: **Never Guess a Name or Acronym Expansion** (cite the full form from a primary source or leave it abbreviated `[unverified]` — never invent a plausible expansion, which reads as fact and propagates); an **entity-creation trigger** (mint a new entity file when a person/org/technology recurs across 3+ independent sources — enriching existing files is not a substitute for creating missing ones); and **staleness-observability + search-depth** freshness rules (every file carries a machine-readable `last_updated:` so a scan can rank and a driver can queue stale files — opportunistic-only refresh lets the long tail rot; and don't scope completeness searches to a fixed channel set / `from:me` filters — a known-to-exist fact your scan missed is a search-depth miss, not an absence).
+
 ## [0.7.2] - 2026-06-22
 
 
