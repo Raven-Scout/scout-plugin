@@ -70,6 +70,17 @@ gh search prs --review-requested @me --state open --json number,title,url,reposi
 
 Pull `gh pr view N --repo R --json author,headRefName,reviewRequests,isDraft` to classify. For buckets 2–3, note who requested it, which repo, how long it's waited (prioritize older), and PR size if available.
 
+### PR Action-Item Context
+
+When a PR becomes an action item, the line must state **what the PR does, which project it serves, and what's blocked downstream** — never just the title and merge status. A reader seeing only "Review PR #123 — open" has to open the PR to learn whether it matters; the action item exists to spare them that. For every PR-derived item, capture:
+
+- **What it does** — the change in one plain-English phrase, not the raw PR title.
+- **Which project/area** — resolve the repo/PR against the KB so it links to the right project entity, not just a bare repo name.
+- **What's blocked** — who is waiting on it, or what ships once it merges. "Review feedback needing a response" and "approval blocking a release" are different priorities; the downstream context is what distinguishes them.
+- **How long it's waited** — staleness drives ordering.
+
+A bare title + status is not enough context to act on.
+
 ### New Issues Assigned
 
 ```bash
