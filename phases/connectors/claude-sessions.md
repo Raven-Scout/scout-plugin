@@ -62,6 +62,19 @@ A session may have changed files that were never committed — invisible to `git
 cd <repo> && git status --porcelain && git log --since='<last-run-time>' --oneline
 ```
 
+### Narrate {{INSTANCE_NAME}}'s Own Development
+
+{{INSTANCE_NAME}} maintains its own codebase, and {{USER_NAME}}'s work *on the system itself* is a real signal the standard connector scans miss — those scans target {{USER_NAME}}'s work product (the repos and trackers tied to projects), not the instance's own development. So commits and PRs against the engine/plugin or a companion app, and sessions spent building {{INSTANCE_NAME}}, go invisible unless swept explicitly.
+
+The vault's own git delta is already narrated (see the Git Setup phase). Extend the **same treatment to the instance's other repositories** — an engine/plugin checkout, a desktop or mobile app — each run:
+
+```bash
+# For each instance-owned dev repo (read from this instance's configuration, not hardcoded):
+git -C <repo> log --since='<last-run-time>' --oneline --shortstat
+```
+
+Narrate the deltas in the run summary, and surface an instance-owned PR that's open and waiting on review (or stale ≥48h) in the action items just as a work-product PR would be. **Parameterize the repo set** — read it from this instance's configuration; never hardcode an absolute user path or a specific private-repo name. An instance whose only repo is its vault simply relies on the vault narration.
+
 ### Claim Gate — No "Actively Building X" Without a Cited Signal
 
 Do not assert that {{USER_NAME}} "is actively building / working on X" unless you can cite a concrete signal: a session JSONL with matching prompts, a commit SHA, an open PR, or dirty working-tree files. A session *title* or a single prompt is weak evidence — tie the claim to the tangible artifact, or downgrade it to "{{USER_NAME}} opened a session about X" rather than asserting active work.
