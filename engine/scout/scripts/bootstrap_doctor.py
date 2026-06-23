@@ -46,6 +46,74 @@ _REQUIRED_CAT1_FILES = (
 # inside these without Full Disk Access granted to the executable.
 _MACOS_TCC_PROTECTED_DIRS = ("Documents", "Desktop", "Downloads")
 
+# Runner log filename prefixes written under <vault>/.scout-logs/ by the three
+# cat-1b runners (run-scout.sh / run-dreaming.sh / run-research.sh).
+_RUN_LOG_GLOBS = ("scout-*.log", "dreaming-*.log", "research-*.log")
+
+# Rejected-Claude-credential signatures. Anchored on infra-emitted strings (the
+# retry wrapper's own marker + the Claude CLI's exact auth-error phrasing) rather
+# than a bare "401", so a session that merely *writes about* HTTP 401 in its
+# output can't trip the detector.
+_AUTH_FAILURE_RE = re.compile(
+    r"=== Authentication failure \(HTTP 401/403\)"
+    r"|Failed to authenticate\. API Error: 40[13]"
+    r"|Invalid authentication credentials"
+)
+
+
+def _tail_text(path: Path, *, max_bytes: int = 65536) -> str:
+    """Return the trailing ``max_bytes`` of ``path`` decoded as UTF-8.
+
+    Session logs can be large; we only need the end (where the failure marker
+    and the run-finished line live). Reads the last chunk so the check stays
+    cheap regardless of log size. Returns "" on any read error.
+    """
+    try:
+        with path.open("rb") as f:
+            size = path.stat().st_size
+            if size > max_bytes:
+                f.seek(-max_bytes, os.SEEK_END)
+            data = f.read()
+    except OSError:
+        return ""
+    return data.decode("utf-8", errors="replace")
+
+
+def _check_recent_auth_failure(*, vault: Path) -> tuple[list[str], list[str]]:
+    """RED if the most recent run log ended on a rejected-credential failure.
+
+    A 401/403 from Claude Code blocks *every* scheduled run until a human
+    re-authenticates, yet it leaves no on-disk vault state — so without this the
+    doctor (and the post-upgrade smoke) stay green through a total outage. We
+    look only at the single newest run log so the signal self-clears: the next
+    successful run writes a newer, clean log and the error disappears.
+    """
+    logs_dir = vault / ".scout-logs"
+    if not logs_dir.is_dir():
+        return [], []
+    candidates: list[Path] = []
+    for pat in _RUN_LOG_GLOBS:
+        candidates.extend(logs_dir.glob(pat))
+    if not candidates:
+        return [], []
+    try:
+        latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return [], []
+    if not _AUTH_FAILURE_RE.search(_tail_text(latest)):
+        return [], []
+    return (
+        [
+            f"latest scheduled run failed to authenticate (HTTP 401/403): {latest.name}. "
+            "Claude Code's API credentials were rejected — every scheduled run will fail "
+            "until this is fixed. Re-authenticate the claude binary the runner uses: "
+            "`claude setup-token` (headless, then expose CLAUDE_CODE_OAUTH_TOKEN to the "
+            "runner's environment) or `claude` (interactive login). Verify with "
+            f"`<claude-bin> -p 'hello'`. Full log: .scout-logs/{latest.name}."
+        ],
+        [],
+    )
+
 
 def _check_macos_plist_scoutctl_bin(*, home: Path) -> tuple[list[str], list[str]]:
     """Inspect the installed schedule-tick plist's scoutctl path.
@@ -253,6 +321,13 @@ def run_doctor(*, vault: Path, check_jobs: bool = True, home: Path | None = None
     # Hand-edit backups (yellow but informational).
     for bak in vault.glob("run-*.sh.bak.*"):
         warnings.append(f"runner backup present: {bak.name} (hand-edit detected on prior update)")
+
+    # Recent Claude-CLI auth failure — scan the newest run log for a rejected
+    # credential. Read-only and offline (no API call); self-clears on the next
+    # successful run. Not gated by check_jobs — it inspects on-disk logs only.
+    auth_errors, auth_warnings = _check_recent_auth_failure(vault=vault)
+    errors.extend(auth_errors)
+    warnings.extend(auth_warnings)
 
     # Live launchd jobs.
     if check_jobs and os.name == "posix":

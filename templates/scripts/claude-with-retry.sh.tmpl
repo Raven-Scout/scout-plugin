@@ -50,6 +50,11 @@ fi
 # Pipe-separated grep -E regex. Keep narrow — anything matched here triggers a retry.
 TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|Connection closed mid-response|529 Overloaded'
 
+# Auth-failure class (HTTP 401/403). NOT retried — re-authentication needs a human —
+# but surfaced with a concrete remediation instead of the opaque "not classified"
+# line, since a rejected credential blocks EVERY scheduled run until fixed.
+AUTH_PATTERNS='Failed to authenticate|Invalid authentication credentials|API Error: 40[13]|40[13] Unauthorized|40[13] Forbidden|OAuth token (has )?expired'
+
 attempt=1
 exit_code=0
 while :; do
@@ -70,6 +75,17 @@ while :; do
     fi
 
     if ! tail -50 "$LOG_FILE" | grep -qE "$TRANSIENT_PATTERNS"; then
+        if tail -50 "$LOG_FILE" | grep -qE "$AUTH_PATTERNS"; then
+            {
+                echo "=== Authentication failure (HTTP 401/403) — no retry (exit $exit_code) ==="
+                echo "    Claude Code's API credentials were rejected. This blocks every scheduled {{INSTANCE_NAME}} run until re-authenticated."
+                echo "    Re-authenticate the claude binary this runner uses ($CLAUDE_BIN):"
+                echo "      - interactive: run 'claude' once and complete login, or"
+                echo "      - headless:    run 'claude setup-token' and expose CLAUDE_CODE_OAUTH_TOKEN to this runner's environment."
+                echo "    Then verify before the next scheduled run:  $CLAUDE_BIN -p 'hello' --model opus"
+            } >> "$LOG_FILE"
+            exit "$exit_code"
+        fi
         echo "=== Failure not classified as transient — no retry (exit $exit_code) ===" >> "$LOG_FILE"
         exit "$exit_code"
     fi
