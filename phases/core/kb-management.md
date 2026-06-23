@@ -75,6 +75,12 @@ The KB is the **persistent memory** of this system. Action items are ephemeral (
 4. Add any new people to `people.md`
 5. Add any new issues to the issue tracker file
 
+**Create a new entity file (`knowledge-base/people/`, `ontology/entities/`) when:**
+- A person, organization, or technology **recurs across 3+ independent sources** (e.g. named in two meetings and a message thread, or an issue + a PR + a calendar invite). Recurrence at that threshold means it's a real entity worth tracking, not a one-off mention — the trigger is the recurrence itself; don't wait to be told.
+- It has relationships worth tracking (who it works with, what it depends on, which projects it touches).
+
+Enriching the files you already have is **not** a substitute for minting the ones you're missing: a run that goes deep on existing entities but never creates one for a person/org/tech that has clearly crossed the recurrence threshold leaves a structural gap in the graph.
+
 **Do NOT create a new file when:**
 - A topic is just a sub-item of an existing project (add it to that project's file instead)
 - It's a one-off task with no ongoing context (that's an action item, not a KB entry)
@@ -104,6 +110,10 @@ Every KB file should have a "Last updated" or "Last verified" line. The standard
 | `knowledge-base.md` | Every run (it's the index) |
 
 During consolidation KB audits, **prioritize the stalest high-priority files** when choosing what to audit.
+
+**Make staleness observable, don't just assert it.** The table above is only enforceable if each file's age is machine-readable: every KB file should carry a `last_updated:` property (and, where possible, its latest-commit date) — not just a prose "Last updated" line — so a scan can rank files by staleness and a refresh driver can queue the over-threshold ones. Freshness enforced *opportunistically* — a file refreshed only when a run happens to touch its project — lets the long tail rot: files with no recent connector activity never get picked, and nothing in the system ever *sees* them aging.
+
+**Widen discovery beyond a fixed net.** A material fact can land in an unwatched channel, an off-keyword phrasing, or a source you don't routinely scan — so don't scope KB-completeness searches to a fixed channel set or to `from:me`-style filters alone. When a fact is known to exist (referenced in a meeting, a message, or by {{USER_NAME}}) but your scan didn't surface it, treat that as a *search-depth miss*, not an absence: broaden the query (other channels, both directions, alternate terms) until you find it.
 
 ### Review Queue — `knowledge-base/review-queue.md`
 
@@ -142,6 +152,10 @@ When writing KB content, use these markers:
 - **[stale]** = known to be outdated but kept as historical context until replacement info is found
 - **[contradicted]** = two sources disagree; both claims noted with sources cited — always add to review queue
 - **[speculative]** = an inferred causal/contributory link that no single source actually states; allowed only with this marker (see Causal-Claim Gate)
+
+### Never Guess a Name or Acronym Expansion
+
+When you encounter an acronym, an abbreviation, or a partial/initialled name, **never expand it from a guess** — a plausible-but-wrong expansion reads as fact and propagates across the KB. Cite the **full form from a primary source** (the sender's signature, an org's own site or docs, an issue/PR body, a calendar invite, the person's own message), or leave the token in its original abbreviated form marked `[unverified]`. The failure mode is inventing a confident full name for an acronym that actually stands for something else entirely. This applies equally to organization names, product/codenames, team names, and people's full names. If {{USER_NAME}} corrects an expansion, record the correct full form so it resolves next time.
 
 ### Causal-Claim Gate
 

@@ -34,6 +34,14 @@ Every action item extracted from a transcript is a **candidate** that must be ve
 
 **Never write a transcript-sourced action item directly to the action items file without cross-checking it first.**
 
+### Deliverable-Invention Gate
+
+A dated commitment or deliverable pulled from a transcript needs a **verbatim source quote**, or it doesn't get written. Before attaching any urgency marker — "must be done by X", "before Y", "committed to Z", "due Friday" — to an extracted item, confirm the transcript (or a post-meeting message) contains the exact sentence stating that commitment. If the quote doesn't exist verbatim, ship the item **without** the urgency marker, or route it to `review-queue.md` for {{USER_NAME}} to confirm — never synthesize the deadline.
+
+Two traps that produce invented deliverables:
+- **Topic conflation.** When two adjacent topics surface in the same meeting (e.g. a documentation deliverable and an unrelated upcoming trip), do not fuse them into one dated item. Write them separately and let {{USER_NAME}} cull.
+- **One-off ≠ standing.** A single mention is not a recurring cadence. "Every Friday" / "every Monday" commitments must come from the speaker's own words, not be inferred from one occurrence.
+
 ### Extraction Gate — Content, Not Breadcrumbs
 
 A "✅ transcript captured" / "notes available for [meeting]" line is **not** extraction — it is a breadcrumb that silently drops the meeting's substance. For every meeting {{USER_NAME}} attended where a transcript exists, you MUST produce the substantive extraction above (action items, decisions, commitments-by-others, deadlines, open questions) or an explicit "reviewed — no actionable content (reason)" note. A bare capture/availability breadcrumb is forbidden as the only output for an attended meeting.

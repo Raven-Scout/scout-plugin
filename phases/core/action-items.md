@@ -34,6 +34,17 @@ Categorize every action item using these levels:
 - **🟢 Watching**: Tracking but no action needed yet
 - **✅ Done**: Completed with evidence of completion
 
+### Hard Rule — Deadline-Distance Ceiling
+
+Urgency is **capped by how far away the deadline is** — distance sets a *ceiling*, not a floor. Before assigning any tier, compute the days between today and the item's real deadline:
+
+- **30+ days out** → 🟢 Watching (max). Far-future items never lead the list.
+- **7–30 days out** → 🟡 To Do (max).
+- **< 7 days out** → eligible for 🔴 Urgent.
+- **< 3 days out** → 🔴 when the next action is {{USER_NAME}}'s to take.
+
+**Evaluate the actual deadline, not the source's tone.** Notification language — "action required", "expiring soon", "final notice", "limit reached" — is alarm-word framing, not real urgency, and never promotes an item past the distance ceiling. Deprecation / end-of-life notices specifically stay 🟢 Watching until ~2–3 weeks before the cutover. This ceiling is the counterpart to the deadline *escalation* rule under Knowledge Graph Personal Tasks below: escalation raises priority as a deadline nears; the ceiling stops a distant deadline from being surfaced as urgent on tone alone.
+
 ## Action Items File Format
 
 Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
@@ -188,8 +199,10 @@ If {{USER_NAME}} corrects a name ("who is X?", "X doesn't exist", "this is hallu
 If the ontology parser is set up, query it for personal tasks and deadlines:
 
 ```bash
-cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py query --type task
+cd {{SCOUT_DIR}} && python knowledge-base/ontology/parser.py query --type task --exclude-status "completed,cancelled"
 ```
+
+**Always filter terminal statuses — never query bare `--type task`.** A bare query returns *every* task entity, including ones already finished, so completed work resurfaces on the daily list as if it were still open (the classic regression: a task whose `status` flipped to `completed` weeks ago reappears tomorrow). Pass `--exclude-status "completed,cancelled"` to get the currently-actionable set — task entities use mixed statuses (`open` / `in-progress` / `scheduled` / …), so excluding the terminal ones is more robust than trying to enumerate the live ones. Narrow further with `--domain personal` / `--domain work` when you want a single slice, `--status <s>` for an exact status, and `--deadline-before <ISO-date>` for deadline sweeps.
 
 **`surface_rule` windows are authoritative.** Before rendering any `type: task` entity into the daily file, read its `surface_rule:` block. If `default: do_not_surface` and **no** `windows` entry covers today's date AND **no** `always_visible_if` condition fires, the task is intentionally muted — do not render it, do not flag it stale, do not mention it in the wrap notification. If a window covers today, render at that window's `surface:` priority using its `task:` label override if present. If `always_visible_if` fires, force 🔴. A task with no `surface_rule` falls back to surfacing daily until `status: completed` (back-compat). This stops long-window tasks (multi-week trips, future-dated deadlines) from polluting the daily surface during their idle phases.
 
