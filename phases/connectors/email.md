@@ -62,6 +62,10 @@ Use `gmail_search_messages` to find recent emails in the inbox. Prioritize:
 - Mass email (BCC'd, mailing list) from unknown source = **skip**
 - If uncertain whether an email is legitimate or cold outreach, file under **Watching** at most, **never under To Do**
 
+### Automated-Alert Triage
+
+Automated/transactional alerts — credential & token expiry, quota/spend thresholds, usage metrics, billing milestones, scheduled-maintenance notices — are **informational by default**: file them under **Watching** (🟢), never To Do or Urgent on tone alone. Promote one only when there is an *imminent functional impact*: a production credential expiring within days that breaks an active workflow, or a hard shutoff with a near deadline. The alert's own language ("action required", "expiring soon", "limit reached") is not urgency — evaluate the actual deadline and whether anything {{USER_NAME}} relies on would actually break. Test/dev/non-production credentials and routine threshold notices stay 🟢.
+
 ### What to Record
 
 For each legitimate inbound email:
@@ -70,6 +74,10 @@ For each legitimate inbound email:
 - **What's being asked or communicated**
 - **Whether {{USER_NAME}} already replied** (check sent mail for a response in the same thread)
 - **Urgency** — explicit deadline, tone, or sender importance
+
+### Drill Active Threads — Don't Trust the Snippet
+
+`gmail_search_messages` returns a preview snippet of just *one* message in a thread — often not the latest. For any thread that has moved since the last run (newer than your last-checked watermark, or tied to an open action item or a tracked contact), fetch the **full thread** (`get_thread`) and read the tail before drawing any conclusion. **Never assert a thread's state — "still no reply", "awaiting X", "unanswered" — from the search snippet alone:** the reply you're looking for may already be sitting in the thread tail. Threads attached to an open 🔴/🟡 item are mandatory drills.
 
 ---
 phase: connector
