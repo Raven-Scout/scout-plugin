@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **GitHub PR action-item context** (`phases/connectors/github.md`) — a rule upstreamed from accumulated instance experience: when a PR becomes an action item, the line must state **what the PR does, which project it serves, and what's blocked downstream** — never just the title and merge status. Captures the change in plain English, the project/area resolved against the KB, who's waiting / what ships on merge, and how long it's waited; a bare title + status is not enough context to act on.
+
 ## [0.7.2] - 2026-06-22
 
 
