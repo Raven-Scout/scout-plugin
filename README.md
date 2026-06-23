@@ -464,3 +464,13 @@ Pull the latest version of the plugin repo. Then run `/scout-setup` and choose R
 
 **What about costs?**
 Run `/scout-status` to see the budget tracking section. The usage tracker logs every session's cost. The budget check automatically skips sessions when the rolling-window spend crosses the skip threshold. To inspect or adjust the limits, see *"My runs keep getting skipped because of budget"* above — the key knobs are `daily_budget_estimate_usd`, `rate_limit_window_hours`, and `skip_threshold_pct` in `scout-config.yaml`.
+
+## License & legal
+
+Scout is open-source under the [MIT License](LICENSE).
+
+- **[Privacy Policy](PRIVACY.md)** — Scout is local-first and collects nothing; your data stays on your machine. ([web version](https://raven-scout.github.io/scout-plugin/privacy.html))
+- **[Terms of Use](TERMS.md)** — free, open-source, provided as-is. ([web version](https://raven-scout.github.io/scout-plugin/terms.html))
+- **[Security Policy](https://github.com/Raven-Scout/.github/blob/main/SECURITY.md)** · **[Code of Conduct](https://github.com/Raven-Scout/.github/blob/main/CODE_OF_CONDUCT.md)**
+
+Scout is an independent project and is not affiliated with, endorsed by, or sponsored by Anthropic, Microsoft, Keboola, or any other company.
