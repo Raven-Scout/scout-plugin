@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from scout.scripts.bootstrap_doctor import (
@@ -110,6 +111,71 @@ def test_invalid_schedule_yaml_is_red(tmp_path):
     report = run_doctor(vault=tmp_path, check_jobs=False)
     assert report.severity is Severity.RED
     assert any("schedule.yaml invalid" in e for e in report.errors)
+
+
+# ---------------------------------------------------------------------------
+# Recent Claude-CLI auth failure — scan newest run log for rejected credentials
+# ---------------------------------------------------------------------------
+
+_AUTH_LOG_TAIL = (
+    "=== Scout run starting at Tue Jun 23 13:11:28 CEST 2026 ===\n"
+    "[budget-check] budget OK — $0.00 spent (threshold: $8.34)\n"
+    "Failed to authenticate. API Error: 401 Invalid authentication credentials\n"
+    "=== Authentication failure (HTTP 401/403) — no retry (exit 1) ===\n"
+    "=== Scout run finished at Tue Jun 23 13:11:33 CEST 2026 (exit code: 1, duration: 3s) ===\n"
+)
+
+_CLEAN_LOG_TAIL = (
+    "=== Scout run starting at Tue Jun 23 14:00:00 CEST 2026 ===\n"
+    "[budget-check] budget OK — $0.00 spent (threshold: $8.34)\n"
+    "session complete\n"
+    "=== Scout run finished at Tue Jun 23 14:05:00 CEST 2026 (exit code: 0, duration: 300s) ===\n"
+)
+
+
+def test_recent_auth_failure_in_log_is_red(tmp_path):
+    """The newest run log showing a 401 auth failure makes the doctor RED with remediation."""
+    _populate_minimal_vault(tmp_path)
+    logs = tmp_path / ".scout-logs"
+    logs.mkdir()
+    (logs / "scout-2026-06-23_13-11.log").write_text(_AUTH_LOG_TAIL)
+    report = run_doctor(vault=tmp_path, check_jobs=False)
+    assert report.severity is Severity.RED
+    assert any("authenticate" in e.lower() for e in report.errors)
+    assert any("setup-token" in e for e in report.errors)
+
+
+def test_clean_latest_log_stays_green(tmp_path):
+    """A run log with no auth-failure signature must not trip the detector (no false positives)."""
+    _populate_minimal_vault(tmp_path)
+    logs = tmp_path / ".scout-logs"
+    logs.mkdir()
+    (logs / "scout-2026-06-23_14-00.log").write_text(_CLEAN_LOG_TAIL)
+    report = run_doctor(vault=tmp_path, check_jobs=False)
+    assert report.severity is Severity.GREEN
+
+
+def test_auth_failure_self_clears_when_newer_run_succeeds(tmp_path):
+    """An older failed-auth log is ignored once a NEWER log shows a clean run."""
+    _populate_minimal_vault(tmp_path)
+    logs = tmp_path / ".scout-logs"
+    logs.mkdir()
+    failed = logs / "scout-2026-06-23_13-11.log"
+    clean = logs / "scout-2026-06-23_14-00.log"
+    failed.write_text(_AUTH_LOG_TAIL)
+    clean.write_text(_CLEAN_LOG_TAIL)
+    # Make the clean run unambiguously the most recent.
+    os.utime(failed, (1_000_000, 1_000_000))
+    os.utime(clean, (2_000_000, 2_000_000))
+    report = run_doctor(vault=tmp_path, check_jobs=False)
+    assert report.severity is Severity.GREEN
+
+
+def test_no_logs_dir_is_green(tmp_path):
+    """A vault that has never run (no .scout-logs) must not error on the auth check."""
+    _populate_minimal_vault(tmp_path)
+    report = run_doctor(vault=tmp_path, check_jobs=False)
+    assert report.severity is Severity.GREEN
 
 
 # ---------------------------------------------------------------------------

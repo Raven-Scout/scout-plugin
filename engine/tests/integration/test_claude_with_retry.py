@@ -119,3 +119,52 @@ def test_does_not_retry_non_transient_error(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert _attempts(scout_dir) == 1, "non-transient failure must not be retried"
+
+
+def test_auth_failure_emits_remediation(tmp_path: Path) -> None:
+    """A 401 must not retry, but must log a clear re-authentication remediation.
+
+    Regression context: engine 0.7.2 user hit "Failed to authenticate. API Error:
+    401 Invalid authentication credentials" and the wrapper only logged the opaque
+    "Failure not classified as transient" line — no pointer to re-auth. The auth
+    class now gets its own remediation block (still no retry).
+    """
+    scout_dir = tmp_path / "Scout"
+    scout_dir.mkdir()
+    script = _render(TEMPLATE, scout_dir)
+    fake = _fake_claude(
+        scout_dir,
+        first_attempt_output="Failed to authenticate. API Error: 401 Invalid authentication credentials",
+        first_attempt_exit=1,
+    )
+    log_file = scout_dir / "run.log"
+
+    result = _run(script, fake, log_file)
+
+    assert result.returncode == 1
+    assert _attempts(scout_dir) == 1, "auth failure must not be retried"
+    log = log_file.read_text()
+    assert "setup-token" in log, "auth remediation must point at `claude setup-token`"
+    assert "Authentication failure" in log, "auth failure must be classified distinctly"
+
+
+def test_non_auth_non_transient_keeps_generic_message(tmp_path: Path) -> None:
+    """A non-auth, non-transient failure keeps the generic 'not classified' message
+    and does NOT get the auth remediation block."""
+    scout_dir = tmp_path / "Scout"
+    scout_dir.mkdir()
+    script = _render(TEMPLATE, scout_dir)
+    fake = _fake_claude(
+        scout_dir,
+        first_attempt_output="API Error: 400 Bad Request — malformed prompt",
+        first_attempt_exit=1,
+    )
+    log_file = scout_dir / "run.log"
+
+    result = _run(script, fake, log_file)
+
+    assert result.returncode == 1
+    assert _attempts(scout_dir) == 1
+    log = log_file.read_text()
+    assert "not classified as transient" in log
+    assert "setup-token" not in log, "non-auth failures must not get the auth remediation"

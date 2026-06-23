@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Claude-CLI auth-failure detection** — a rejected API credential (HTTP 401/403) from the `claude` binary blocks *every* scheduled run but left no on-disk vault state, so the failure surfaced only as the opaque "Failure not classified as transient" line and `scoutctl bootstrap doctor` stayed green through a total outage. Two changes close the gap: (1) `claude-with-retry.sh` now classifies the auth-failure class distinctly and logs a concrete remediation block (re-authenticate via `claude setup-token` for headless runs or `claude` interactively, naming the exact runner binary and a verify command) instead of the generic message — it still does **not** retry, since a bad credential needs a human; (2) `bootstrap_doctor` scans the newest run log under `.scout-logs/` and reports RED with the same remediation when the latest scheduled run died on a rejected credential. The doctor check is read-only and offline (no API call), anchors on infra-emitted strings rather than a bare "401" to avoid tripping on session output that merely mentions HTTP 401, and self-clears once the next run succeeds.
+
 ## [0.7.2] - 2026-06-22
 
 
