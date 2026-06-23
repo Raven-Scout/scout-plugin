@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Email inbound-scan hardening** (`phases/connectors/email.md`) — three rules upstreamed from accumulated instance experience: **Automated-Alert Triage** (credential/token-expiry, quota/spend-threshold, usage, billing, and maintenance alerts are 🟢 Watching by default — promoted only on imminent functional impact, never on alarm-word tone); and **Drill Active Threads — Don't Trust the Snippet** (a search snippet previews one message, often not the latest — fetch the full thread before asserting "no reply"/"awaiting X"/"unanswered"; threads tied to an open item are mandatory drills).
+
 ## [0.7.2] - 2026-06-22
 
 
