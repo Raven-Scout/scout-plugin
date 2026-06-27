@@ -12,7 +12,7 @@
 
 `_assemble(kind)` returns `"# {kind}\n\n**BASE_DIR:** …\n"` followed by each selected phase **section body**, run through `render_template()` and joined by `\n\n`. Selection: SKILL = `core`+`connectors` (modes briefing/consolidation); DREAMING = `core`+`modes` (dreaming); RESEARCH = `core`+`research` (research); files globbed sorted, sections filtered by `requires` (enabled connector) and `mode`.
 
-`render_template()` is **lossy**: `{{VAR}}` → concrete value (`{{USER_NAME}}`→"Jordan", `{{INSTANCE_NAME}}`→"Scout", …). Reversing the substitution is the central difficulty.
+`render_template()` is **lossy**: `{{VAR}}` → concrete value (`{{USER_NAME}}`→"Alex", `{{INSTANCE_NAME}}`→"Scout", …). Reversing the substitution is the central difficulty.
 
 ### Template variables, by reversal safety
 

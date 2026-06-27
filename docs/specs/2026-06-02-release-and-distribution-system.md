@@ -75,7 +75,7 @@ Today `/scout-update` upgrades the vault only. Extend it to the single "update S
 
 1. **Bring the plugin to latest.** Adapts to marketplace type:
    - GitHub marketplace (public users): `claude plugin marketplace update scout-plugin` (git pull) + reinstall.
-   - Directory marketplace (maintainer/Jordan, `~/scout-plugin`): `git -C ~/scout-plugin pull`; the editable venv auto-reflects it.
+   - Directory marketplace (maintainer, `~/scout-plugin`): `git -C ~/scout-plugin pull`; the editable venv auto-reflects it.
 2. **Ensure the engine venv** via the plugin's existing `scripts/install-venv.sh`.
 3. **Upgrade the vault against the _new_ plugin.** Resolve the freshly-installed plugin root (from `claude plugin list` / `installed_plugins.json`) and invoke `<new-plugin-root>/.venv/bin/scoutctl bootstrap upgrade` **by absolute path** — avoiding the stale `$CLAUDE_PLUGIN_ROOT`-in-session problem, so no restart is needed. This is the existing sidecar-safe 8-stage pipeline (including the `parser.py` 3-way merge).
 4. **Doctor + report** old→new version and any `.proposed-merge` sidecars.

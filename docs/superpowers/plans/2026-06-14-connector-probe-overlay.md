@@ -13,7 +13,7 @@
 - `engine/scout/scripts/connector_probes.py` already has `load_registry(path) -> dict[str, Probe]` (single-file parser, fully tested in `engine/tests/unit/test_connector_probe_registry.py`). It raises **`ValueError`** on malformed input — existing tests assert `ValueError`, so leave that behavior intact.
 - `Probe` is a frozen dataclass with `.name`, `.kind` (`ProbeKind.MCP_TOOL` / `ProbeKind.BASH`), `.tool_chain: list[str]`, `.bash_command: str`, `.needs_user_input: list[str]`. `ProbeKind.MCP_TOOL.value == "mcp_tool"`, `ProbeKind.BASH.value == "bash"`.
 - `ConfigError` is in `scout.errors` (subclass of `ScoutError`).
-- Plugin root is `Path(scout.__file__).parent.parent.parent` (verified == `/Users/jordanburger/scout-plugin`); shipped registry is at `<plugin_root>/templates/connector-probes.yaml` (verified exists). Data dir comes from `scout.paths.data_dir()`.
+- Plugin root is `Path(scout.__file__).parent.parent.parent` (verified == `~/scout-plugin`); shipped registry is at `<plugin_root>/templates/connector-probes.yaml` (verified exists). Data dir comes from `scout.paths.data_dir()`.
 - The `connectors` Typer subapp is built in `engine/scout/cli.py` inside `_register_connectors()` (has `list`, `show`, `reload`, `snapshot`). **Subcommands import their heavy deps inside the function body** — a perf rule enforced by `engine/tests/perf/test_no_heavy_imports.py`. Follow that: import `connector_probes` inside the new command, not at module top.
 - **This branch does NOT have the hermetic-test autouse fixture** (that's in the still-open Batch 1 PR #124). Consequence #1: this plan's tests must be self-contained — pass `plugin_root=`/`data_dir=` explicitly, or set `SCOUT_DATA_DIR` — never rely on `HOME` isolation. Consequence #2: a full `pytest tests/` run on this branch shows **2 pre-existing failures** in `test_cli_schedule_subapp.py` (the live-vault slot-count tests Batch 1 fixes). Those are not introduced here; the final-verification task accounts for them.
 
@@ -23,7 +23,7 @@
 
 - [ ] **Step 1: Verify you're on the feature branch**
 
-Run: `git -C /Users/jordanburger/scout-plugin branch --show-current`
+Run: `git -C ~/scout-plugin branch --show-current`
 Expected: `feat/connector-probe-overlay`. (If not, the spec commit `e30ee4d` is on it; check it out.)
 
 ---
@@ -461,7 +461,7 @@ In `commands/scout-update.md`, add a line to the upgrade report/notes section (w
 - [ ] **Step 4: Sanity-check the wizard command end-to-end**
 
 ```bash
-cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m scout connectors probe-registry --json | head -20
+cd ~/scout-plugin/engine && ../.venv/bin/python -m scout connectors probe-registry --json | head -20
 ```
 
 Expected: a JSON object including `slack`, `github`, etc. (the shipped set; no overlay on this machine unless you created one).

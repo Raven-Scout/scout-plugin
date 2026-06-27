@@ -20,8 +20,8 @@
 
 - [ ] **Step 1: Verify branch and a green baseline**
 
-Run: `git -C /Users/jordanburger/scout-plugin branch --show-current` → expect `fix/batch-3-high-severity`.
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/ -q 2>&1 | tail -2`
+Run: `git -C ~/scout-plugin branch --show-current` → expect `fix/batch-3-high-severity`.
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/ -q 2>&1 | tail -2`
 Expected: all pass, 0 failed (Batch 1's hermetic fixture means no live-vault flakes). If anything fails, STOP and report before making changes.
 
 ---
@@ -128,7 +128,7 @@ def test_parse_lines_matches_parse_file(tmp_path):
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_action_items_parser.py -q -k parse_lines tests/unit/test_action_items_backfill.py -q -k "single_file_read or mid_loop"`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_action_items_parser.py -q -k parse_lines tests/unit/test_action_items_backfill.py -q -k "single_file_read or mid_loop"`
 Expected: `parse_lines` test errors (`cannot import name 'parse_lines'`); `single_file_read` fails (2 reads); `mid_loop` fails (registered set missing the first prefix).
 
 - [ ] **Step 3: Add `parse_lines` to the parser (single-read seam for #41)**
@@ -218,7 +218,7 @@ In `engine/scout/action_items/backfill.py`, change the import on line 41 and the
 
 - [ ] **Step 5: Run the new tests, then the affected suites**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_action_items_backfill.py tests/unit/test_action_items_parser.py tests/integration/test_post_session_backfill.py -q`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_action_items_backfill.py tests/unit/test_action_items_parser.py tests/integration/test_post_session_backfill.py -q`
 Expected: all PASS. Then `../.venv/bin/python -m ruff check scout/action_items/backfill.py scout/action_items/parser.py tests/unit/test_action_items_backfill.py tests/unit/test_action_items_parser.py && ../.venv/bin/python -m ruff format --check scout/action_items/parser.py scout/action_items/backfill.py && ../.venv/bin/python -m mypy scout/action_items/parser.py scout/action_items/backfill.py` — all clean.
 
 - [ ] **Step 6: Commit**
@@ -268,7 +268,7 @@ def test_load_yaml_unreadable_file_raises_configerror(tmp_path):
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_connectors_yaml.py -q -k unreadable`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_connectors_yaml.py -q -k unreadable`
 Expected: FAIL — raises `FileNotFoundError`/`OSError`, not `ConfigError`.
 
 - [ ] **Step 3: Add the OSError guard**
@@ -291,7 +291,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 - [ ] **Step 4: Run the connectors tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_connectors_yaml.py -q && ../.venv/bin/python -m ruff check scout/connectors.py tests/unit/test_connectors_yaml.py && ../.venv/bin/python -m mypy scout/connectors.py`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_connectors_yaml.py -q && ../.venv/bin/python -m ruff check scout/connectors.py tests/unit/test_connectors_yaml.py && ../.venv/bin/python -m mypy scout/connectors.py`
 Expected: all PASS / clean.
 
 - [ ] **Step 5: Commit**
@@ -344,7 +344,7 @@ def test_bootstrap_upgrade_malformed_config_exits_configerror(tmp_path, monkeypa
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_cli.py -q -k bootstrap_upgrade_malformed`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_cli.py -q -k bootstrap_upgrade_malformed`
 Expected: FAIL — exit code is not 10 (raw YAMLError → Typer maps to 1, or the internal-error code).
 
 - [ ] **Step 3: Guard the read+parse**
@@ -371,7 +371,7 @@ Replace the `existing = ...` line with a guarded read (keep the `import yaml as 
 
 - [ ] **Step 4: Run the CLI tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_cli.py -q && ../.venv/bin/python -m ruff check scout/cli.py tests/unit/test_cli.py && ../.venv/bin/python -m mypy scout/cli.py`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_cli.py -q && ../.venv/bin/python -m ruff check scout/cli.py tests/unit/test_cli.py && ../.venv/bin/python -m mypy scout/cli.py`
 Expected: all PASS / clean.
 
 - [ ] **Step 5: Commit**
@@ -442,7 +442,7 @@ NOTE: confirm the `KnowledgeGraph.__init__` parameter names by reading `engine/s
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_kb_ontology.py -q -k "missing_schema or malformed_schema or without_properties"`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_kb_ontology.py -q -k "missing_schema or malformed_schema or without_properties"`
 Expected: missing/malformed raise `OSError`/`YAMLError` (not `KBError`); `without_properties` raises `KeyError`.
 
 - [ ] **Step 3: Add `KBSchemaError` to errors.py**
@@ -479,7 +479,7 @@ And in `validate`, change the bare subscript (currently ~line 141) from `type_de
 
 - [ ] **Step 5: Run the KB tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_kb_ontology.py -q && ../.venv/bin/python -m ruff check scout/kb/ontology.py scout/errors.py tests/unit/test_kb_ontology.py && ../.venv/bin/python -m mypy scout/kb/ontology.py scout/errors.py`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_kb_ontology.py -q && ../.venv/bin/python -m ruff check scout/kb/ontology.py scout/errors.py tests/unit/test_kb_ontology.py && ../.venv/bin/python -m mypy scout/kb/ontology.py scout/errors.py`
 Expected: all PASS / clean.
 
 - [ ] **Step 6: Commit**
@@ -559,7 +559,7 @@ def test_build_terminal_applescript_prompt_is_shell_quoted():
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py -q`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py -q`
 Expected: FAIL — `ModuleNotFoundError: scout.tui.spawn_cmd`.
 
 - [ ] **Step 3: Create the pure builder module**
@@ -625,7 +625,7 @@ def build_terminal_applescript(*, title: str, prompt: str) -> tuple[str, str]:
 
 - [ ] **Step 4: Run the builder tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py -q`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py -q`
 Expected: all PASS.
 
 - [ ] **Step 5: Rewire `spawn.py` to use the builder + offload Popen**
@@ -664,7 +664,7 @@ and:
 
 - [ ] **Step 6: Verify the smoke test still imports and run the builder tests once more**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py tests/unit/test_tui_smoke.py -q && ../.venv/bin/python -m ruff check scout/tui/spawn_cmd.py scout/tui/screens/spawn.py tests/unit/test_tui_spawn_cmd.py && ../.venv/bin/python -m ruff format --check scout/tui/spawn_cmd.py scout/tui/screens/spawn.py && ../.venv/bin/python -m mypy scout/tui/spawn_cmd.py`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_tui_spawn_cmd.py tests/unit/test_tui_smoke.py -q && ../.venv/bin/python -m ruff check scout/tui/spawn_cmd.py scout/tui/screens/spawn.py tests/unit/test_tui_spawn_cmd.py && ../.venv/bin/python -m ruff format --check scout/tui/spawn_cmd.py scout/tui/screens/spawn.py && ../.venv/bin/python -m mypy scout/tui/spawn_cmd.py`
 Expected: builder tests PASS; `test_tui_smoke.py` PASSES or SKIPS (textual not installed → skip is fine); ruff/mypy clean. (mypy on `screens/spawn.py` may be skipped per existing `[[tool.mypy.overrides]]` for `textual.*`; only assert mypy clean on `spawn_cmd.py`.)
 
 - [ ] **Step 7: Commit**
@@ -741,7 +741,7 @@ NOTE: confirm `discover_kb_files`'s parameter — the test passes the vault root
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_hooks_kb_pre_filter.py -q -k "tz_aware or symlink_loop"`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_hooks_kb_pre_filter.py -q -k "tz_aware or symlink_loop"`
 Expected: `tz_aware` FAILS (naive datetime, `tzinfo is None`); `symlink_loop` FAILS by timing out (thread still alive after 10s) — or passes slowly; either way it must become fast+safe after the fix.
 
 - [ ] **Step 3: Make `parse_date` ET-aware and stop following symlinks**
@@ -781,7 +781,7 @@ Keep the existing per-file filter/append logic that followed the old `for p in .
 
 - [ ] **Step 4: Run the hook tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_hooks_kb_pre_filter.py -q`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_hooks_kb_pre_filter.py -q`
 Expected: all PASS — including the existing `test_classify_age_is_dst_correct_across_spring_forward` (the DST arithmetic still holds since `parse_date` now returns the same ET-aware value `classify` used to compute). Then `../.venv/bin/python -m ruff check scout/hooks/kb_pre_filter.py tests/unit/test_hooks_kb_pre_filter.py && ../.venv/bin/python -m mypy scout/hooks/kb_pre_filter.py` — clean.
 
 - [ ] **Step 5: Commit**
@@ -851,7 +851,7 @@ NOTE: this test calls a new helper `_unique_backup_path` you will add in Step 3.
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_bootstrap_upgrade.py -q -k same_day`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_bootstrap_upgrade.py -q -k same_day`
 Expected: FAIL — `_unique_backup_path` doesn't exist (AttributeError).
 
 - [ ] **Step 3: Add a unique-backup helper and use it**
@@ -890,7 +890,7 @@ Then in `_stage_cat1b_runners`, replace the backup block (lines 222-226):
 
 - [ ] **Step 4: Run the bootstrap-upgrade tests**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_bootstrap_upgrade.py -q && ../.venv/bin/python -m ruff check scout/scripts/bootstrap.py tests/unit/test_bootstrap_upgrade.py && ../.venv/bin/python -m mypy scout/scripts/bootstrap.py`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/unit/test_bootstrap_upgrade.py -q && ../.venv/bin/python -m ruff check scout/scripts/bootstrap.py tests/unit/test_bootstrap_upgrade.py && ../.venv/bin/python -m mypy scout/scripts/bootstrap.py`
 Expected: all PASS / clean.
 
 - [ ] **Step 5: Commit**
@@ -915,7 +915,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Full suite, lint, types**
 
-Run: `cd /Users/jordanburger/scout-plugin/engine && ../.venv/bin/python -m pytest tests/ -q 2>&1 | tail -3`
+Run: `cd ~/scout-plugin/engine && ../.venv/bin/python -m pytest tests/ -q 2>&1 | tail -3`
 Expected: 0 failed, 0 xfailed (this branch has Batch 1's hermetic fixture, so no live-vault flakes).
 Run: `../.venv/bin/python -m ruff check scout/ tests/ && ../.venv/bin/python -m ruff format --check scout/ tests/ && ../.venv/bin/python -m mypy scout/`
 Expected: all clean. (If `ruff format --check` flags a new file, run `../.venv/bin/python -m ruff format scout/ tests/` and amend the relevant commit.)
