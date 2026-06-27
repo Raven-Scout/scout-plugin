@@ -43,7 +43,7 @@ By using Scout, you agree that you are responsible for:
 Scout integrates with third-party services and runs on Anthropic's Claude. Those services are
 controlled by their respective providers and governed by their own terms and privacy policies;
 we are not responsible for them. Scout is an **independent project** and is **not affiliated with,
-endorsed by, or sponsored by** Anthropic, Microsoft, Keboola, Slack, Google, Linear, GitHub, or
+endorsed by, or sponsored by** Anthropic, Microsoft, Slack, Google, Linear, GitHub, or
 any other company. All product names, logos, and trademarks are the property of their respective
 owners and are used only to describe interoperability.
 

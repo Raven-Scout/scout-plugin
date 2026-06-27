@@ -103,8 +103,8 @@ EOF
         cat > "$kb/ontology/schema.md" <<'EOF'
 # Schema
 EOF
-        cat > "$kb/personal/jordan.md" <<'EOF'
-# Jordan
+        cat > "$kb/personal/alex.md" <<'EOF'
+# Alex
 EOF
         cat > "$kb/projects/archived/old.md" <<'EOF'
 # Old

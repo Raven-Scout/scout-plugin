@@ -295,7 +295,7 @@ def test_upgrade_migrates_legacy_wishlist_and_research(tmp_path):
     # Simulate a pre-migration (legacy-format) vault: plant the old single files.
     (vault / "docs" / "Wishlist.md").write_text(
         "# Wishlist\n\n"
-        "* **HIGH — Alpha thing** (2026-06-10 — Jordan DM) do alpha.\n"
+        "* **HIGH — Alpha thing** (2026-06-10 — Alex DM) do alpha.\n"
         "* **[in progress] MEDIUM — Beta thing** do beta.\n"
     )
     (vault / "knowledge-base" / "research-queue.md").write_text(

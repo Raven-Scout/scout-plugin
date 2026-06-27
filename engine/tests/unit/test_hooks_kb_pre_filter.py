@@ -215,7 +215,7 @@ def test_discover_excludes_personal(tmp_path):
     kb = _make_kb(tmp_path)
     (kb / "knowledge-base.md").write_text("x")
     (kb / "personal").mkdir()
-    (kb / "personal" / "jordan.md").write_text("x")
+    (kb / "personal" / "alex.md").write_text("x")
 
     files = discover_kb_files(tmp_path)
     rels = sorted(p.relative_to(tmp_path).as_posix() for p in files)

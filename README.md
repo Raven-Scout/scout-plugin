@@ -473,4 +473,4 @@ Scout is open-source under the [MIT License](LICENSE).
 - **[Terms of Use](TERMS.md)** — free, open-source, provided as-is. ([web version](https://raven-scout.github.io/scout-plugin/terms.html))
 - **[Security Policy](https://github.com/Raven-Scout/.github/blob/main/SECURITY.md)** · **[Code of Conduct](https://github.com/Raven-Scout/.github/blob/main/CODE_OF_CONDUCT.md)**
 
-Scout is an independent project and is not affiliated with, endorsed by, or sponsored by Anthropic, Microsoft, Keboola, or any other company.
+Scout is an independent project and is not affiliated with, endorsed by, or sponsored by Anthropic, Microsoft, or any other company.

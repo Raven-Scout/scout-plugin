@@ -31,7 +31,7 @@ The goal: the user decides, Scout drafts and executes. Never send a message, mer
 
 4. **Skip** items from the **🟢 Watching** section — those are monitoring, not actionable.
 
-5. **Skip** items explicitly described as blocked by another item (e.g., "Blocked by AI-2630", "Waiting on Legal review").
+5. **Skip** items explicitly described as blocked by another item (e.g., "Blocked by PROJ-2630", "Waiting on Legal review").
 
 6. Present a numbered summary:
    ```

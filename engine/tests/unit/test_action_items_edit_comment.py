@@ -30,7 +30,7 @@ def test_edit_comment_by_index_replaces_body_only(fake_data_dir: Path, monkeypat
     _register_prefix(fake_data_dir)
     daily = _make_daily(
         fake_data_dir,
-        "- [ ] [#A3F7] task\n  - jordan: first draft\n  - jordan: second draft\n",
+        "- [ ] [#A3F7] task\n  - alex: first draft\n  - alex: second draft\n",
     )
     monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -42,7 +42,7 @@ def test_edit_comment_by_index_replaces_body_only(fake_data_dir: Path, monkeypat
     )
 
     text = daily.read_text()
-    assert "  - jordan: first final\n" in text
+    assert "  - alex: first final\n" in text
     assert "first draft" not in text
     assert "second draft" in text  # untouched
     assert isinstance(event, Event)
@@ -73,7 +73,7 @@ def test_edit_comment_preserves_original_indent(fake_data_dir: Path, monkeypatch
 
 def test_edit_comment_rejects_empty_text(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _register_prefix(fake_data_dir)
-    _make_daily(fake_data_dir, "- [ ] [#A3F7] task\n  - jordan: original\n")
+    _make_daily(fake_data_dir, "- [ ] [#A3F7] task\n  - alex: original\n")
     monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
 
     with pytest.raises(ActionItemError, match="new-text must not be empty"):
@@ -84,7 +84,7 @@ def test_edit_comment_by_text_substring(fake_data_dir: Path, monkeypatch: pytest
     _register_prefix(fake_data_dir)
     daily = _make_daily(
         fake_data_dir,
-        "- [ ] [#A3F7] task\n  - jordan: ping vendor\n  - jordan: legal sign-off\n",
+        "- [ ] [#A3F7] task\n  - alex: ping vendor\n  - alex: legal sign-off\n",
     )
     monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -96,5 +96,5 @@ def test_edit_comment_by_text_substring(fake_data_dir: Path, monkeypatch: pytest
     )
 
     text = daily.read_text()
-    assert "  - jordan: legal cleared 2026-04-26\n" in text
+    assert "  - alex: legal cleared 2026-04-26\n" in text
     assert "ping vendor" in text

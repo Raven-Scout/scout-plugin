@@ -16,7 +16,7 @@ and Slack search available) looks up the real completion date and passes it via
 over the entity's stored `last_completed_date` and is NOT written back to the file
 — live evidence stays caller-side; only the date math runs here.
     e.g. recurring-task-status.py --date 2026-05-29 \
-            --last-completed kai-builds-data-apps-weekly-update=2026-05-29
+            --last-completed weekly-status-update=2026-05-29
 
 Status semantics:
     done       — last_completed_date is within the current cadence window
@@ -289,7 +289,7 @@ def main() -> int:
             "keyed by file stem (slug). Repeatable. The runner fetches this from "
             "Linear (`get_project` -> lastUpdateAt) or Slack search, then passes it "
             "in so the local date math reflects live evidence without writing to the "
-            "entity file. Example: --last-completed kai-builds-data-apps-weekly-update=2026-05-29"
+            "entity file. Example: --last-completed weekly-status-update=2026-05-29"
         ),
     )
     args = parser.parse_args()

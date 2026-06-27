@@ -100,8 +100,8 @@ def test_parse_keeps_metadata_subbullets_out_of_comments(tmp_path: Path) -> None
     md.write_text(
         "# Title\n\n## 📌 Section\n\n"
         "- [ ] 🔴 Ship the thing\n"
-        "  - Source: Linear (AI-3325)\n"
-        "  - Context: [[kai-backend]]\n"
+        "  - Source: Linear (PROJ-3325)\n"
+        "  - Context: [[backend-service]]\n"
         "  - scout: actually started it\n",
         encoding="utf-8",
     )

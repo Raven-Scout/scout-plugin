@@ -137,8 +137,8 @@ connectors:
       first_fix: "Run `gh auth status`; if expired, `gh auth login` to re-auth. Token lives in macOS keychain."
       detail: |
         GitHub access is via the local `gh` CLI (not an MCP). Token expiry is the usual
-        cause. `gh auth status` shows current state; `gh auth login` refreshes it. After a
-        Keboola SAML re-auth, the personal token may need a separate refresh.
+        cause. `gh auth status` shows current state; `gh auth login` refreshes it. After an
+        SSO/SAML re-auth, the personal token may need a separate refresh.
 
   mcp:claude-in-chrome:
     display_name: Chrome (Google Messages)

@@ -1,10 +1,10 @@
 ---
 type: person
-name: Jordan
+name: Alex
 team: Engineering
 works_on: [scout, plugin-x]
 ---
 
-# Jordan
+# Alex
 
 Test fixture entity for KB ontology tests.
