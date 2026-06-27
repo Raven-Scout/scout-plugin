@@ -92,13 +92,13 @@ def test_resolve_target_auto_registers_prefix_in_file_but_not_idmap(
     items = [
         ActionItem(
             priority="🔥",
-            title="Rotate Kai Pricing GitHub token",
+            title="Rotate vendor API token",
             status="open",
             section="Urgent",
             context_links=[],
             notes=[],
             details=[],
-            raw_line="- [ ] [#KPTK] 🔥 Rotate Kai Pricing GitHub token",
+            raw_line="- [ ] [#KPTK] 🔥 Rotate vendor API token",
             line_number=12,
             short_prefix="KPTK",
         ),
@@ -114,7 +114,7 @@ def test_resolve_target_auto_registers_prefix_in_file_but_not_idmap(
     e2 = m2.lookup_by_prefix("KPTK")
     assert e2 is not None
     assert e2.ulid == ulid
-    assert e2.last_title == "Rotate Kai Pricing GitHub token"
+    assert e2.last_title == "Rotate vendor API token"
 
 
 def test_resolve_target_ambiguous_subject_raises(fake_data_dir: Path) -> None:

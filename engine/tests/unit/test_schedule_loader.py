@@ -24,7 +24,7 @@ from scout.schedule import (
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
-def test_load_default_schedule_returns_jordan_default_slots():
+def test_load_default_schedule_returns_default_slots():
     sched = load_default_schedule()
     keys = set(sched.keys())
     # The 10 slot keys shipped in engine/scout/defaults/schedule.yaml.

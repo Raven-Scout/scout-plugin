@@ -32,9 +32,9 @@ def test_delete_comment_by_index(fake_data_dir: Path, monkeypatch: pytest.Monkey
         fake_data_dir,
         "## In Progress\n\n"
         "- [ ] [#A3F7] task\n"
-        "  - jordan: first\n"
-        "  - jordan: second\n"
-        "  - jordan: third\n"
+        "  - alex: first\n"
+        "  - alex: second\n"
+        "  - alex: third\n"
         "- [ ] another task\n",
     )
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
@@ -56,7 +56,7 @@ def test_delete_comment_by_text_substring(fake_data_dir: Path, monkeypatch: pyte
     _register_prefix(fake_data_dir)
     _make_daily(
         fake_data_dir,
-        "## In Progress\n\n- [ ] [#A3F7] task\n  - jordan: vendor confirmed\n  - jordan: legal review needed\n",
+        "## In Progress\n\n- [ ] [#A3F7] task\n  - alex: vendor confirmed\n  - alex: legal review needed\n",
     )
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -73,7 +73,7 @@ def test_delete_comment_ignores_snoozed_until_marker(fake_data_dir: Path, monkey
     _register_prefix(fake_data_dir)
     daily = _make_daily(
         fake_data_dir,
-        "## In Progress\n\n- [ ] [#A3F7] task\n  - snoozed-until: 2026-05-01\n  - jordan: real comment\n",
+        "## In Progress\n\n- [ ] [#A3F7] task\n  - snoozed-until: 2026-05-01\n  - alex: real comment\n",
     )
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -88,7 +88,7 @@ def test_delete_comment_index_out_of_range(fake_data_dir: Path, monkeypatch: pyt
     _register_prefix(fake_data_dir)
     _make_daily(
         fake_data_dir,
-        "- [ ] [#A3F7] task\n  - jordan: only one\n",
+        "- [ ] [#A3F7] task\n  - alex: only one\n",
     )
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -100,7 +100,7 @@ def test_delete_comment_ambiguous_text(fake_data_dir: Path, monkeypatch: pytest.
     _register_prefix(fake_data_dir)
     _make_daily(
         fake_data_dir,
-        "- [ ] [#A3F7] task\n  - jordan: vendor ping\n  - jordan: vendor confirmed\n",
+        "- [ ] [#A3F7] task\n  - alex: vendor ping\n  - alex: vendor confirmed\n",
     )
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
 
@@ -110,7 +110,7 @@ def test_delete_comment_ambiguous_text(fake_data_dir: Path, monkeypatch: pytest.
 
 def test_delete_comment_requires_exactly_one_selector(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _register_prefix(fake_data_dir)
-    _make_daily(fake_data_dir, "- [ ] [#A3F7] task\n  - jordan: hi\n")
+    _make_daily(fake_data_dir, "- [ ] [#A3F7] task\n  - alex: hi\n")
     monkeypatch.setattr("scout.action_items.delete_comment._today", lambda: dt.date(2026, 4, 26))
 
     with pytest.raises(ActionItemError, match="exactly one of --index or --text"):

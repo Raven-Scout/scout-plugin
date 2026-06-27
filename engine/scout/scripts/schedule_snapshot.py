@@ -104,7 +104,7 @@ def canonical_snapshot_path() -> Path:
 def app_fixture_snapshot_path() -> Path:
     """Return scout-app's bundled fixture path.
 
-    Best-effort secondary write target. Hardcoded to Jordan's dev-machine
+    Best-effort secondary write target. Assumes the conventional dev-machine
     layout (``~/scout-app/...``); skipped with a warning if scout-app isn't
     checked out at that location.
     """

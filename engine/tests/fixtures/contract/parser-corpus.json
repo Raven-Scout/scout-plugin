@@ -3,22 +3,22 @@
   "entries": [
     {
       "name": "prefixed-emoji-bold",
-      "line": "- [ ] [#AB30] **🔴 Validate kai-agent LangSmith tracing — [[AI-3026]]** _(carries 6/2→6/4)_ — overnight progress",
+      "line": "- [ ] [#AB30] **🔴 Validate the tracing pipeline — [[PROJ-3026]]** _(carries 6/2→6/4)_ — overnight progress",
       "expected": {
         "short_prefix": "AB30",
-        "subject": "**🔴 Validate kai-agent LangSmith tracing — [[AI-3026]]** _(carries 6/2→6/4)_",
-        "plain_subject": "🔴 Validate kai-agent LangSmith tracing — AI-3026 _(carries 6/2→6/4)_",
+        "subject": "**🔴 Validate the tracing pipeline — [[PROJ-3026]]** _(carries 6/2→6/4)_",
+        "plain_subject": "🔴 Validate the tracing pipeline — PROJ-3026 _(carries 6/2→6/4)_",
         "body": "overnight progress"
       },
-      "_note": "Prefix changed from draft [#AI30] to [#AB30]: 'AI30' contains 'I', which is NOT in the Crockford alphabet (I/L/O/U excluded), so it could never parse as a short_prefix. subject retains '**' bold markers per the Swift reference contract; the inner ' — ' before [[AI-3026]] is inside the bold span so the split lands at the LAST top-level ' — ' (before 'overnight progress'); the italic _(carries ...)_ is not a separator so it stays in subject. Python render.py xfails this case: it does not strip the [#AB30] prefix from subject/plain_subject (no short_prefix extraction in render.py) — see test _note."
+      "_note": "Prefix changed from draft [#AI30] to [#AB30]: 'AI30' contains 'I', which is NOT in the Crockford alphabet (I/L/O/U excluded), so it could never parse as a short_prefix. subject retains '**' bold markers per the Swift reference contract; the inner ' — ' before [[PROJ-3026]] is inside the bold span so the split lands at the LAST top-level ' — ' (before 'overnight progress'); the italic _(carries ...)_ is not a separator so it stays in subject. Python render.py xfails this case: it does not strip the [#AB30] prefix from subject/plain_subject (no short_prefix extraction in render.py) — see test _note."
     },
     {
       "name": "unprefixed-the-issue10-line",
-      "line": "- [ ] **🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers** _(net-new from Kai's pricing meeting)_",
+      "line": "- [ ] **🔥 🆕 Update the pricing calculator app with per-tenant conversion levers** _(net-new from the pricing review)_",
       "expected": {
         "short_prefix": null,
-        "subject": "**🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers** _(net-new from Kai's pricing meeting)_",
-        "plain_subject": "🔥 🆕 Update kai-pricing-calculator-app with per-client conversion levers _(net-new from Kai's pricing meeting)_",
+        "subject": "**🔥 🆕 Update the pricing calculator app with per-tenant conversion levers** _(net-new from the pricing review)_",
+        "plain_subject": "🔥 🆕 Update the pricing calculator app with per-tenant conversion levers _(net-new from the pricing review)_",
         "body": ""
       },
       "_note": "No separator outside tokens, so body is empty and the whole line (bold span + trailing italic) is the subject. subject retains '**'; plain_subject strips it. Draft omitted the bold markers from subject (corrected, case a)."
@@ -30,85 +30,85 @@
     },
     {
       "name": "done-with-github-pr-link",
-      "line": "- [x] [#PR99] **Merge the fix** — see https://github.com/keboola/keboola_com/pull/301",
+      "line": "- [x] [#PR99] **Merge the fix** — see https://github.com/example-org/example-repo/pull/301",
       "expected": {
         "short_prefix": "PR99",
         "subject": "**Merge the fix**",
         "plain_subject": "Merge the fix",
-        "body": "see https://github.com/keboola/keboola_com/pull/301"
+        "body": "see https://github.com/example-org/example-repo/pull/301"
       }
     },
     {
       "name": "snooze-suffix",
-      "line": "- [ ] [#SNZ1] **Ping Devin** — nudge — 🛌 Snoozed until 2026-06-10",
+      "line": "- [ ] [#SNZ1] **Ping Sam** — nudge — 🛌 Snoozed until 2026-06-10",
       "expected": {
         "short_prefix": "SNZ1",
-        "subject": "**Ping Devin**",
-        "plain_subject": "Ping Devin",
+        "subject": "**Ping Sam**",
+        "plain_subject": "Ping Sam",
         "body": "nudge — 🛌 Snoozed until 2026-06-10"
       }
     },
     {
       "name": "carry-in-was-kind",
-      "line": "- [ ] [#CRY2] **Reschedule Groupon** _(carried in from 2026-06-03, was urgent)_",
+      "line": "- [ ] [#CRY2] **Reschedule the demo** _(carried in from 2026-06-03, was urgent)_",
       "expected": {
         "short_prefix": "CRY2",
-        "subject": "**Reschedule Groupon** _(carried in from 2026-06-03, was urgent)_",
-        "plain_subject": "Reschedule Groupon _(carried in from 2026-06-03, was urgent)_",
+        "subject": "**Reschedule the demo** _(carried in from 2026-06-03, was urgent)_",
+        "plain_subject": "Reschedule the demo _(carried in from 2026-06-03, was urgent)_",
         "body": ""
       },
       "_note": "No separator outside tokens (the italic _(...)_ is not a separator), so body is empty and the parenthetical stays in subject. Draft put the parenthetical in body (corrected, case a)."
     },
     {
       "name": "wikilink-alias-and-code",
-      "line": "- [ ] [#WK01] **Check [[AI-2619|the cost ruling]]** — run `scoutctl status`",
+      "line": "- [ ] [#WK01] **Check [[PROJ-2619|the cost ruling]]** — run `scoutctl status`",
       "expected": {
         "short_prefix": "WK01",
-        "subject": "**Check [[AI-2619|the cost ruling]]**",
-        "plain_subject": "Check AI-2619",
+        "subject": "**Check [[PROJ-2619|the cost ruling]]**",
+        "plain_subject": "Check PROJ-2619",
         "body": "run `scoutctl status`"
       }
     },
     {
       "name": "semantic-tag-4char-non-crockford",
-      "line": "- [ ] [#MIRO] **Miro 1:1 follow-through** — 3 quick sends",
+      "line": "- [ ] [#MIRO] **Team 1:1 follow-through** — 3 quick sends",
       "expected": {
         "short_prefix": "MIRO",
-        "subject": "**Miro 1:1 follow-through**",
-        "plain_subject": "Miro 1:1 follow-through",
+        "subject": "**Team 1:1 follow-through**",
+        "plain_subject": "Team 1:1 follow-through",
         "body": "3 quick sends"
       },
       "_note": "4-char tag containing I and O (NOT Crockford). Exercises the widened recognition grammar (#117). subject/plain_subject xfail on Python (render.py prefix-strip #114)."
     },
     {
       "name": "semantic-tag-6char",
-      "line": "- [ ] [#AI3026] **Validate kai-agent tracing**",
+      "line": "- [ ] [#AI3026] **Validate the tracing job**",
       "expected": {
         "short_prefix": "AI3026",
-        "subject": "**Validate kai-agent tracing**",
-        "plain_subject": "Validate kai-agent tracing",
+        "subject": "**Validate the tracing job**",
+        "plain_subject": "Validate the tracing job",
         "body": ""
       },
       "_note": "6-char tag containing I. Length > the old 4-char limit."
     },
     {
       "name": "semantic-tag-3char",
-      "line": "- [ ] [#RSM] Rossum SL tester",
+      "line": "- [ ] [#RSM] Review SL tester",
       "expected": {
         "short_prefix": "RSM",
-        "subject": "Rossum SL tester",
-        "plain_subject": "Rossum SL tester",
+        "subject": "Review SL tester",
+        "plain_subject": "Review SL tester",
         "body": ""
       },
       "_note": "3-char tag, no bold, no separator."
     },
     {
       "name": "semantic-tag-digit-led",
-      "line": "- [ ] [#5864M] **Merge ui PR** — APPROVED",
+      "line": "- [ ] [#5864M] **Merge the web PR** — APPROVED",
       "expected": {
         "short_prefix": "5864M",
-        "subject": "**Merge ui PR**",
-        "plain_subject": "Merge ui PR",
+        "subject": "**Merge the web PR**",
+        "plain_subject": "Merge the web PR",
         "body": "APPROVED"
       },
       "_note": "Digit-led 5-char tag with one trailing letter — accepted (has a letter); pure-digit would be rejected as a GitHub ref."

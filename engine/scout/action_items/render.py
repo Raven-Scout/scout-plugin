@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -611,20 +612,25 @@ def _plain_subject(subject: str) -> str:
 
 
 # Deep-link detection ------------------------------------------------------
-# Linear: `AI-2619`, `ST-3853`, `SUPPORT-15915`, `LDRS-321`, `KAI-12`. The
-# allowed prefixes below are the ones seen in real action items / KB; adding
-# more is cheap. Note that a Linear ID also appears inside `[[AI-XXXX]]`
-# wikilinks — those render as plain text, so the same regex finds both.
-_LINEAR_ID_RE = re.compile(r"\b(AI|ST|SUPPORT|LDRS|KAI|DATA)-\d+\b")
+# Linear IDs are any `TEAM-123` shape (2–10 uppercase letters + digits),
+# mirroring scout-app's reference detector so the two stay in contract. A
+# Linear ID also appears inside `[[TEAM-XXXX]]` wikilinks — those render as
+# plain text, so the same regex finds both.
+_LINEAR_ID_RE = re.compile(r"\b[A-Z]{2,10}-\d+\b")
 _GITHUB_PR_RE = re.compile(r"https://github\.com/([\w.\-]+)/([\w.\-]+)/pull/(\d+)")
 _SLACK_LINK_RE = re.compile(r"https://[\w.\-]+\.slack\.com/archives/[A-Z0-9]+/p\d+(?:\?[^\s)\"']+)?")
+
+# Linear workspace slug for issue deep links (the `<slug>` in
+# linear.app/<slug>/issue/...). Set SCOUT_LINEAR_WORKSPACE to your workspace;
+# defaults to a neutral placeholder so no real workspace is baked into source.
+_LINEAR_WORKSPACE = os.environ.get("SCOUT_LINEAR_WORKSPACE", "your-workspace")
 
 
 def _render_task_links(t: Task) -> str:
     """Emit deep-link buttons (Linear / GitHub PR / Slack) for the task.
 
     Links come from scanning the subject + body for well-known URL shapes and
-    Linear issue IDs. De-duplicated per-card so `[[AI-2619]]` mentioned three
+    Linear issue IDs. De-duplicated per-card so `[[PROJ-2619]]` mentioned three
     times still yields one button.
     """
     text = f"{t.subject} {t.body}"
@@ -636,7 +642,7 @@ def _render_task_links(t: Task) -> str:
         if key in seen:
             continue
         seen.add(key)
-        links.append((f"Linear {iid}", f"https://linear.app/keboola/issue/{iid}"))
+        links.append((f"Linear {iid}", f"https://linear.app/{_LINEAR_WORKSPACE}/issue/{iid}"))
     for m in _GITHUB_PR_RE.finditer(text):
         repo = f"{m.group(1)}/{m.group(2)}"
         pr = m.group(3)

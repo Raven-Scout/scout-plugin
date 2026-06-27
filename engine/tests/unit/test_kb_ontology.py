@@ -18,14 +18,14 @@ def test_knowledge_graph_loads_fixture() -> None:
         kb_root=str(FIXTURE_DIR),
     )
     g.load()
-    results = g.query(type="person", name="Jordan")
+    results = g.query(type="person", name="Alex")
     assert len(results) == 1
     # Adapt assertion shape to what query() returns (dict vs object).
     first = results[0]
     if hasattr(first, "name"):
-        assert first.name == "Jordan"
+        assert first.name == "Alex"
     else:
-        assert first["name"] == "Jordan"
+        assert first["name"] == "Alex"
 
 
 def test_knowledge_graph_query_unknown_type_returns_empty() -> None:

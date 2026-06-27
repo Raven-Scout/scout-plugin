@@ -18,7 +18,7 @@
 | `engine/pyproject.toml` | `[project]` → `version = "X"` |
 | `engine/scout/__init__.py` | `__version__ = "X"` |
 
-**Working directory for all commands:** `/Users/jordanburger/scout-plugin` (the `engine/.venv` is the test venv; run pytest/ruff/mypy from `engine/`).
+**Working directory for all commands:** `~/scout-plugin` (the `engine/.venv` is the test venv; run pytest/ruff/mypy from `engine/`).
 
 ---
 

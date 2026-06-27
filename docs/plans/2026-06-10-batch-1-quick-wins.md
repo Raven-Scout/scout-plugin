@@ -18,7 +18,7 @@
 - [ ] **Step 1: Create the working branch**
 
 ```bash
-cd /Users/jordanburger/scout-plugin
+cd ~/scout-plugin
 git checkout -b fix/batch-1-quick-wins
 ```
 
@@ -789,7 +789,7 @@ Fixes #47"
 
 Expected: pytest 0 failed / 0 xfailed; ruff and mypy clean.
 
-- [ ] **Step 2: Push and open the PR (outward-facing — confirm with Jordan if not pre-authorized)**
+- [ ] **Step 2: Push and open the PR (outward-facing — confirm with the maintainer if not pre-authorized)**
 
 ```bash
 git push -u origin fix/batch-1-quick-wins
