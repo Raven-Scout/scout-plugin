@@ -65,7 +65,7 @@
   <g>
     <rect x="120" y="498" width="450" height="74" rx="9" fill="#EFE8D7"/>
     <text x="138" y="521" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="10" letter-spacing="0.5" fill="#A6A8AF">LINEAR</text>
-    <text x="138" y="546" font-size="13.5" fill="#5A5E69">Ticket moved to <tspan font-weight="700" fill="#30343F">Done</tspan> by Marcus,</text>
+    <text x="138" y="546" font-size="13.5" fill="#5A5E69">Ticket moved to <tspan font-weight="700" fill="#30343F">Done</tspan> by Sam,</text>
     <text x="138" y="565" font-size="13.5" fill="#5A5E69">yesterday 6:12 pm.</text>
     <rect x="590" y="498" width="450" height="74" rx="9" fill="#EFE8D7"/>
     <text x="608" y="521" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="10" letter-spacing="0.5" fill="#A6A8AF">GITHUB</text>
