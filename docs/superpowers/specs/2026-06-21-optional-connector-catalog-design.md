@@ -3,6 +3,7 @@
 **Date:** 2026-06-21
 **Status:** Proposed (design) — for review
 **Closes:** the absence of a way for users to discover and turn on optional connectors without hand-authoring them. Generalizes the one-off "Google Messages connector" need into a curated, browsable catalog.
+**Folds in:** #172 — the email/`gmail` canonical-key mismatch — as a precondition of the catalog's key model (see §7).
 
 ## Problem
 
@@ -75,12 +76,30 @@ The first catalog connector, demonstrating the format end-to-end:
 - `phases/connectors/google-messages.md`: de-personalized personal-text scanning behavior, `requires: google_messages`, `mode: [briefing, consolidation]`.
 - **No contacts ship.** The contact list is vault-only state the user accumulates; the engine ships scanning behavior only.
 
-### 7. Testing
+### 7. Canonical-key invariant (precondition — fixes #172)
+
+The `enable` flow (§3: add `<key>` to `connectors.enabled`, then re-render so the `requires:`-gated sections appear) only works if a connector is named by **one** key string across the namespaces a connector key lives in:
+
+| Namespace | File | Mail connector today |
+|---|---|---|
+| Probe / detection key (written into `connectors.enabled`) | `connector-probes.yaml` | `gmail` |
+| Config enabled key | `scout-config.yaml` `connectors.enabled` | `gmail` |
+| Phase gate | `phases/connectors/<name>.md` `requires:` | **`email`** |
+| Roster entry | `connectors.yaml` | `mcp:claude_ai_Gmail` (health-id namespace) |
+
+Make agreement a **hard invariant of the catalog model**, enforced in validation: `scoutctl connectors` (and a CI check) asserts that every phase `requires:` resolves to a roster entry and equals the key its probe emits. A connector whose namespaces disagree is **silently un-enableable** — `enable <key>` writes a key the phase gate never matches, so the sections never render: no error, just missing behavior. That is the exact trap the catalog's turn-key promise must not inherit.
+
+**Existing violation (#172).** The mail connector already breaks the invariant: its probe + config key is `gmail`, but the phase is `requires: email`, so `select_sections` drops the **entire** email phase from the assembled `SKILL.md` on real vaults (verified — a live `SKILL.md` carries zero email-phase markers while the Slack control is present). Every *other* connector's probe key already equals its phase `requires:` (`slack`, `calendar`, `linear`, `github`, `granola`, `drive`, `claude_sessions`); mail is the lone diverging case. Reconciling it is a **precondition** for the catalog — otherwise the catalog ships atop a key model already inconsistent for a *default* connector, and the first provider-variant connector (Outlook/IMAP) repeats the break.
+
+**Resolution (recommended).** Standardize on the **provider-neutral** key `email` — already the canonical name in the default set above, throughout this spec, and in the phase. Map the Gmail probe to emit `email`, keep `gmail` as a recognized **alias**, and normalize `gmail → email` in `connectors.enabled` idempotently on `/scout-update` so existing vaults migrate with no manual edit. A future Outlook/IMAP probe then maps to the same `email` capability key — one phase, many providers. *Lower-effort alternative, rejected:* rename the phase to `requires: gmail` (one line, no migration) — but it couples a capability to one provider and forces a second key per mail provider later. Final call sits with this catalog work.
+
+### 8. Testing
 - Schema: `connectors.yaml` with `optional` + `catalog` parses; `load_registry` exposes both; absent fields default safely.
 - `catalog`: lists only `optional` connectors with correct enabled/available markers; `--json` shape stable.
 - `enable`: writes config idempotently, collects `needs_user_input`, prints setup, probes, triggers a clean re-render that includes the new sections; refuses a non-optional or unknown key. `disable`: reverts config; inputs preserved.
 - Assembly: an enabled optional connector's sections appear in the target brain file and **do not leak** into other targets; disabling excludes them on re-render.
 - Wizard: optional connectors are never auto-enabled even when their probe passes.
+- Key-consistency invariant (§7): every phase `requires:` resolves to a roster entry and equals its probe-emitted key; the `gmail → email` alias normalizes a legacy config; an intentionally-mismatched fixture **fails** validation (guards against silently un-enableable connectors, the #172 class of bug).
 
 ## Alternatives considered
 
@@ -92,6 +111,7 @@ The first catalog connector, demonstrating the format end-to-end:
 - **Enable re-render coupling.** `enable` invoking the cat-4 assembly path is the turn-key promise but couples the command to the merge machinery. Mitigation: the change is purely additive (new `requires:`-gated sections), so the merge is clean; the `/scout-update` fallback covers the unexpected-conflict case. Worth a careful look in review.
 - **Probe semantics for setup-gated connectors.** Google Messages can't be fully probed from the CLI (pairing is manual/browser). The probe asserts the *capability* (browser tool present); true readiness is confirmed at run time. Catalog entries should be honest that "probe passed" ≠ "set up".
 - **Disable leaves inputs/state.** Intentional (re-enabling shouldn't re-prompt), but worth confirming.
+- **Legacy-config migration for #172.** Existing vaults carry `gmail` in `connectors.enabled`; the `gmail → email` normalization must run idempotently on `/scout-update` and only when no genuine provider distinction is intended. Additive and low-risk, but it edits live config — confirm the normalization is a no-op on a vault that has already migrated.
 
 ## Out of scope / future
 - Community-contributed connectors + a packaged distribution format (Alternative B).
