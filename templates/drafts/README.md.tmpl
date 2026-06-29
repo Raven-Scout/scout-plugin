@@ -1,0 +1,54 @@
+# Reply Drafts
+
+This directory holds **prepared reply drafts** — one markdown file per open conversational
+loop where you owe someone an answer. {{INSTANCE_NAME}} writes these during briefing and
+consolidation runs (see the *Reply Drafts* phase). You review them in `/scout-work` or in the
+Scout macOS app, then **send them yourself**.
+
+**{{INSTANCE_NAME}} never sends anything and never creates native Gmail/Slack drafts.** These
+files are text only. Sending is always your action.
+
+## File shape — `drafts/<TAG>.md`
+
+`<TAG>` matches the `[#TAG]` of the corresponding action item, so the obligation is tracked in
+the daily action-items list while the draft body lives here.
+
+```
+---
+tag: NAHSEND
+channel: email            # email | slack | linear | github | whatsapp
+loop_type: direct-debt    # direct-debt | promise-answered
+to: "Jan Novák <jan@firma.cz>"
+thread_ref: "https://mail.google.com/mail/u/0/#inbox/<thread-id>"
+subject: "Re: Rozpočet Q3"          # email/PR title; omit for chat channels
+status: draft             # draft | sent | dismissed
+created: 2026-06-29
+context_answer_ref: ""    # permalink to the answer that arrived (promise-answered only)
+---
+
+Ahoj Jane,
+
+<the drafted reply, grounded only in the thread + knowledge base. Anything unknown is
+marked [TBD: ...] for you to fill in before sending.>
+```
+
+## Fields
+
+| Field | Meaning |
+|---|---|
+| `tag` | Stable id, mirrors the action item `[#TAG]`. |
+| `channel` | Where the reply is owed: `email`, `slack`, `linear`, `github`, `whatsapp`. |
+| `loop_type` | `direct-debt` (someone asked, you haven't replied) or `promise-answered` (you promised → asked elsewhere → the answer arrived). |
+| `to` | Recipient (name + address/handle when known). |
+| `thread_ref` | Link/permalink/thread id to the original conversation. |
+| `subject` | Email subject or PR/issue title. Omit for chat. |
+| `status` | `draft` (awaiting you), `sent` (you sent it), `dismissed` (no longer needed). |
+| `created` | Date the draft was prepared. |
+| `context_answer_ref` | For `promise-answered`: link to the answer that unblocked the reply. |
+
+## Lifecycle
+
+- New loops → a `status: draft` file is created.
+- You send the reply yourself, then mark it `sent` (in `/scout-work` or the app).
+- No longer relevant → `dismissed`.
+- `sent` / `dismissed` files older than 7 days are moved to `drafts/archive/`.

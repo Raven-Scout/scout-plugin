@@ -42,6 +42,23 @@ def test_install_creates_directory_tree(tmp_path):
     assert (vault / ".scout-state").is_dir()
     assert (vault / "scripts").is_dir()
     assert (vault / "hooks").is_dir()
+    assert (vault / "drafts").is_dir()
+    assert (vault / "drafts" / "archive").is_dir()
+
+
+def test_install_seeds_drafts_readme(tmp_path):
+    """The drafts/ directory ships a README documenting the draft file contract
+    that the plugin writer, /scout-work, and the macOS app all key on."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+    readme = vault / "drafts" / "README.md"
+    assert readme.exists()
+    text = readme.read_text()
+    assert "drafts/<TAG>.md" in text
+    assert "status: draft" in text
+    # The no-send guarantee must be documented for the user.
+    assert "never sends" in text.lower()
 
 
 def test_install_writes_scout_config(tmp_path):
