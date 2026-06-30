@@ -48,7 +48,10 @@ Runs **in the current conversation** (not a background session).
 
 For the chosen draft, show:
 
-- **Header:** to, cc (if any), subject, channel, how long it's been owed.
+- **Header:** to, cc (if any), subject, channel, how long it's been owed. Include a labeled,
+  clickable link to the original thread (`thread_ref`) named for the channel — "Open in Gmail: <url>"
+  for email, "Open in Slack: <url>" for slack, "Open in Linear/GitHub: <url>" otherwise — so the user
+  can jump straight to where it's being discussed.
 - **Prepared reply:** the full body verbatim (it's plain text for email/chat; markdown for
   linear/github), including any `[TBD: …]` markers.
 - **Summary:** the `## Summary` from the context block (what the topic is about).
