@@ -33,6 +33,7 @@ class SlotType(enum.Enum):
     CONSOLIDATION = "consolidation"
     DREAMING = "dreaming"
     RESEARCH = "research"
+    TRADING = "trading"
     MANUAL = "manual"
 
 
@@ -59,6 +60,7 @@ class SlotPriority(enum.IntEnum):
     BRIEFING = 50
     CONSOLIDATION = 40
     DREAMING = 30
+    TRADING = 25
     RESEARCH = 20
     MANUAL = 10
 
@@ -107,6 +109,7 @@ _PRIORITY_BY_TYPE: dict[SlotType, SlotPriority] = {
     SlotType.BRIEFING: SlotPriority.BRIEFING,
     SlotType.CONSOLIDATION: SlotPriority.CONSOLIDATION,
     SlotType.DREAMING: SlotPriority.DREAMING,
+    SlotType.TRADING: SlotPriority.TRADING,
     SlotType.RESEARCH: SlotPriority.RESEARCH,
     SlotType.MANUAL: SlotPriority.MANUAL,
 }

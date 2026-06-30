@@ -1,0 +1,38 @@
+#!/bin/bash
+# Agentic Trading master switch (optional subsystem). on | off | status
+# See knowledge-base/projects/agentic-trading/agentic-trading.md
+set -euo pipefail
+
+VAULT="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+CFG="$VAULT/scripts/trading-config.py"
+NAV="$VAULT/knowledge-base/projects/agentic-trading/nav-history.md"
+
+cmd="${1:-status}"
+case "$cmd" in
+  on)
+    python3 "$CFG" set enabled true
+    echo "Agentic Trading: ENABLED (mode=$(python3 "$CFG" get mode)). Runs on its market-hours schedule slot(s)."
+    ;;
+  off)
+    python3 "$CFG" set enabled false
+    echo "Agentic Trading: DISABLED. No new orders or management. Open positions are left untouched."
+    ;;
+  status)
+    en=$(python3 "$CFG" get enabled)
+    mode=$(python3 "$CFG" get mode)
+    acct=$(python3 "$CFG" get account)
+    deadline=$(python3 "$CFG" get test.deadline 2>/dev/null || echo "(unset)")
+    echo "Agentic Trading status"
+    echo "  enabled:    $en"
+    echo "  mode:       $mode"
+    echo "  account:    ••••${acct: -4}"
+    echo "  deadline:   $deadline"
+    if [ -f "$NAV" ]; then
+      echo "  last NAV:   $(grep -E '^\| [0-9]' "$NAV" | tail -1 || echo '(none yet)')"
+    fi
+    ;;
+  *)
+    echo "usage: trading.sh on|off|status" >&2
+    exit 1
+    ;;
+esac
