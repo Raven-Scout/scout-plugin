@@ -123,6 +123,7 @@ recipient's `knowledge-base/people/<slug>.md` (relationship, language, formality
 - **Body = the message and nothing else.** The body holds only what gets sent. Recipients, CC,
   subject, and any internal notes live in frontmatter — never inline in the body. The one allowed
   non-message token in the body is a `[TBD: …]` marker for {{USER_NAME}} to resolve before sending.
+  The summary + thread go **after** the `<!-- scout:context -->` marker (Step 4), never in the body.
 
 ## Step 4 — Write the draft file + action item
 
@@ -148,7 +149,25 @@ For each verified loop:
    ---
 
    <plain-text reply (markdown only for linear/github), with [TBD: ...] markers for anything unknown>
+
+   <!-- scout:context -->
+   ## Summary
+
+   <one short paragraph: what this thread/topic is about and what's being asked, so {{USER_NAME}} knows what he's replying to without opening the thread>
+
+   ## Thread
+
+   - [<YYYY-MM-DD>] <Sender>: <one-line paraphrase or short quote of their message>
+   - [<YYYY-MM-DD>] {{USER_NAME}} (you): <your last message on the topic>
    ```
+
+   **Always append the context block** after the sendable reply, separated by the literal
+   `<!-- scout:context -->` marker. It has two parts the app shows as collapsible sections:
+   - `## Summary` — your AI summary of what the topic/thread is about and what's owed.
+   - `## Thread` — the messages on this topic you actually read, each as `- [date] Sender: one line`,
+     in chronological order. Include {{USER_NAME}}'s own prior messages too (label `{{USER_NAME}} (you)`).
+   The context block is **NOT part of the reply** — it lives after the marker, so it never gets sent or
+   copied. Keep `## Thread` lines plain (`- [date] Sender: text`); do not nest or add markdown beyond that.
 
    **Preserve the thread's CC.** When replying on an email/PR thread that has other recipients,
    carry them in the `cc:` frontmatter field — never drop them and never list them inside the body.

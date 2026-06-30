@@ -43,6 +43,12 @@ the body as `[TBD: <what to supply>]`. In the Scout app (and `/scout-work`) each
 labeled input; typing a value replaces the whole `[TBD: …]` with your text in the body, so the reply
 reads cleanly. Fill them in before sending.
 
+**Context block — summary + thread.** After the reply, separated by a `<!-- scout:context -->`
+marker, each draft carries a `## Summary` (what the topic is about) and a `## Thread` list of the
+relevant messages (`- [date] Sender: one line`). The app renders these as two collapsible sections
+under the draft so you can see what you're replying to. This block lives **after** the marker, so it
+is never sent or copied — it is context only.
+
 ## Fields
 
 | Field | Meaning |
