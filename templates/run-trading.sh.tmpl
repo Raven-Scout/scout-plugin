@@ -1,0 +1,103 @@
+#!/bin/bash
+# {{INSTANCE_NAME}} Trading runner — optional Agentic Trading subsystem (default-disabled).
+# Invoked by the schedule dispatcher (a `type: trading` slot) or manually.
+# GUARD FIRST: exits before any cost if the subsystem's master switch is off.
+
+set -euo pipefail
+
+SCOUT_DIR="{{SCOUT_DIR}}"
+# Exported so any consumer of scout-plugin's engine package resolves the vault.
+export SCOUT_DATA_DIR="$SCOUT_DIR"
+LOG_DIR="$SCOUT_DIR/.scout-logs"
+CLAUDE_BIN="{{CLAUDE_BIN}}"
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
+LOG_FILE="$LOG_DIR/trading-$TIMESTAMP.log"
+LOCK_FILE="$LOG_DIR/.scout-session.lock"
+
+mkdir -p "$LOG_DIR"
+
+# --- MASTER SWITCH GUARD (before any spend) ---
+# The Agentic Trading subsystem ships disabled. A fired slot is a harmless no-op
+# until the operator sets `enabled: true` in
+# knowledge-base/projects/agentic-trading/config.yaml (e.g. via scripts/trading.sh on).
+ENABLED=$(python3 "$SCOUT_DIR/scripts/trading-config.py" get enabled 2>/dev/null || echo "false")
+if [ "$ENABLED" != "true" ]; then
+    echo "=== Agentic Trading DISABLED (config.yaml enabled != true) — skipping $(date) ===" >> "$LOG_FILE"
+    exit 0
+fi
+
+# Concurrency guard — only one {{INSTANCE_NAME}} session at a time
+if [ -f "$LOCK_FILE" ]; then
+    LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
+    if kill -0 "$LOCK_PID" 2>/dev/null; then
+        echo "=== Another {{INSTANCE_NAME}} session running (PID $LOCK_PID) — skipping ===" >> "$LOG_FILE"
+        exit 0
+    else
+        rm -f "$LOCK_FILE"
+    fi
+fi
+echo $$ > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
+
+PROMPT="You are {{INSTANCE_NAME}} running in TRADING mode — the optional Agentic Trading subsystem. Your working directory is {{SCOUT_DIR}}.
+
+Step 1: Read {{SCOUT_DIR}}/TRADING.md in full and follow it exactly.
+Step 2: Re-confirm the master switch in-session (config.yaml \`enabled\` must be true) and honor the deadline wind-down rule.
+
+Important:
+- The robinhood-trading MCP tools are deferred — load them via ToolSearch before use.
+- The broker is the source of truth: reconcile live before any decision.
+- Enforce every guardrail in config.yaml as a HARD rule. System-test-first: never gamble to force the target.
+- Commit with message format: trading [HH:MM]: <summary>. Use TZ={{TIMEZONE}} for timestamps.
+- Your output should focus on what you decided and why, not infrastructure steps."
+
+echo "=== {{INSTANCE_NAME}} Trading run starting at $(date) ===" >> "$LOG_FILE"
+
+# Budget check — skip if we're over the spending threshold
+BUDGET_CHECK="$SCOUT_DIR/scripts/budget-check.sh"
+if [ -x "$BUDGET_CHECK" ]; then
+    if ! "$BUDGET_CHECK" --verbose >> "$LOG_FILE" 2>&1; then
+        echo "=== Budget check: skipping this run ===" >> "$LOG_FILE"
+        exit 0
+    fi
+fi
+
+# Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
+# without SCOUT_FORCE_MODE set, default to "trading-manual".
+MODE="${SCOUT_FORCE_MODE:-trading-manual}"
+
+START_TIME=$(date +%s)
+
+# Run Claude in print mode through the retry wrapper — capture exit code without triggering set -e.
+EXIT_CODE=0
+cd "$SCOUT_DIR" && "$SCOUT_DIR/scripts/claude-with-retry.sh" \
+    "$LOG_FILE" \
+    "$CLAUDE_BIN" \
+    --permission-mode auto \
+    --model opus \
+    --max-budget-usd {{MAX_BUDGET}} \
+    --name "{{INSTANCE_NAME_LOWER}}-${MODE}-$(date +%Y%m%d-%H%M)" \
+    -p "$PROMPT" \
+    || EXIT_CODE=$?
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+echo "=== {{INSTANCE_NAME}} Trading run finished at $(date) (exit code: $EXIT_CODE, duration: ${DURATION}s) ===" >> "$LOG_FILE"
+
+# If the run failed, log it and check for rate limiting
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "{{INSTANCE_NAME}} Trading run FAILED with exit code $EXIT_CODE at $(date)" >> "$LOG_DIR/failures.log"
+    RATE_DETECT="$SCOUT_DIR/scripts/rate-limit-detect.sh"
+    if [ -x "$RATE_DETECT" ]; then
+        if "$RATE_DETECT" "$LOG_FILE" --write-tracker 2>/dev/null; then
+            echo "Rate limit detected — logged to usage tracker" >> "$LOG_FILE"
+        fi
+    fi
+fi
+
+# Track session cost (the session self-reports actual cost from inside; this runner
+# call is a fallback so failed/crashed runs still leave a row).
+COST_TRACKER="$SCOUT_DIR/scripts/write-session-cost.sh"
+if [ -x "$COST_TRACKER" ]; then
+    "$COST_TRACKER" "trading" {{MAX_BUDGET}} 0 "$EXIT_CODE" "runner" 2>/dev/null || true
+fi

@@ -102,3 +102,32 @@ slots:
     missed_window_hours: 4
     on_miss: skip
     cooldown_minutes: 240
+
+  # --- Optional Agentic Trading subsystem (default-disabled) ---
+  # These slots are COMMENTED OUT so they never fire on a default install.
+  # To use the trading subsystem: (1) set `account` + `enabled: true` in
+  # knowledge-base/projects/agentic-trading/config.yaml (or `scripts/trading.sh on`),
+  # and (2) uncomment the slots below in your vault's .scout-state/schedule.yaml.
+  # `tz` pins them to US market hours (ET) regardless of the system timezone.
+  # run-trading.sh self-guards on the master switch, so even an uncommented slot
+  # is a harmless no-op until the config is enabled.
+  #
+  # trading-market-open:
+  #   type: trading
+  #   runner: run-trading.sh
+  #   fires_at_local: "10:00"
+  #   weekdays: [Mon, Tue, Wed, Thu, Fri]
+  #   missed_window_hours: 1
+  #   on_miss: skip
+  #   cooldown_minutes: 120
+  #   tz: "America/New_York"
+  #
+  # trading-pre-close:
+  #   type: trading
+  #   runner: run-trading.sh
+  #   fires_at_local: "15:30"
+  #   weekdays: [Mon, Tue, Wed, Thu, Fri]
+  #   missed_window_hours: 1
+  #   on_miss: skip
+  #   cooldown_minutes: 120
+  #   tz: "America/New_York"
