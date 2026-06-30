@@ -103,7 +103,10 @@ recipient's `knowledge-base/people/<slug>.md` (relationship, language, formality
 {{USER_NAME}} actually writes to that person.
 
 - **No invented facts.** Do not fabricate decisions, dates, numbers, names, or commitments. Anything
-  not present in the thread or KB is marked inline as `[TBD: <what {{USER_NAME}} must supply>]`.
+  not present in the thread or KB is marked inline as `[TBD: <what {{USER_NAME}} must supply>]`. Each
+  `[TBD: …]` is surfaced as a **fill-in field** in `/scout-work` and the Scout app — so write it as a
+  **self-contained, actionable prompt** ({{USER_NAME}} reads only that sentence), one fact per marker,
+  and place it exactly where the supplied value should land in the sentence so it reads cleanly once filled.
 - **Answer the actual ask.** A direct-debt reply addresses the specific question/request. A
   promise-answered reply relays Q's answer to P in {{USER_NAME}}'s voice, attributing the source only
   as far as the thread warrants.
