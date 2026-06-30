@@ -57,6 +57,12 @@ This is distinct from the cat-1 `.proposed-merge` sidecar machinery, which handl
 
 `engine/scout/scripts/phase_backport.py` (`scoutctl phases backport`, Scout Open Question #10) already reverse-maps **prose edits to existing phase fragments** from a vault's assembled brain files back into `phases/`, gated on a round-trip check. That's real and useful — but it covers only one slice. A *structural* facet like PR #176 — new files, new dirs, schema fields, new commands, migration markers — is entirely hand-assembled. The tooling covers maybe a third of what a facet back-port actually needs.
 
+## Problem 5 — Facets activate "cold" on mature vaults
+
+Facets are authored and tested against fresh vaults, but deployed onto vaults with months of history. A facet that *derives data and then acts on it* runs its first pass against a mature vault in a regime its tests never exercise — and the bootstrap case is easy to miss.
+
+PR #176's relationship-maintenance facet is the live example. On first activation `last_interaction` is unset on every person, so there is no baseline for its "silent for N weeks" cooling logic — yet the phase carries no cold-start guard. Modeled against a real vault (31 of 41 people referenced in the last ~2 weeks of action-items; `meetings/` and `cc-session-cache/` empty, so cadence/frequency is fully live-derived each run), a loose reading of "surface a cooling relationship" could emit reconnect nudges for the whole tracked set on day one. It's bounded and self-correcting — but it's a general property: **a derive-and-act facet's first run on an existing vault is a distinct, under-tested regime,** and we test on the regime that never ships to real users.
+
 ## Sketch of a direction (not a proposal yet)
 
 Before reaching for Skills as the configurability mechanism, note there is **already a gating primitive** in `phase_assembly.py:select_sections`: phases filter on `requires: <connector>` and `mode: [...]`. A facet toggle could extend it:
@@ -76,6 +82,7 @@ This would address **Problem 1** (reversibility — disabling re-renders the fac
 4. **Teardown semantics.** When a facet is disabled or removed, what happens to orphaned vault files and entity-data writes (`last_interaction`)? Leave them? Quarantine them? Document "no teardown" as intentional?
 5. **Back-port procedure.** Should `scoutctl phases backport` grow to cover structural facets, or do we want a separate documented checklist for promoting a personal-vault capability to the engine?
 6. **Default-on vs default-off** for newly back-ported facets, and whether existing vaults opt in on upgrade or get them automatically (current behavior is automatic via seed-replay).
+7. **Cold-start contract for derive-and-act facets** (Problem 5). Should a newly activated facet treat its first N runs as baseline-only — derive state, don't act on it — until it has the history its logic assumes? And should facets be tested against a mature-vault fixture, not just a fresh install?
 
 ## Non-goals
 
