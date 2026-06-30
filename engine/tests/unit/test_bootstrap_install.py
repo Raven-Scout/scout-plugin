@@ -57,8 +57,8 @@ def test_install_seeds_drafts_readme(tmp_path):
     text = readme.read_text()
     assert "drafts/<TAG>.md" in text
     assert "status: draft" in text
-    # The no-send guarantee must be documented for the user.
-    assert "never sends" in text.lower()
+    # The autonomous-never-sends guarantee must be documented for the user.
+    assert "never send" in text.lower()
 
 
 def test_install_writes_scout_config(tmp_path):
