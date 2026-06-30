@@ -19,6 +19,7 @@ tag: NAHSEND
 channel: email            # email | slack | linear | github | whatsapp
 loop_type: direct-debt    # direct-debt | promise-answered
 to: "Jan Novák <jan@firma.cz>"
+cc: "Petra Malá <petra@firma.cz>"   # other thread recipients to keep; omit if none
 thread_ref: "https://mail.google.com/mail/u/0/#inbox/<thread-id>"
 subject: "Re: Rozpočet Q3"          # email/PR title; omit for chat channels
 status: draft             # draft | sent | dismissed
@@ -32,6 +33,11 @@ Ahoj Jane,
 marked [TBD: ...] for you to fill in before sending.>
 ```
 
+**The body is plain, sendable text.** For email / Slack / WhatsApp there is **no markdown** in the
+body (no `**bold**`, `#` headings, `-` bullets, backticks, or HTML comments) — it must look right
+when sent as-is. Markdown is only used for `linear` / `github` drafts, which render it. Recipients,
+CC, and subject live in the frontmatter, never inside the body.
+
 ## Fields
 
 | Field | Meaning |
@@ -40,6 +46,7 @@ marked [TBD: ...] for you to fill in before sending.>
 | `channel` | Where the reply is owed: `email`, `slack`, `linear`, `github`, `whatsapp`. |
 | `loop_type` | `direct-debt` (someone asked, you haven't replied) or `promise-answered` (you promised → asked elsewhere → the answer arrived). |
 | `to` | Recipient (name + address/handle when known). |
+| `cc` | Other thread recipients to keep on the reply (email/PR). Omitted when none. |
 | `thread_ref` | Link/permalink/thread id to the original conversation. |
 | `subject` | Email subject or PR/issue title. Omit for chat. |
 | `status` | `draft` (awaiting you), `sent` (you sent it), `dismissed` (no longer needed). |
