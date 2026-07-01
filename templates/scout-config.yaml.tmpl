@@ -11,13 +11,19 @@ user:
   name: {{USER_NAME}}
   email: {{USER_EMAIL}}
   slack_id: {{USER_SLACK_ID}}
+  google_chat_id: {{USER_GOOGLE_CHAT_ID}}
+  jira_account_id: {{USER_JIRA_ACCOUNT_ID}}
+  asana_gid: {{USER_ASANA_GID}}
   github_username: {{GITHUB_USERNAME}}
 
 connectors:
   slack: {{SLACK_ENABLED}}
+  google_chat: {{GOOGLE_CHAT_ENABLED}}
   calendar: {{CALENDAR_ENABLED}}
   email: {{EMAIL_ENABLED}}
   linear: {{LINEAR_ENABLED}}
+  jira: {{JIRA_ENABLED}}
+  asana: {{ASANA_ENABLED}}
   github: {{GITHUB_ENABLED}}
   granola: {{GRANOLA_ENABLED}}
   drive: {{DRIVE_ENABLED}}
@@ -33,6 +39,10 @@ platform: {{PLATFORM}}
 scout_dir: {{SCOUT_DIR}}
 timezone: {{TIMEZONE}}
 github_repos: [{{GITHUB_REPOS}}]
+jira_projects: [{{JIRA_PROJECTS}}]
+jira_primary_project: {{JIRA_PRIMARY_PROJECT}}
+asana_projects: [{{ASANA_PROJECTS}}]
+asana_workspace_gid: {{ASANA_WORKSPACE_GID}}
 
 # Budget + session-limit awareness — consumed by scripts/budget-check.sh,
 # scripts/heartbeat.sh, and scripts/rate-limit-detect.sh.

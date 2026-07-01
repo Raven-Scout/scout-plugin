@@ -44,6 +44,22 @@ def test_install_creates_directory_tree(tmp_path):
     assert (vault / "hooks").is_dir()
 
 
+def test_install_stages_asana_api_cli(tmp_path):
+    """The Asana connector calls `python3 scripts/asana_api.py` vault-relative,
+    so bootstrap MUST stage the CLI into <vault>/scripts/ from the bundled
+    skill (skills/asana-api/scripts/asana_api.py). Regression guard: a missing
+    stage entry would leave every Asana connector call failing with
+    'No such file or directory' at runtime."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    install(_config(vault, plugin_root=plugin))
+    staged = vault / "scripts" / "asana_api.py"
+    assert staged.is_file()
+    # Verbatim copy of the source of truth, not a placeholder stub.
+    source = plugin / "skills" / "asana-api" / "scripts" / "asana_api.py"
+    assert staged.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+
+
 def test_install_writes_scout_config(tmp_path):
     plugin = Path(__file__).parent.parent.parent.parent
     vault = tmp_path / "Scout"

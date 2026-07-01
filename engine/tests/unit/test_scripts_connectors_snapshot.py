@@ -61,8 +61,9 @@ def test_build_snapshot_filters_to_official_tier_only():
 def test_build_snapshot_contains_expected_canonical_keys():
     """Lock in the exact roster that scout-app must reflect.
 
-    The YAML defines 11 official-tier connectors (Slack, Linear, Gmail,
-    Calendar, Granola, Fathom, Drive, github, chrome, whatsapp, telegram).
+    The YAML defines 14 official-tier connectors (Slack, Linear, Gmail,
+    Calendar, Granola, Fathom, Drive, asana:cli, jtk:jira, github,
+    gws:chat, chrome, whatsapp, telegram).
     """
     s = snap.build_snapshot()
     keys = {c["key"] for c in s["connectors"]}
@@ -74,12 +75,15 @@ def test_build_snapshot_contains_expected_canonical_keys():
         "mcp:claude_ai_Granola",
         "mcp:fathom",
         "mcp:claude_ai_Google_Drive",
+        "asana:cli",
+        "jtk:jira",
         "github",
+        "gws:chat",
         "mcp:claude-in-chrome",
         "mcp:whatsapp-mcp",
         "notify:telegram",
     }
-    assert len(s["connectors"]) == 11
+    assert len(s["connectors"]) == 14
 
 
 def test_build_snapshot_preserves_yaml_insertion_order():
