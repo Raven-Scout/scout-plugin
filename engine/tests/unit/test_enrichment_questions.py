@@ -76,7 +76,8 @@ def _build_kb(tmp_path: Path) -> Path:
 def _snapshot(kb: Path) -> dict[str, str]:
     return {
         p.relative_to(kb).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted(kb.rglob("*")) if p.is_file()
+        for p in sorted(kb.rglob("*"))
+        if p.is_file()
     }
 
 
@@ -97,9 +98,10 @@ def test_ranking_covers_all_five_sources_in_order(tmp_path):
 def test_limit_via_cli_json(tmp_path):
     kb = _build_kb(tmp_path)
     out = subprocess.run(
-        [sys.executable, str(SCRIPT), "--kb", str(kb), "--json",
-         "--no-reject-file", "--limit", "2"],
-        capture_output=True, text=True, check=True,
+        [sys.executable, str(SCRIPT), "--kb", str(kb), "--json", "--no-reject-file", "--limit", "2"],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     payload = json.loads(out.stdout)
     assert payload["count"] == 2
@@ -181,7 +183,9 @@ def test_generator_never_writes_to_the_kb(tmp_path):
     before = _snapshot(kb)
     subprocess.run(
         [sys.executable, str(SCRIPT), "--kb", str(kb), "--json", "--no-reject-file"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     gen.collect(kb)
     assert _snapshot(kb) == before  # identical file set + contents
@@ -190,7 +194,8 @@ def test_generator_never_writes_to_the_kb(tmp_path):
 def test_missing_kb_dir_exits_nonzero(tmp_path):
     r = subprocess.run(
         [sys.executable, str(SCRIPT), "--kb", str(tmp_path / "nope"), "--no-reject-file"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert r.returncode == 2
 
@@ -199,8 +204,10 @@ def test_missing_kb_dir_exits_nonzero(tmp_path):
 
 
 def test_generator_wired_as_cat1_file():
-    assert (_CAT1_FILES_FROM_PLUGIN["scripts/generate-enrichment-questions.py"]
-            == "templates/scripts/generate-enrichment-questions.py")
+    assert (
+        _CAT1_FILES_FROM_PLUGIN["scripts/generate-enrichment-questions.py"]
+        == "templates/scripts/generate-enrichment-questions.py"
+    )
 
 
 def test_state_files_seeded_install_only():
