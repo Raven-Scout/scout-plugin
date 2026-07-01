@@ -45,6 +45,16 @@ Urgency is **capped by how far away the deadline is** — distance sets a *ceili
 
 **Evaluate the actual deadline, not the source's tone.** Notification language — "action required", "expiring soon", "final notice", "limit reached" — is alarm-word framing, not real urgency, and never promotes an item past the distance ceiling. Deprecation / end-of-life notices specifically stay 🟢 Watching until ~2–3 weeks before the cutover. This ceiling is the counterpart to the deadline *escalation* rule under Knowledge Graph Personal Tasks below: escalation raises priority as a deadline nears; the ceiling stops a distant deadline from being surfaced as urgent on tone alone.
 
+### Goal Alignment — Secondary Signal Only
+
+Read the **Confirmed goals** in `knowledge-base/profile/goals.md`. Goal alignment helps {{USER_NAME}} see what advances what they're trying to achieve — but it is strictly **secondary to the urgency rules above** and must not distort them:
+
+- **It never changes a tier.** Goal alignment does **not** promote an item to 🔴/🟡, does **not** override the deadline-distance ceiling, and does **not** rescue noise. An item that wouldn't otherwise be surfaced stays unsurfaced no matter how on-goal it sounds. Urgency/deadline/cross-check decide the tier first; alignment only acts *after*.
+- **It orders within a band.** When two items share a tier, the goal-advancing one sorts first.
+- **It annotates.** When an item clearly advances a confirmed goal, append a quiet marker linking the goal: `(advances [[goals#<goal>]])`. Only for **confirmed** goals — never proposed ones.
+
+If `goals.md` has no confirmed goals, skip alignment entirely (no markers, no reordering).
+
 ## Action Items File Format
 
 Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
@@ -324,6 +334,10 @@ At the end of every briefing and consolidation run, append or update a **Scout D
 
 ### KB Growth Today
 - Ontology stats, new entities, patterns added
+
+### Goals
+- **Moved today:** which confirmed `[[goals]]` today's items/activity advanced
+- **Neglected:** any confirmed goal with no related activity for ~a week — one low-key line
 ```
 
 **Rules:**
@@ -332,3 +346,4 @@ At the end of every briefing and consolidation run, append or update a **Scout D
 - "Your Input Needed" lists ONLY items where {{USER_NAME}}'s action unblocks {{INSTANCE_NAME}} or a project.
 - Keep it scannable — no walls of text. Link to KB files for details.
 - On a `weekend-briefing` run, fold the **Monday Preview** into the digest rather than emitting it separately.
+- **Goals lens:** populate from **confirmed** goals in `knowledge-base/profile/goals.md` only. Goal **neglect** is a low-key flag, never a 🔴 unless a goal carries a real deadline. Omit the Goals section entirely when there are no confirmed goals. Honor `profile/communication.md` cadence — don't turn this into a nag.

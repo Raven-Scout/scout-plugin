@@ -82,6 +82,7 @@ _CAT1_DIR_LAYOUT = (
     "knowledge-base/projects",
     "knowledge-base/ontology/entities",
     "knowledge-base/people",
+    "knowledge-base/profile",
     "knowledge-base/personal",
     "knowledge-base/recurring-tasks",
     "action-items/archive",
@@ -126,12 +127,27 @@ _CAT1_TEMPLATES = (
 
 _INSTALL_ONLY_TEMPLATES = (
     # Vault-owned files seeded once on install (cat 2). Never overwritten on upgrade.
+    # Idempotent: _stage_install_only_seeds skips any file that already exists, so
+    # this tuple is safe to replay on upgrade — which is how existing vaults pick
+    # up newly-added seeds (e.g. the profile files) without clobbering edits.
     ("dreaming-proposals.md", "templates/dreaming-proposals.md.tmpl"),
     ("knowledge-base/scout-mistake-audit.md", "templates/scout-mistake-audit.md.tmpl"),
     ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
     ("inbox.md", "templates/inbox.md.tmpl"),
     ("meetings/meetings.md", "templates/meetings/meetings.md.tmpl"),
+    # User profile: a Scout-maintained "about you" snapshot, a communication
+    # contract, and a goals file used as a prioritization lens. Seeded as
+    # editable stubs; Scout derives/refines the rest. See phases/core/00-about-you.md.
+    ("knowledge-base/profile/about-you.md", "templates/knowledge-base/profile/about-you.md.tmpl"),
+    ("knowledge-base/profile/communication.md", "templates/knowledge-base/profile/communication.md.tmpl"),
+    ("knowledge-base/profile/goals.md", "templates/knowledge-base/profile/goals.md.tmpl"),
 )
+
+# Marker recorded in scout-config.yaml `plugin.applied_migrations` once the
+# profile seeds have been replayed on an existing vault, so the upgrade path is
+# observable (and so a future cleanup could gate on it). The seed itself is
+# idempotent regardless of this marker.
+_PROFILE_SEED_MIGRATION = "profile-files-v1"
 
 _CAT1B_RUNNERS = (
     ("run-scout.sh", "templates/run-scout.sh.tmpl"),
@@ -513,7 +529,12 @@ def _stage_version_stamp(cfg: BootstrapConfig, *, is_upgrade: bool) -> None:
         # permanently red.
         plugin.setdefault("version_at_last_setup", cfg.plugin_version)
     plugin["version_at_last_update"] = cfg.plugin_version
-    plugin.setdefault("applied_migrations", [])
+    migrations = plugin.setdefault("applied_migrations", [])
+    # Record the profile-seed migration once the seeds have been written
+    # (install always seeds; upgrade replays the idempotent seeder). Makes the
+    # profile rollout observable in scout-config.yaml without re-running work.
+    if _PROFILE_SEED_MIGRATION not in migrations:
+        migrations.append(_PROFILE_SEED_MIGRATION)
     _atomic_write(config_path, yaml.safe_dump(existing, sort_keys=False))
 
 
@@ -614,6 +635,11 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         # no-ops on vaults that are already per-file or never had legacy files.
         _stage_migrations(cfg)
         _stage_cat1_writes(cfg)
+        # Replay install-only seeds so existing vaults pick up newly-added
+        # cat-2 files (e.g. the profile/ files). Idempotent: every seed skips
+        # a target that already exists, so user edits are never clobbered and
+        # files seeded on a prior install/upgrade are left untouched.
+        _stage_install_only_seeds(cfg)
         # _stage_seed_schedule is idempotent (returns early if the file
         # exists) so it's safe to call on upgrade. Without it, vaults set
         # up before .scout-state/schedule.yaml was a first-class file
