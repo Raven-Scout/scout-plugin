@@ -99,6 +99,10 @@ _CAT1_FILES_FROM_PLUGIN = {
     "knowledge-base/ontology/__init__.py": "templates/knowledge-base/ontology/__init__.py",
     "action-items/render.py": "templates/action-items/render.py",
     "scripts/recurring-task-status.py": "templates/scripts/recurring-task-status.py",
+    # Proactive enrichment-recall generator (the "🧠 Help me remember" loop). Read-only
+    # KB scanner invoked by the dreaming feedback-processing phase; copied verbatim like
+    # recurring-task-status.py (no template rendering).
+    "scripts/generate-enrichment-questions.py": "templates/scripts/generate-enrichment-questions.py",
 }
 
 # Cat-1 files that are BOTH engine-owned AND user-editable in the vault, so they
@@ -131,6 +135,11 @@ _INSTALL_ONLY_TEMPLATES = (
     ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
     ("inbox.md", "templates/inbox.md.tmpl"),
     ("meetings/meetings.md", "templates/meetings/meetings.md.tmpl"),
+    # Enrichment-recall state (the "🧠 Help me remember" loop). Vault-owned so an
+    # upgrade never clobbers accumulated suppressions / Q&A history. Shipped as empty
+    # headers; the stoplist grows as the user dismisses questions in-thread.
+    ("scripts/enrichment-stoplist.txt", "templates/enrichment-stoplist.txt.tmpl"),
+    ("knowledge-base/enrichment-qa-log.md", "templates/enrichment-qa-log.md.tmpl"),
 )
 
 _CAT1B_RUNNERS = (
