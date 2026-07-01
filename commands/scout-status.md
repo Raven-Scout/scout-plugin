@@ -219,8 +219,11 @@ List every connector from the config. Use ✅ for `true` and ❌ for `false`:
 
 ```
   ✅ Slack
+  ❌ Google Chat
   ❌ Google Calendar
   ✅ Gmail
+  ❌ Jira
+  ❌ Asana
   ...
 ```
 
@@ -383,25 +386,45 @@ If an update is available, add: "Run `/scout-update` to apply it."
 
 ### Knowledge Graph Health
 
-Run the ontology parser to check the knowledge graph:
+Run the ontology parser to check the knowledge graph. Prefer the project venv if present (`SCOUT_DIR/.venv/bin/python`) — falls back to system `python3` then `python`:
 
 ```bash
-cd "SCOUT_DIR" && python knowledge-base/ontology/parser.py stats 2>/dev/null
-cd "SCOUT_DIR" && python knowledge-base/ontology/parser.py validate 2>/dev/null
+PY="$SCOUT_DIR/.venv/bin/python"
+[ -x "$PY" ] || PY=$(command -v python3 || command -v python || echo "")
+[ -n "$PY" ] && cd "$SCOUT_DIR" && "$PY" knowledge-base/ontology/parser.py stats 2>/dev/null
+[ -n "$PY" ] && cd "$SCOUT_DIR" && "$PY" knowledge-base/ontology/parser.py validate 2>/dev/null
 ```
 
-If the parser is available and succeeds, show:
+If the parser succeeds, show **all four** facets — counts by type, total relationships, validation status, and an orphan summary (counted separately from errors):
 
 ```
-  Entities:       X (Y person, Z project, ...)
+  Entities:       N (X person, Y project, Z organization, W technology, ...)
   Relationships:  N
-  Validation:     X errors / No errors
+  Validation:     0 errors / N errors
+  Orphans:        N entities with no relationships
 ```
 
-If the parser isn't set up (file doesn't exist or Python error), show:
+Compute the orphan count by re-running `validate` and counting lines that match `Orphaned entity` — these are warnings, not validation errors. List up to 5 most recently modified orphan entity files (use `find SCOUT_DIR/knowledge-base/ontology/entities -name '*.md' -newer ...` or `ls -t`) when the count is non-zero, so the user can see what's drifting:
+
+```
+  ⚠️  Orphans (top 5 by recency):
+    - knowledge-base/ontology/entities/people/<name>.md  — <YYYY-MM-DD>
+    ...
+```
+
+If `Entities: 0` even though the parser ran, surface the gap:
+
+```
+  ⚠️  Parser runs but graph is empty. Likely cause: KB markdown files lack YAML frontmatter
+  with `name:` and `type:` keys. Run a dreaming session to auto-seed entities from prose,
+  or re-run scripts/seed-entities-from-people.py manually.
+```
+
+If the parser isn't set up (file doesn't exist) OR the runtime is unavailable (no python3 / yaml module missing), show:
 
 ```
   Knowledge graph not configured. Run /scout-setup to set up the ontology.
+  (Tip: if python3 is present but yaml is missing — `pip3 install pyyaml` or use a venv.)
 ```
 
 ---

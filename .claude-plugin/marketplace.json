@@ -8,7 +8,7 @@
     {
       "name": "scout",
       "source": "./",
-      "description": "Autonomous knowledge management and daily briefing system for Claude Code",
+      "description": "Autonomous knowledge management and daily briefing system for Claude Code. Monitors Slack, Gmail, Google Calendar, Google Chat, Linear, Jira, Asana, GitHub, Granola, and Google Drive; synthesizes findings into a persistent knowledge base and delivers scheduled daily action items.",
       "version": "0.7.3",
       "author": {
         "name": "Jordan Burger"
@@ -20,7 +20,18 @@
         "briefing",
         "automation",
         "scheduling",
-        "obsidian"
+        "obsidian",
+        "connectors",
+        "slack",
+        "gmail",
+        "google-calendar",
+        "google-chat",
+        "linear",
+        "jira",
+        "asana",
+        "github",
+        "granola",
+        "google-drive"
       ]
     }
   ]
