@@ -130,6 +130,53 @@ The `mcp_tool`-vs-`bash` probe distinction reuses the existing `ProbeKind` enum;
 new connector categories in the future add a `ProbeKind` variant and the
 preflight handles them without structural change.
 
+**Preflight is best-effort prevention, not a guarantee.** It is a point-in-time
+check *before* the session and it **fails open** (§"Error handling"): if the
+probe can't determine health, the run proceeds. It therefore has two blind spots
+that it cannot cover on its own:
+
+1. **Inconclusive probe** — the probe errored, so the policy was never applied to
+   this run.
+2. **Mid-session failure** — the probe passed, but a token expired mid-run, or a
+   connector not exercised at probe time failed when the session actually called
+   it. The decision to run was already committed.
+
+Both blind spots would otherwise produce exactly the outcome this design exists
+to prevent: a blind run that the policy *would* have skipped, with no gap
+recorded and no backfill offered. Layer 1b closes them.
+
+### Layer 1b — Post-session reconciliation (safety net)
+
+A reactive counterpart to the preflight, run *after* the session completes
+(a new post-session step in the runner, alongside the existing cost-tracker).
+It answers a different question than the preflight: not "are the connectors up
+right now?" but **"which critical connectors actually errored *during* the run
+that just finished?"**
+
+1. Read the connector-call telemetry for the just-finished session
+   (`.scout-logs/connector-calls-*.jsonl`, the same records
+   `connector_health_report` consumes) and compute, per critical connector for
+   this slot type, whether it logged zero successful calls / only errors.
+2. If one or more critical connectors were dark **and** the slot type's
+   `on_degraded` policy is `skip`, treat the just-finished run as effectively
+   blind and **record a gap retroactively** (open/extend per Layer 3) — even
+   though the run happened. The window is still surfaced and backfillable.
+3. If policy is `warn`/`run`, no gap is opened (the user opted into degraded
+   runs), but the degradation is still noted in the health telemetry as today.
+
+This is the layer that makes the two-part story honest: the **preflight**
+prevents wasted runs when degradation is cheaply detectable upfront; the
+**reconciliation** guarantees that a blind run — however it slipped past the
+preflight — still leaves a recorded gap. Together they mean *no silent gap*;
+neither alone does.
+
+Unlike the preflight (which is independent of #121), reconciliation **reads the
+JSONL telemetry and therefore depends on #121 being fixed** — while
+`SCOUT_MODE` is unset the telemetry is empty and reconciliation has nothing to
+read. This is the one part of the design that is gated on #121, and it degrades
+safely: with no telemetry it simply records no retroactive gaps (the preflight
+still functions).
+
 ### Layer 2 — `on_degraded` policy (configurable)
 
 New block in `scout-config.yaml`, defaulting to today's behavior so existing
@@ -268,6 +315,13 @@ main claude session
    └─ if SCOUT_DEGRADED_CONNECTORS set → prepend degradation banner
    └─ if open/recovered gaps exist    → prepend backfill banner + deeplink
    │
+   ▼
+runner post-session (run-scout.sh.tmpl)
+   └─ scoutctl connectors reconcile --slot-type <type> --session <id>   ← NEW
+         ├─ read this session's connector-calls JSONL (needs #121)
+         └─ critical connector was dark AND policy=skip
+               → open/extend gap retroactively (safety net)
+   │
    ▼  (user clicks, any time later)
 /scout-backfill --slot-type … --from … --to …
    └─ subagent fan-out (connector × time chunk) → synthesis → KB → mark backfilled
@@ -277,7 +331,13 @@ main claude session
 
 - **Preflight probe itself fails** (e.g. `claude mcp list` errors/times out):
   treat as *inconclusive*, not degraded — default to running (fail-open), and log
-  a warning. A broken probe must not silently block all runs.
+  a warning. A broken probe must not silently block all runs. The run's actual
+  connector health is still caught after the fact by Layer 1b reconciliation, so
+  fail-open does not mean the gap goes unrecorded.
+- **Reconciliation with no telemetry** (#121 unfixed, or the session logged no
+  rows): record no retroactive gaps and log a warning — degrade safely rather
+  than guess. Reconciliation never blocks or retries the run; it only annotates
+  after the fact.
 - **Malformed `connector_policy`**: `ConfigError` naming the field; fall back to
   global defaults rather than crashing the runner.
 - **`gaps.jsonl` write failure**: log to stderr but never crash the runner
@@ -295,6 +355,11 @@ main claude session
   `from` = last healthy run; close on recovery; one record across a multi-run
   outage; `skipped_runs` count correct.
 - Fail-open: probe error → run proceeds.
+- Reconciliation: session where a critical connector was dark + policy `skip`
+  → retroactive gap opened; same case + policy `warn`/`run` → no gap; probe
+  passed but connector died mid-session → gap opened; no telemetry (#121 unfixed)
+  → no gap, warning logged; a preflight-skip and a reconciliation for the same
+  outage coalesce into one record (not two).
 - Surfacing: `scoutctl gaps list --json` shape; banner rendering with/without
   open gaps.
 - Backfill skill: chunking math scales with window length; provenance marker
@@ -302,24 +367,29 @@ main claude session
 
 ## Relationship to #121
 
-#121 (runner never exports `SCOUT_MODE`, so the *retrospective* telemetry is
-dark) is **complementary and independent**:
+#121 (runner never exports `SCOUT_MODE`, so the JSONL telemetry is dark) relates
+to this design in two different ways depending on the layer:
 
-- This design's preflight does **not** read the JSONL telemetry, so it works
-  even while #121 is unfixed.
-- Once #121 is fixed, the retrospective health report and this proactive
-  preflight reinforce each other: preflight prevents blind runs going forward;
-  the health matrix gives historical visibility.
+- The **preflight (Layer 1)** does **not** read the JSONL telemetry — it probes
+  live connector state — so it works even while #121 is unfixed.
+- The **post-session reconciliation (Layer 1b)** *does* read the telemetry and is
+  therefore **gated on #121**. Until `SCOUT_MODE` is exported the telemetry is
+  empty and reconciliation records nothing (it degrades safely; the preflight
+  still functions).
 
-#121 still needs its own fix and will be linked from the PR that implements this
-spec.
+So #121 is a prerequisite for the *safety net*, not for the design as a whole.
+It still needs its own fix (a ~2-line export in the runner templates) and will
+be linked from the PR that implements this spec — ideally landing before or
+alongside Phase 2 below.
 
 ## Phasing (shippable increments)
 
 1. **Preflight + skip/warn/run policy** (Layers 1–2) — the operational win;
-   stops blind runs immediately.
+   stops blind runs immediately. Independent of #121.
 2. **Gap tracking + CLI + briefing banner** (Layers 3–4, minus the app) — makes
-   gaps visible and recoverable-in-principle.
+   gaps visible and recoverable-in-principle. Add **post-session reconciliation
+   (Layer 1b)** here, once #121 is fixed, so both the proactive and reactive
+   paths feed the same gap store.
 3. **`/scout-backfill` skill** (Layer 5) — the recovery action.
 4. **macOS app gap surface + Backfill button** — first-class app integration.
 
@@ -332,7 +402,12 @@ spec.
    behavior unchanged.
 3. A contiguous multi-run outage produces exactly **one** gap record spanning
    last-healthy-run → recovery.
-4. The briefing output and the macOS app both surface the gap and trigger the
+4. A run that slips past the preflight (inconclusive probe, or a connector that
+   fails mid-session) but was in fact blind still produces a gap via
+   post-session reconciliation — no silent gap — provided telemetry is available
+   (#121 fixed). A preflight-skip and a reconciliation for the same outage
+   coalesce into one record.
+5. The briefing output and the macOS app both surface the gap and trigger the
    identical `/scout-backfill` command.
-5. `/scout-backfill` reconstructs the full window via subagent fan-out without
+6. `/scout-backfill` reconstructs the full window via subagent fan-out without
    context exhaustion and marks the gap backfilled.
