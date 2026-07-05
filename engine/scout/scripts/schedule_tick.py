@@ -31,6 +31,7 @@ import datetime as _dt
 import fcntl
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -159,9 +160,13 @@ def _local_tz_name(localtime: Path | None = None) -> str:
     localtime = localtime or Path("/etc/localtime")
     if localtime.is_symlink():
         target = str(localtime.resolve())
-        marker = "zoneinfo/"
-        if marker in target:
-            name = target.split(marker, 1)[1]
+        # The zone name is whatever follows the deepest zoneinfo* directory.
+        # macOS resolves through layouts like /var/db/timezone/tz/<ver>/zoneinfo/
+        # or /usr/share/zoneinfo.default/ depending on whether tzd has run, so
+        # a literal "zoneinfo/" match is not enough.
+        matches = list(re.finditer(r"/zoneinfo[^/]*/", target))
+        if matches:
+            name = target[matches[-1].end() :]
             try:
                 ZoneInfo(name)
                 return name
@@ -172,7 +177,7 @@ def _local_tz_name(localtime: Path | None = None) -> str:
                 )
         else:
             print(
-                "schedule_tick: /etc/localtime target has no 'zoneinfo/' component "
+                "schedule_tick: /etc/localtime target has no zoneinfo directory component "
                 f"({target!r}); falling back to UTC — set $TZ to your IANA zone",
                 file=sys.stderr,
             )
