@@ -54,6 +54,14 @@ For each session activity found:
 
 This connector catches the gap between "{{USER_NAME}} worked on something" and "the output appeared in another system." Work done in Claude sessions often shows up in GitHub, email, or Slack shortly after — but during consolidation, the session may be the earliest signal of completed or in-progress work.
 
+### Hard Gate — Multi-Session Repo Activity Must Reach the Action Items
+
+If the session scan shows **≥3 sessions in the same repo since the last run**, the action items MUST reference that work — as completed (✅ with the PR/commit/merge evidence), in-progress (what's next), or blocked (state the blocker). If none of the existing action items connect to it, create one. A run that surfaces multi-session repo activity but produces an action-items file with no mention of it is a failed run: the heaviest observed work signal of the window went unacknowledged.
+
+### Remote-Session Limitation
+
+Web, desktop-app, and remote-agent sessions are NOT locally accessible — there is no API for their transcripts. Only their *committed outputs* are visible (via `git log`). If {{USER_NAME}} did relevant work in a remote session and didn't commit, it is invisible to this scan — never treat "no local session found" as "no work happened." When in doubt, ask {{USER_NAME}} rather than asserting a negative.
+
 ### Uncommitted Working-Tree Sweep
 
 A session may have changed files that were never committed — invisible to `git log` and to GitHub. For each repo a session touched, also check the working tree so "in progress" vs "done" is grounded:

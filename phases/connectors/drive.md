@@ -21,12 +21,23 @@ Use `list_recent_files` or `search_files` with date filters to find documents mo
    - Collaborative work is in progress
 3. **Documents {{USER_NAME}} edited** — files modified by {{USER_NAME}} are evidence of completed work.
 
-### Cross-Reference with Transcript Tools
+### Mandatory on Weekday Runs
 
-**Cross-reference with meeting transcript tools (e.g., Granola).** Some meetings appear in Drive but not in transcript tools, and vice versa:
-- A Google Doc titled "Meeting Notes — [Topic]" may have structured notes that a transcript tool missed
-- A transcript tool may have captured audio that wasn't documented in Drive
-- If both exist for the same meeting, **synthesize the best information from each** — use the transcript for exact quotes and commitments, use the Drive doc for structured decisions and action items
+When Drive is a connected source, **a weekday consolidation or briefing run with zero Drive calls is a coverage bug**, not an optimization. Two reasons Drive is non-negotiable:
+
+1. **Meeting-notes cross-check.** Many meetings are captured in Drive (auto-generated notes, hand-written docs, teammates' shared notes) but not in the transcript tool — and vice versa. A run that only reads transcripts loses a large fraction of the meeting record, and the entity-creation gaps that follow (people, decisions, projects that only ever appeared in a Drive doc) compound in the KB.
+2. **Decision artifacts.** Specs, RFCs, and post-meeting writeups land in Drive without ever being announced in a channel. They're the source of truth for what was actually decided.
+
+Note coverage explicitly in the run log: `Drive — N files in window, K read in detail`. (Weekend-briefing runs may skip the Drive sweep per the Weekend Scope rule.)
+
+### Cross-Reference with Transcript Tools (hard rule)
+
+**Cross-reference with meeting transcript tools (e.g., Granola, Fathom) — in both directions.** Some meetings appear in Drive but not in transcript tools, and vice versa:
+
+- For every meeting surfaced by the transcript tool this run, search Drive for files modified in the meeting's **±2h window** with names matching the meeting title or attendee names.
+- For every Drive file in the window that looks like meeting notes, search the transcript tool for a matching transcript.
+- If only one of (transcript tool, Drive) has the meeting, **note the gap explicitly in the action items file** (e.g., "_transcript exists; no Drive notes found_") so future runs — and {{USER_NAME}} — know what coverage looked like.
+- If both exist for the same meeting, **synthesize the best information from each** — use the transcript for exact quotes and commitments, use the Drive doc for structured decisions and action items.
 
 ### What to Extract
 

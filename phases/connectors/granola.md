@@ -59,6 +59,10 @@ If a flagged meeting has no decisions/commitments/follow-ups recorded near it, g
 
 Note all meeting attendees. Cross-reference with `people.md` and add any new people with context: "Attendee in [meeting title] on [date]."
 
+### Cross-Reference with the Document Store
+
+If a document-store connector (e.g. Google Drive) is also connected, apply its bidirectional meeting cross-check hard rule: for every meeting surfaced here, search the document store for notes in the meeting's ±2h window — and note explicitly when only one side has the meeting. Transcript-only coverage silently loses the meetings that were documented but not recorded.
+
 ---
 phase: connector
 name: granola
