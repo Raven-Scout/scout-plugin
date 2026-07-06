@@ -93,6 +93,19 @@ _Always the LAST section of the file — run metadata is a footer for review, ne
 
 All action items files must include `[[wikilinks]]` to any KB files referenced by action items.
 
+### Hard Rule — Daily-File Completeness Invariant
+
+`action-items/action-items-YYYY-MM-DD.md` must contain the **full carried-forward item list from the moment it exists**. Companion surfaces (scout-app, the TUI) render the daily file as the complete truth — a stub makes every open item invisible until the next full rewrite.
+
+- If today's file does not exist when your session starts, run the deterministic backstop FIRST, then edit on top of the complete file:
+  ```bash
+  scoutctl action-items materialize
+  ```
+  It copies the most recent prior daily file (up to 7 days back) verbatim under a fresh date header and a provisional banner. Idempotent — a no-op when today's file exists. The runner preambles already call it before every session; this in-session call covers sessions launched outside the runners.
+- **NEVER write a section that points at a previous day's file in lieu of the items.** "Carry forward in full from yesterday — see that file" is FORBIDDEN, no matter how lightweight your session is. This binds every session type — briefing, consolidation, research, dreaming, and any auxiliary session that happens to be the day's first writer.
+- When you find the mechanical carry-forward banner at the top of today's file, you are the enriching pass: rewrite the header/focus sections for today, reconcile items normally, and remove the banner. Do not treat the banner as a reason to start a fresh file.
+- This rule complements the continuity rules below: the count-guard and dropoff audit protect the ledger *across* days; this invariant protects the rendered surface *within* the day.
+
 ### Hard Rule — Every Task Line Has a Stable `[#TAG]`
 
 **Every new task line you write MUST start with a stable `[#TAG]` identifier** — 2–8 uppercase letters/digits with at least one letter (e.g. `[#NAHSEND]`, `[#AI3026]`, `[#RSM]`). The tag is the structural identifier scout-app uses to mark tasks done, snooze them, and attach comments — without it, the app falls back to brittle markdown-substring matching that fails on emoji, italics, em-dashes, embedded links, or any non-ASCII drift. Issue #10 of scout-app catalogs the failure modes.
