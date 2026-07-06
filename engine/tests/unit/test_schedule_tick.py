@@ -917,6 +917,21 @@ def test_local_tz_name_resolves_relative_symlink(monkeypatch, tmp_path):
     assert st._local_tz_name(localtime=link) == "Europe/Paris"
 
 
+def test_local_tz_name_resolves_zoneinfo_variant_dir(monkeypatch, tmp_path):
+    # macOS ships /usr/share/zoneinfo as a symlink to zoneinfo.default, so a
+    # fully-resolved /etc/localtime target may contain "zoneinfo.default"
+    # rather than a literal "zoneinfo" component.
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.delenv("TZ", raising=False)
+    zone_file = tmp_path / "share" / "zoneinfo.default" / "America" / "New_York"
+    zone_file.parent.mkdir(parents=True)
+    zone_file.write_bytes(b"TZif")
+    link = tmp_path / "localtime"
+    link.symlink_to(zone_file)
+    assert st._local_tz_name(localtime=link) == "America/New_York"
+
+
 def test_local_tz_name_not_symlink_warns_and_falls_back_to_utc(monkeypatch, tmp_path, capsys):
     from scout.scripts import schedule_tick as st
 

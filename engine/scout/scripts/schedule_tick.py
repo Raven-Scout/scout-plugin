@@ -158,10 +158,20 @@ def _local_tz_name(localtime: Path | None = None) -> str:
     #    (valid POSIX) and multi-hop links, which os.readlink alone would not.
     localtime = localtime or Path("/etc/localtime")
     if localtime.is_symlink():
-        target = str(localtime.resolve())
-        marker = "zoneinfo/"
-        if marker in target:
-            name = target.split(marker, 1)[1]
+        target = localtime.resolve()
+        # The zoneinfo directory is not always literally named "zoneinfo":
+        # macOS ships /usr/share/zoneinfo as a symlink to zoneinfo.default,
+        # so a fully-resolved target looks like
+        # /usr/share/zoneinfo.default/America/New_York. Match the last path
+        # component named "zoneinfo" or "zoneinfo.<variant>" and take
+        # everything after it as the IANA name.
+        parts = target.parts
+        zi_idx = max(
+            (i for i, p in enumerate(parts) if p == "zoneinfo" or p.startswith("zoneinfo.")),
+            default=-1,
+        )
+        if 0 <= zi_idx < len(parts) - 1:
+            name = "/".join(parts[zi_idx + 1 :])
             try:
                 ZoneInfo(name)
                 return name
@@ -172,8 +182,8 @@ def _local_tz_name(localtime: Path | None = None) -> str:
                 )
         else:
             print(
-                "schedule_tick: /etc/localtime target has no 'zoneinfo/' component "
-                f"({target!r}); falling back to UTC — set $TZ to your IANA zone",
+                "schedule_tick: /etc/localtime target has no zoneinfo directory component "
+                f"({str(target)!r}); falling back to UTC — set $TZ to your IANA zone",
                 file=sys.stderr,
             )
     else:
