@@ -858,6 +858,248 @@ def _register_schedule() -> None:
 _register_schedule()
 
 
+def _register_triggers() -> None:
+    """scoutctl trigger {list,show,validate,reload,test,fire-now,stats}.
+
+    Event-trigger operations over the vault's .scout-state/triggers.yaml
+    (docs/specs/event-triggers.md). Mirrors the schedule sub-app pattern.
+    `trigger serve` (the v2 webhook receiver) is intentionally absent.
+    """
+
+    trigger_app = typer.Typer(help="Event-trigger operations (vault triggers.yaml).")
+    app.add_typer(trigger_app, name="trigger")
+
+    def _load_vault_triggers():
+        from scout import paths as _paths
+        from scout.triggers.config import load_triggers, triggers_path
+
+        path = triggers_path(_paths.data_dir())
+        if not path.exists():
+            return path, None
+        return path, load_triggers(path)
+
+    def _trigger_record(t) -> dict:
+        return {
+            "id": t.id,
+            "enabled": t.enabled,
+            "source": t.source,
+            "match": dict(t.match),
+            "action": {"kind": t.action.kind.value, **t.action.params},
+            "cooldown_seconds": t.cooldown_seconds,
+            "daily_fire_cap": t.daily_fire_cap,
+            "allow_cycle": t.allow_cycle,
+        }
+
+    @trigger_app.command("list")
+    def cli_trigger_list(
+        as_json: bool = typer.Option(
+            False,
+            "--json/--no-json",
+            help="Emit a JSON array of full trigger records instead of tab-separated lines.",
+        ),
+    ) -> None:
+        """List the configured triggers."""
+        import json as _json
+
+        _path, triggers = _load_vault_triggers()
+        if triggers is None:
+            typer.echo("(no triggers.yaml; no triggers configured)")
+            return
+        if as_json:
+            typer.echo(_json.dumps([_trigger_record(t) for t in triggers]))
+            return
+        for t in triggers:
+            enabled = "enabled" if t.enabled else "disabled"
+            typer.echo(f"{t.id}\t{t.source}\t{t.match_type}\t{t.action.kind.value}\t{enabled}\tcap={t.daily_fire_cap}")
+
+    @trigger_app.command("show")
+    def cli_trigger_show(trigger_id: str) -> None:
+        """Show one trigger's full record (incl. dedup/fire state) as JSON."""
+        import json as _json
+
+        from scout import paths as _paths
+        from scout.triggers.dedup import DedupStore
+        from scout.triggers.engine import dedup_path
+
+        _path, triggers = _load_vault_triggers()
+        found = next((t for t in (triggers or []) if t.id == trigger_id), None)
+        if found is None:
+            typer.echo(f"unknown trigger: {trigger_id}", err=True)
+            raise typer.Exit(code=1)
+        record = _trigger_record(found)
+        record["fire_state"] = DedupStore(dedup_path(_paths.data_dir())).state(trigger_id)
+        typer.echo(_json.dumps(record, indent=2))
+
+    @trigger_app.command("validate")
+    def cli_trigger_validate(
+        target: Path | None = typer.Option(
+            None,
+            "--target",
+            "-t",
+            help="Validate the triggers.yaml at this path instead of the vault canonical.",
+        ),
+    ) -> None:
+        """Check triggers.yaml without applying it; exit 0 on success."""
+        from scout.triggers.config import load_triggers
+
+        if target is not None:
+            if not target.exists():
+                typer.echo(f"target does not exist: {target}", err=True)
+                raise typer.Exit(code=1)
+            try:
+                load_triggers(target)
+            except ConfigError as e:
+                typer.echo(str(e), err=True)
+                raise typer.Exit(code=1) from e
+            typer.echo(f"triggers OK: {target}")
+            return
+
+        try:
+            path, triggers = _load_vault_triggers()
+        except ConfigError as e:
+            typer.echo(str(e), err=True)
+            raise typer.Exit(code=1) from e
+        if triggers is None:
+            typer.echo("triggers OK: (no triggers.yaml; no triggers configured)")
+        else:
+            typer.echo(f"triggers OK: {path} ({len(triggers)} trigger(s))")
+
+    @trigger_app.command("reload")
+    def cli_trigger_reload() -> None:
+        """Force-reload triggers.yaml (fires use a per-tick snapshot; next tick picks this up)."""
+        _path, _triggers = _load_vault_triggers()
+        typer.echo("reloaded")
+
+    @trigger_app.command("test")
+    def cli_trigger_test(
+        trigger_id: str,
+        window_minutes: int = typer.Option(60, "--window-minutes", help="How far back to scan for events."),
+    ) -> None:
+        """Simulate one trigger against the last hour of source events. Never dispatches."""
+        import datetime as _dt
+        import json as _json
+
+        from scout import paths as _paths
+        from scout.triggers.dedup import DedupStore
+        from scout.triggers.engine import dedup_path
+        from scout.triggers.matcher import matches
+        from scout.triggers.sources import get_source
+
+        _path, triggers = _load_vault_triggers()
+        found = next((t for t in (triggers or []) if t.id == trigger_id), None)
+        if found is None:
+            typer.echo(f"unknown trigger: {trigger_id}", err=True)
+            raise typer.Exit(code=1)
+
+        vault = _paths.data_dir()
+        source = get_source(found.source, vault=vault)
+        healthy, reason = source.health_check()
+        if not healthy:
+            typer.echo(f"source {found.source} is not healthy: {reason}", err=True)
+            raise typer.Exit(code=1)
+
+        since = (_dt.datetime.now(tz=_dt.UTC) - _dt.timedelta(minutes=window_minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        events = source.scan_since(since)
+        dedup = DedupStore(dedup_path(vault))
+        matched = [
+            {
+                "source_event_id": e.source_event_id,
+                "ts": e.ts,
+                "fields": e.normalized_match_fields,
+                "already_fired": not dedup.is_new(trigger_id, e.source_event_id),
+            }
+            for e in events
+            if matches(found.match, e)
+        ]
+        typer.echo(_json.dumps({"scanned": len(events), "matched": matched}, indent=2))
+
+    @trigger_app.command("fire-now")
+    def cli_trigger_fire_now(trigger_id: str) -> None:
+        """Manually fire a trigger with a synthetic event (development aid)."""
+        import datetime as _dt
+
+        from scout import paths as _paths
+        from scout.events import now_iso
+        from scout.ids import new_ulid
+        from scout.triggers.dedup import DedupStore
+        from scout.triggers.dispatcher import dispatch, log_fire
+        from scout.triggers.engine import dedup_path
+        from scout.triggers.sources.base import ConnectorEvent
+
+        _path, triggers = _load_vault_triggers()
+        found = next((t for t in (triggers or []) if t.id == trigger_id), None)
+        if found is None:
+            typer.echo(f"unknown trigger: {trigger_id}", err=True)
+            raise typer.Exit(code=1)
+
+        vault = _paths.data_dir()
+        event = ConnectorEvent(
+            source=found.source,
+            source_event_id=f"manual-{new_ulid()}",
+            ts=now_iso(),
+            raw_payload={"manual": True},
+            normalized_match_fields={"type": found.match_type, "manual": True},
+        )
+        outcome = dispatch(found, event, vault=vault)
+        now = _dt.datetime.now(tz=_dt.UTC)
+        DedupStore(dedup_path(vault)).record_fire(trigger_id, event.source_event_id, now)
+        log_fire(_paths.logs_dir(vault), outcome, extra={"source": found.source, "manual": True})
+        if outcome.status != "ok":
+            typer.echo(f"failed: {outcome.detail.get('error', outcome.detail)}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"fired: {trigger_id} ({found.action.kind.value})")
+
+    @trigger_app.command("stats")
+    def cli_trigger_stats(
+        days: int = typer.Option(7, "--days", help="How many days of fire logs to roll up."),
+        as_json: bool = typer.Option(False, "--json/--no-json", help="Emit JSON instead of text."),
+    ) -> None:
+        """Roll-up: fires by trigger and fires by day, from trigger-fires-*.jsonl."""
+        import datetime as _dt
+        import json as _json
+
+        from scout import paths as _paths
+        from scout.triggers.dispatcher import FIRE_LOG_PREFIX
+
+        log_dir = _paths.logs_dir(_paths.data_dir())
+        today = _dt.datetime.now(tz=_dt.UTC).date()
+        by_trigger: dict[str, dict[str, int]] = {}
+        by_day: dict[str, int] = {}
+        for offset in range(days):
+            day = (today - _dt.timedelta(days=offset)).isoformat()
+            log_path = log_dir / f"{FIRE_LOG_PREFIX}{day}.jsonl"
+            if not log_path.exists():
+                continue
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                tid = row.get("trigger_id", "?")
+                entry = by_trigger.setdefault(tid, {"total": 0, "ok": 0, "error": 0})
+                entry["total"] += 1
+                entry["ok" if row.get("status") == "ok" else "error"] += 1
+                by_day[day] = by_day.get(day, 0) + 1
+
+        if as_json:
+            typer.echo(_json.dumps({"days": days, "by_trigger": by_trigger, "by_day": by_day}))
+            return
+        if not by_trigger:
+            typer.echo(f"(no trigger fires in the last {days} day(s))")
+            return
+        for tid in sorted(by_trigger):
+            e = by_trigger[tid]
+            typer.echo(f"{tid}\ttotal={e['total']}\tok={e['ok']}\terror={e['error']}")
+        for day in sorted(by_day):
+            typer.echo(f"{day}\t{by_day[day]}")
+
+
+_register_triggers()
+
+
 def _register_notify() -> None:
     """scoutctl notify {telegram} — outbound notification commands.
 

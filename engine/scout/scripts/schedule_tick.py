@@ -697,6 +697,29 @@ def run() -> Event:
         )
 
 
+def _evaluate_triggers(*, vault: Path, log_dir: Path) -> None:
+    """Run trigger evaluation before schedule evaluation. Never raises.
+
+    evaluate() isolates its own per-source/per-trigger failures; this guard
+    exists for the layers above it (import errors, config-path crashes) so
+    the trigger subsystem can never take down slot dispatch.
+    """
+    try:
+        from scout.triggers import engine as triggers_engine
+
+        triggers_engine.evaluate(
+            vault=vault,
+            emit_event=lambda **kw: _emit_event(log_dir, **kw),
+        )
+    except Exception as exc:
+        _emit_event(
+            log_dir,
+            kind="triggers.evaluate.failed",
+            source="cli:schedule_tick",
+            payload={"error": f"{type(exc).__name__}: {exc}"},
+        )
+
+
 def _do_tick(
     *,
     vault: Path,
@@ -705,6 +728,9 @@ def _do_tick(
     tracker_path: Path,
     started_at: float,
 ) -> Event:
+    # Event triggers evaluate first (spec: docs/specs/event-triggers.md §Event flow).
+    _evaluate_triggers(vault=vault, log_dir=log_dir)
+
     schedule = _load_or_default(vault)
     last_fire = _get_last_fire_index(state_dir, tracker_path)
     now = _now()

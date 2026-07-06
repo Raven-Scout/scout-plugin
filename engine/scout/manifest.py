@@ -69,6 +69,10 @@ def build_manifest() -> EngineManifest:
             "kb_ontology_v1": True,  # Plan 2
             "tui_v1": True,  # Plan 2
             "schedule_v2": True,  # Plan 5
+            # Event triggers (docs/specs/event-triggers.md). Opt-in: flips
+            # True once the polling matcher + dedup/cooldown are verified
+            # across a week of live runs.
+            "triggers_v1": False,
         },
         subcommands=_list_subcommands(),
     )
