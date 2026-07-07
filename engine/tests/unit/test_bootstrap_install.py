@@ -67,9 +67,44 @@ def test_install_writes_assembled_files_and_snapshots(tmp_path):
     plugin = Path(__file__).parent.parent.parent.parent
     vault = tmp_path / "Scout"
     install(_config(vault, plugin_root=plugin))
-    for name in ("SKILL", "DREAMING", "RESEARCH"):
+    for name in ("SKILL", "DREAMING", "RESEARCH", "TRADING"):
         assert (vault / f"{name}.md").exists()
         assert (vault / ".scout-state" / "last-assembled" / f"{name}.md").exists()
+
+
+def test_install_seeds_agentic_trading_subsystem_disabled(tmp_path):
+    """The optional Agentic Trading subsystem renders fully but ships disabled:
+    TRADING brain assembled, runner guards on the master switch, config seeded
+    with enabled:false, and the on/off CLI + config reader present."""
+    plugin = Path(__file__).parent.parent.parent.parent
+    vault = tmp_path / "Scout"
+    cfg = _config(vault, plugin_root=plugin)
+    cfg.connector_inputs = {"user_slack_id": "U9TEST", "claude_bin": "/usr/local/bin/claude"}
+    install(cfg)
+
+    # TRADING brain assembled from phases/core + phases/trading, no briefing leakage.
+    trading_md = (vault / "TRADING.md").read_text()
+    assert "**BASE_DIR:**" in trading_md
+    assert "Reconcile" in trading_md and "source of truth" in trading_md
+    assert "Hard rules recap" in trading_md
+    assert "action-items file" not in trading_md.lower()  # briefing-only phases excluded
+
+    # Runner self-guards on the master switch before any spend; vars substituted.
+    runner = (vault / "run-trading.sh").read_text()
+    assert "{{" not in runner
+    assert "MASTER SWITCH GUARD" in runner
+
+    # Config seeded disabled; slack id rendered; account left as a fill-in placeholder.
+    config_yaml = (vault / "knowledge-base/projects/agentic-trading/config.yaml").read_text()
+    assert "enabled: false" in config_yaml
+    assert "U9TEST" in config_yaml
+    assert "<your-robinhood-account-number>" in config_yaml
+
+    # CLI + reader + ledgers present.
+    assert (vault / "scripts/trading.sh").exists()
+    assert (vault / "scripts/trading-config.py").exists()
+    for ledger in ("watchlist.md", "decision-log.md", "nav-history.md"):
+        assert (vault / "knowledge-base/projects/agentic-trading" / ledger).exists()
 
 
 def test_install_refuses_existing_vault(tmp_path):

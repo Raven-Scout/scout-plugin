@@ -6,6 +6,15 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Agentic Trading session type** (optional, **default-disabled**) — a fourth scheduled session type that runs an autonomous equity-trading loop against an operator-configured Robinhood account via the `robinhood-trading` MCP. Real money, opt-in, **not financial advice**; ships off and does nothing until explicitly enabled. Design: `docs/superpowers/specs/2026-06-26-agentic-trading-design.md`.
+  - New `SlotType.TRADING` (+ `SlotPriority.TRADING = 25`) in `schedule.py`, so a `type: trading` schedule slot dispatches through the standard 5-minute tick like any other session — no new launchd plist.
+  - New `TRADING` brain assembled from `phases/core` + `phases/trading/` (`mode: [trading]`), wired into `bootstrap.py` `_assemble()` and both stage-5 loops; `git-setup.md` opted into `trading` so the brain inherits the shared git/timezone/cost conventions.
+  - New `phases/trading/trading-loop.md` — the 6-step loop (reconcile → risk gate → manage → consider entries → execute → log/report) with hard guardrails (capital cap, single-name cap, mandatory stop, daily-loss cap, circuit breaker, settled-cash-only, no penny/leveraged) and a **graceful degrade**: if a headless session is blocked from placing an order, it records a `PENDING-APPROVAL` order + one-tap-approve DM instead of failing silently.
+  - New `run-trading.sh` runner (`templates/run-trading.sh.tmpl`) that **guards on the master switch before any spend**, plus `scripts/trading.sh` (on/off/status) and `scripts/trading-config.py` (config get/set).
+  - Per-install config seeded once at `knowledge-base/projects/agentic-trading/config.yaml` (master switch + guardrails; account is a fill-in placeholder, never overwritten on upgrade) alongside `watchlist.md` / `decision-log.md` / `nav-history.md` ledgers.
+  - Commented-out example `trading-market-open` / `trading-pre-close` slots (ET-pinned) in the default schedule — opt-in; uncomment in the vault's `schedule.yaml` to activate.
+
 ## [0.7.3] - 2026-06-23
 
 

@@ -99,6 +99,9 @@ _CAT1_FILES_FROM_PLUGIN = {
     "knowledge-base/ontology/__init__.py": "templates/knowledge-base/ontology/__init__.py",
     "action-items/render.py": "templates/action-items/render.py",
     "scripts/recurring-task-status.py": "templates/scripts/recurring-task-status.py",
+    # Optional Agentic Trading subsystem (default-disabled). Invoked via `python3`,
+    # so no chmod needed → direct copy rather than a rendered+chmod cat-1 template.
+    "scripts/trading-config.py": "templates/scripts/trading-config.py",
 }
 
 # Cat-1 files that are BOTH engine-owned AND user-editable in the vault, so they
@@ -121,6 +124,8 @@ _CAT1_TEMPLATES = (
     ("scripts/claude-with-retry.sh", "templates/scripts/claude-with-retry.sh.tmpl"),
     ("scripts/post-session-backfill.sh", "templates/scripts/post-session-backfill.sh.tmpl"),
     ("hooks/kb-pre-filter.sh", "templates/hooks/kb-pre-filter.sh.tmpl"),
+    # Optional Agentic Trading subsystem (default-disabled) — the on/off/status CLI.
+    ("scripts/trading.sh", "templates/scripts/trading.sh.tmpl"),
     (".gitignore", "templates/.gitignore.tmpl"),
 )
 
@@ -131,12 +136,34 @@ _INSTALL_ONLY_TEMPLATES = (
     ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
     ("inbox.md", "templates/inbox.md.tmpl"),
     ("meetings/meetings.md", "templates/meetings/meetings.md.tmpl"),
+    # Optional Agentic Trading subsystem (default-disabled). Seeded once so the
+    # config master-switch + state ledgers persist across upgrades (user edits
+    # `config.yaml: enabled` / account; the ledgers accumulate). Never overwritten.
+    (
+        "knowledge-base/projects/agentic-trading/config.yaml",
+        "templates/knowledge-base/projects/agentic-trading/config.yaml.tmpl",
+    ),
+    (
+        "knowledge-base/projects/agentic-trading/watchlist.md",
+        "templates/knowledge-base/projects/agentic-trading/watchlist.md.tmpl",
+    ),
+    (
+        "knowledge-base/projects/agentic-trading/decision-log.md",
+        "templates/knowledge-base/projects/agentic-trading/decision-log.md.tmpl",
+    ),
+    (
+        "knowledge-base/projects/agentic-trading/nav-history.md",
+        "templates/knowledge-base/projects/agentic-trading/nav-history.md.tmpl",
+    ),
 )
 
 _CAT1B_RUNNERS = (
     ("run-scout.sh", "templates/run-scout.sh.tmpl"),
     ("run-dreaming.sh", "templates/run-dreaming.sh.tmpl"),
     ("run-research.sh", "templates/run-research.sh.tmpl"),
+    # Optional Agentic Trading subsystem (default-disabled). Self-guards on the
+    # config master switch, so a fired slot is a harmless no-op until enabled.
+    ("run-trading.sh", "templates/run-trading.sh.tmpl"),
 )
 
 
@@ -265,6 +292,12 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
     elif kind == "DREAMING":
         sources = [phases_root / "core", phases_root / "modes"]
         target_modes = {"dreaming"}
+    elif kind == "TRADING":
+        # Optional Agentic Trading subsystem. Pulls cross-cutting core phases
+        # whose `mode:` list includes `trading` (git-setup) + everything in
+        # phases/trading/. Stays empty/inert in vaults that never enable it.
+        sources = [phases_root / "core", phases_root / "trading"]
+        target_modes = {"trading"}
     else:  # RESEARCH
         sources = [phases_root / "core", phases_root / "research"]
         target_modes = {"research"}
@@ -300,7 +333,7 @@ def _stage_cat4_install(cfg: BootstrapConfig) -> None:
     """Stage 5 (install): assemble + write live + write snapshot."""
     snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    for kind in ("SKILL", "DREAMING", "RESEARCH"):
+    for kind in ("SKILL", "DREAMING", "RESEARCH", "TRADING"):
         content = _assemble(cfg, kind)
         _atomic_write(cfg.vault / f"{kind}.md", content)
         _atomic_write(snapshot_dir / f"{kind}.md", content)
@@ -329,7 +362,7 @@ def _stage_cat4_upgrade(cfg: BootstrapConfig) -> list[str]:
     snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     conflicts: list[str] = []
-    for kind in ("SKILL", "DREAMING", "RESEARCH"):
+    for kind in ("SKILL", "DREAMING", "RESEARCH", "TRADING"):
         ours = _assemble(cfg, kind)
         live = cfg.vault / f"{kind}.md"
         theirs = live.read_text(encoding="utf-8") if live.exists() else ours

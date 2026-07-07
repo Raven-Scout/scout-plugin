@@ -2,7 +2,7 @@
 phase: core
 name: git-setup
 slot: setup
-mode: [briefing, consolidation, dreaming, research]
+mode: [briefing, consolidation, dreaming, research, trading]
 requires: null
 ---
 
