@@ -900,11 +900,34 @@ def test_local_tz_name_env_tz_invalid_is_ignored_and_warns(monkeypatch, tmp_path
 
 
 def test_local_tz_name_resolves_symlink_zone(monkeypatch, tmp_path):
+    # Absolute symlink target. Hermetic fixture tree instead of the real
+    # /usr/share/zoneinfo: on macOS that chain resolves through host-specific
+    # layouts (/var/db/timezone/tz/<ver>/zoneinfo/ vs /usr/share/zoneinfo.default/),
+    # which made this test flaky across runner images.
     from scout.scripts import schedule_tick as st
 
     monkeypatch.delenv("TZ", raising=False)
+    zone_file = tmp_path / "zoneinfo" / "America" / "New_York"
+    zone_file.parent.mkdir(parents=True)
+    zone_file.write_bytes(b"TZif")
     link = tmp_path / "localtime"
-    link.symlink_to("/usr/share/zoneinfo/America/New_York")
+    link.symlink_to(zone_file)
+    assert st._local_tz_name(localtime=link) == "America/New_York"
+
+
+def test_local_tz_name_resolves_macos_zoneinfo_default_dir(monkeypatch, tmp_path):
+    # macOS layout where /usr/share/zoneinfo -> zoneinfo.default (pristine
+    # systems where tzd hasn't populated /var/db/timezone): the resolved
+    # target has a 'zoneinfo.default' component, not 'zoneinfo/'.
+    from scout.scripts import schedule_tick as st
+
+    monkeypatch.delenv("TZ", raising=False)
+    zone_file = tmp_path / "zoneinfo.default" / "America" / "New_York"
+    zone_file.parent.mkdir(parents=True)
+    zone_file.write_bytes(b"TZif")
+    (tmp_path / "zoneinfo").symlink_to("zoneinfo.default")  # dir-level indirection
+    link = tmp_path / "localtime"
+    link.symlink_to(tmp_path / "zoneinfo" / "America" / "New_York")
     assert st._local_tz_name(localtime=link) == "America/New_York"
 
 

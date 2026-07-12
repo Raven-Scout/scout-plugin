@@ -28,3 +28,16 @@ On `weekend-briefing` runs, keep the scan light:
 - **Run:** calendar (next-workday lookahead — see Monday Preview), personal-task / action-item review, and any KB updates that fall out naturally.
 - **Abbreviate or skip:** the heavy work-connector scans (Slack/email/Linear/GitHub deep sweeps). A quick check for anything explicitly addressed to {{USER_NAME}} is fine; a full inbound/outbound reconciliation is not — that's what the weekday consolidation runs are for.
 - **Tone:** weekend framing. Surface what genuinely needs weekend attention; don't manufacture workday urgency.
+
+***
+
+### Connector Outages Are Surfaced, Never Silently Skipped
+
+If a connected data source is unreachable during a run, **report it as an outage** — in the wrap notification and in the run-notes footer — and move on. Never silently skip it: {{USER_NAME}} treats each connected source as first-class, and a source that quietly went dark reads as "nothing happened" when the truth is "didn't look." A skipped-source run must say which source was skipped and why.
+
+Two rules for declaring an outage honestly:
+
+1. **Attempt before declaring.** "The tool isn't in my catalog" is NOT a valid skip reason when tools load on demand (deferred MCP tools require a `ToolSearch` load first) — perform the load and one probe call before declaring the connector unreachable, so the attempt itself is auditable.
+2. **The claim must match the log.** An "unreachable" claim with zero recorded calls to that connector is invalid — the failed probe call is the proof-of-attempt.
+
+Per-mode scope rules (like Weekend Scope above) that *intentionally* skip a source are fine — the outage rule is about sources the mode *should* have scanned.

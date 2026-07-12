@@ -173,6 +173,20 @@ Never fan a causal claim out to multiple KB surfaces (project file + people + DM
 
 **Dreaming fact-check pass (deep-work mode).** During deep-work runs, take the KB content written or changed in the last few runs (use `git log`/`git diff` to find it) and re-verify the highest-stakes claims against a **freshly re-read primary source** — do not paraphrase what a prior run already wrote (prior runs can be wrong; the KB is claims-to-verify, not facts). Correct or mark `[unverified]`/`[contradicted]` anything that doesn't hold up, and route genuine conflicts to the review queue. This is the active counterpart to the passive verification markers — hallucinations compound across runs unless something re-checks them.
 
+### Audits Remediate or Hand Off — Never Just Report
+
+Applies to **every** audit in every mode — the consolidation KB audit, KG-integrity checks, issue-tracker sync audits, action-item-health checks (the dreaming-mode KG check restates this rule for its own steps). After an audit produces findings, split them into `auto-remediable` vs `backlog` and **act** — an audit with no downstream actor is a slow leak that {{USER_NAME}} reads as noise (*"nice audit, but did you fix anything?"*):
+
+- **Auto-remediable → fix in the same run** (or hand to the next run as an explicit *must-action* queue, not a passive report): an issue-state claim the KB has wrong → re-query the tracker + flip the row; a personnel/status label past its own dated window → correct it + bump the verified date; a dangling relationship target that resolves to an existing entity under a slug → fix the target to the slug/wikilink form.
+- **Backlog → leave as backlog, do NOT auto-create:** genuinely-missing entities, judgment calls, structural decisions.
+- The audit's notification/report then states **what it fixed**, not only what's wrong.
+
+### Session Log Row (mandatory every run)
+
+**Every briefing, consolidation, dreaming, or research run must append a new row to the Recent Sessions table in `knowledge-base.md`.** Editing only the "Last updated" header is not enough — a run that only bumps the header leaves the next run blind to what just happened, and silently shrinks the institutional memory the dreaming run uses to pick audit targets.
+
+Row shape: date · session type (time, manual/scheduled) · 1–2 sentence summary of material findings · commit hash. When writing the row pre-commit, use `pending` for the hash; back-fill the short hash when possible (the dreaming run also picks up `pending` entries and back-fills them).
+
 ### Cross-Reference Integrity
 
 The KB's value depends on its graph being connected. Rules:

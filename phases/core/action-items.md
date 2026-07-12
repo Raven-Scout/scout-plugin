@@ -260,6 +260,39 @@ For each entity the script returns:
 
 **Do not write "quiet window" / "nothing material" framing until the `due`/`overdue` list is exhausted** — a `weekly:friday` cadence is by definition material on a Friday.
 
+## Task Surface-Rule Triggers (briefing AND every consolidation)
+
+Paired with the recurring-task step above. The `surface_rule` render rule (under Knowledge Graph Personal Tasks) only reads the block *when a task is already being surfaced* — nothing pulls an otherwise-idle task onto the list when one of its declared triggers goes live. This step is the missing driver: the **active** form of the entity's declared surfacing intent, mirroring how the cadence computer drives `recurring_task` entities.
+
+For every open `task` entity (query the parser for `type: task`, keep `status: open`/`in-progress`), read its `surface_rule` and compute the `always_visible_if` triggers from the entity's own fields, in the configured timezone:
+
+- **Deadline-window triggers** (e.g. a "final week before the deadline/return date" trigger) → fire when `0 ≤ (deadline − today) ≤ <window-days>`.
+- **Event-derived triggers** (a schedule change, a budget/threshold anomaly) → fire when *this run's own* connector scan or computed watch value shows the change.
+- **Any `windows` entry** whose `[from, to]` range contains today.
+
+When any trigger or window is live, surface the task as an action item at the window's `surface:` priority (default 🟡; escalate to 🔴 when `always_visible_if` fires, per the render rule) — with **explicit transition framing drawn from the entity** (e.g. *"Final week — N days to the [date] deadline: \<render the entity's prep-task list\>"*), never as a bare day-counter buried in a header. **Forbid "nothing hard-due / quiet day" framing while any task's trigger window is live.** A declared trigger that never fires because no step computed it is a silent-miss bug, not a quiet day.
+
+## Continuity Analysis (briefing)
+
+**Before writing any action items, synthesize the previous day's work into today's priorities.** This is not just carrying items forward — it's connecting what {{USER_NAME}} was working on, what changed overnight, and what today's best use of time is.
+
+For each carryover item from the previous action-items file:
+
+1. **Time-based triggers:** Does the item have an implicit or explicit timer? "Monitoring 2–3 days for clean data" → count the days since the fix; flag when the window is ending. "Wait ~1 week, then build X" → when does the week end? A dated handover/availability window → how many actionable days remain before someone is out?
+2. **Changed context:** Did anything happen overnight (from the connector queries) that changes this item's priority or next step? A PR that was blocked yesterday may have merged; a "waiting on X" item may have gotten its reply.
+3. **Work trajectory:** Based on recent sessions, messages, and commits, what was {{USER_NAME}} MOST focused on? Today's briefing should build on that momentum, not ignore it.
+
+**Output: 2–3 "Today you should…" recommendations** at the TOP of the action items file, above the 🔴 section — synthesized guidance, not new action items:
+
+```markdown
+## 💡 Today's Focus (continuity from yesterday)
+- **Finish X** — [why today is the right day, what changed]
+- **Check Y** — [monitoring window ending, follow-up due]
+- **Prepare for Z** — [meeting coming up, deadline approaching]
+```
+
+This is the file-side counterpart of the wrap-DM continuity line (see the notification phase) — the DM opens with the throughline; this section carries the reasoning.
+
 ## Mandatory Cross-Check
 
 **Before ANY item becomes a To Do, it must pass ALL available cross-checks.** The cross-check adapts to your connected services:

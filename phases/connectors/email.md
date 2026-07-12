@@ -77,7 +77,18 @@ For each legitimate inbound email:
 
 ### Drill Active Threads — Don't Trust the Snippet
 
-`gmail_search_messages` returns a preview snippet of just *one* message in a thread — often not the latest. For any thread that has moved since the last run (newer than your last-checked watermark, or tied to an open action item or a tracked contact), fetch the **full thread** (`get_thread`) and read the tail before drawing any conclusion. **Never assert a thread's state — "still no reply", "awaiting X", "unanswered" — from the search snippet alone:** the reply you're looking for may already be sitting in the thread tail. Threads attached to an open 🔴/🟡 item are mandatory drills.
+`gmail_search_messages` returns a preview snippet of just *one* message in a thread — often not the latest. On any thread that has been replied to since the last run, the snippet you get is *not* the latest message; the reply you're looking for may already be sitting in the thread tail. **Never assert a thread's state — "still no reply", "awaiting X", "unanswered" — from the search snippet alone.** Inbound replies that land *between* {{USER_NAME}}'s own outbound messages are the classic miss: a `from:me`-only or snippet-only scan is structurally blind to them.
+
+For every thread returned by search, you MUST fetch the **full thread** (`get_thread`) and read the full message list when ANY of these is true:
+
+1. **The thread moved since the last run** — its latest message timestamp is newer than the prior run's email watermark (keep a last-checked watermark, e.g. `.scout-cache/last-email-checked.txt`; update it only *after* drilling, never on search alone).
+2. **The thread ties to an open action item.** Build a per-run allowlist by grepping today's action-items file for `[[wikilinks]]`, issue identifiers (e.g. `PROJ-1234`), and email addresses, then match threads against it.
+3. **A participant matches a tracked entity** — any email address listed on an open personal-task entity (`knowledge-base/personal/task-*.md`) or an active `knowledge-base/people/*.md` file. Slow-moving negotiations with tracked contacts are exactly where a stale snippet misleads.
+4. **The action-items file already cites this thread with a state framing** (e.g., "awaiting their reply"). Mandatory re-read at compose time — the same rule the issue-tracker connector enforces for fast-moving issues.
+
+After drilling, log coverage as `thread <id> drilled, last-message <timestamp>, n=<message-count>` so a post-run audit can confirm the thread was opened, not just searched. Convert message timestamps to the display timezone at write time (see the timezone rules in the git-setup phase).
+
+**Snippet-vs-state guardrail (compose-time):** before writing or carrying any action item that cites an email thread, the most recent message you've actually *read* on that thread must be ≤ 1 run-window old (the consolidation lookback, or 24h for a briefing). If it's older, drill again. If the drilled state contradicts the carried framing (thread says "approved" while the carried item says "awaiting approval"), update the action item and log the divergence in the mistake audit.
 
 ---
 phase: connector
