@@ -84,6 +84,26 @@ if [ -x "$BUDGET_CHECK" ]; then
     fi
 fi
 
+# Connector preflight — probe critical-connector health (via `claude mcp list`
+# + bash probes) before spending any model tokens. Policy per slot type comes
+# from the connector_policy block in scout-config.yaml (default: run — no gate).
+# Exit 3 = policy skip (orderly, like a budget skip); any other non-zero exit
+# is a preflight error and the run FAILS OPEN.
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [ ! -x "$SCOUTCTL_BIN" ] && command -v scoutctl >/dev/null 2>&1; then
+    SCOUTCTL_BIN="$(command -v scoutctl)"
+fi
+if [ -x "$SCOUTCTL_BIN" ]; then
+    PREFLIGHT_RC=0
+    "$SCOUTCTL_BIN" connectors preflight --mode "$MODE" --claude-bin "$CLAUDE_BIN" >> "$LOG_FILE" 2>&1 || PREFLIGHT_RC=$?
+    if [ "$PREFLIGHT_RC" -eq 3 ]; then
+        echo "=== Connector preflight: skipping this run (degraded) ===" >> "$LOG_FILE"
+        exit 0
+    elif [ "$PREFLIGHT_RC" -ne 0 ]; then
+        echo "=== Connector preflight errored (rc=$PREFLIGHT_RC) — failing open ===" >> "$LOG_FILE"
+    fi
+fi
+
 START_TIME=$(date +%s)
 
 # Run Claude in print mode through the retry wrapper — capture exit code without triggering set -e.

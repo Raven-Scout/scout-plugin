@@ -254,6 +254,8 @@ def _register_connectors() -> None:
                 "detail": c.remediation.detail,
             },
             "notes": c.notes,
+            "harness_server_name": c.harness_server_name,
+            "preflight_command": c.preflight_command,
         }
         typer.echo(_json.dumps(record, indent=2))
 
@@ -264,6 +266,50 @@ def _register_connectors() -> None:
 
         load_registry()  # exercise the path; raises ConfigError on bad YAML
         typer.echo("reloaded")
+
+    @connectors_app.command("preflight")
+    def cli_connectors_preflight(
+        slot_type: str = typer.Option(
+            "",
+            "--slot-type",
+            help="Slot type to gate (briefing | consolidation | dreaming | research | manual).",
+        ),
+        mode: str = typer.Option(
+            "",
+            "--mode",
+            help="Dispatcher slot key (SCOUT_FORCE_MODE); resolved to a slot type via the schedule.",
+        ),
+        claude_bin: str = typer.Option(
+            "claude",
+            "--claude-bin",
+            help="Claude Code binary used for the `claude mcp list` probe.",
+        ),
+        timeout: float = typer.Option(
+            60.0,
+            "--timeout",
+            help="Per-probe timeout in seconds (timeout → inconclusive, fail open).",
+        ),
+    ) -> None:
+        """Pre-session connector preflight (connector-resilience Phase 1).
+
+        Probes the connectors critical for the slot type and applies the
+        vault's `connector_policy` (scout-config.yaml). Exit codes: 0 =
+        proceed, 3 = policy skip (the runner converts this to an orderly
+        skip), 4 = inconclusive probe (the runner fails open).
+        """
+        from scout.scripts.connector_preflight import run as preflight_run
+
+        if not slot_type and not mode:
+            typer.echo("pass --slot-type or --mode", err=True)
+            raise typer.Exit(code=2)
+        raise typer.Exit(
+            preflight_run(
+                slot_type=slot_type or None,
+                mode=mode or None,
+                claude_bin=claude_bin,
+                timeout=timeout,
+            )
+        )
 
     @connectors_app.command("probe-registry")
     def cli_connectors_probe_registry(

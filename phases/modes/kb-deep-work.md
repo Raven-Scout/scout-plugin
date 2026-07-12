@@ -24,6 +24,8 @@ Before doing anything else, read the caches that the runner script generated bef
 
 Prefer these caches over live tool calls during scoring. Fall back to live queries only when a cache is missing, obviously stale, or you need deeper detail (e.g., full PR diff, full session transcript).
 
+Also check `.scout-cache/connector-degradation-pending.md`. If it exists, the pre-session preflight found critical connectors down before this run: prepend a degradation banner naming them, record no "nothing found"-style negative signals for them, and delete the file once consumed.
+
 ***
 
 ### Step 2-pre: Scan for Inline Comments

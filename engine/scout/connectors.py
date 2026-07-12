@@ -58,6 +58,17 @@ class Connector:
     required_in_types: tuple[SlotType, ...]
     remediation: Remediation
     notes: str = ""
+    # Pre-session preflight wiring (connector-resilience Phase 1). Exactly
+    # how the preflight probes this connector before a scheduled run:
+    #   harness_server_name — matched VERBATIM against `claude mcp list`
+    #     output (e.g. "claude.ai Slack"); registry keys / display names
+    #     cannot be mechanically mapped to harness server names.
+    #   preflight_command — a bash probe run directly (exit 0 = healthy),
+    #     harness-independent (e.g. "gh auth status").
+    # A connector with neither field is not preflight-checkable and is
+    # simply not probed.
+    harness_server_name: str = ""
+    preflight_command: str = ""
 
     def required_in_mode(self, mode: str) -> bool:
         """DEPRECATED: keyed on slot key. Prefer ``required_in_type``.
@@ -198,6 +209,8 @@ def _build_connector(key: str, raw: dict[str, Any]) -> Connector:
             required_in_types=required_in_types,
             remediation=remediation,
             notes=raw.get("notes", "") or "",
+            harness_server_name=raw.get("harness_server_name", "") or "",
+            preflight_command=raw.get("preflight_command", "") or "",
         )
     except (KeyError, ValueError) as e:
         raise ConfigError(f"connector {key} entry is malformed: {e}") from e

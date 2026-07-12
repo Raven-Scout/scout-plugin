@@ -41,3 +41,5 @@ Two rules for declaring an outage honestly:
 2. **The claim must match the log.** An "unreachable" claim with zero recorded calls to that connector is invalid — the failed probe call is the proof-of-attempt.
 
 Per-mode scope rules (like Weekend Scope above) that *intentionally* skip a source are fine — the outage rule is about sources the mode *should* have scanned.
+
+**Consume the preflight notice first.** If `.scout-cache/connector-degradation-pending.md` exists, the pre-session connector preflight already found critical connectors down before this run started (the run proceeded under a `warn` policy). Prepend a degradation banner to your output naming those connectors, do NOT record "nothing found"-style negative signals for them — absence of signal from a dark connector is not absence of data — and delete the file once consumed so it doesn't leak into the next run.
