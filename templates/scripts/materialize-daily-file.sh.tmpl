@@ -1,0 +1,28 @@
+#!/bin/bash
+# Daily-file completeness invariant (Pattern #110) — guarantee today's
+# action-items file exists and is COMPLETE before any session touches it.
+#
+# If action-items-<today>.md is missing, `scoutctl action-items materialize`
+# copies the most recent prior daily file (up to 7 days back) verbatim under
+# a fresh date header + provisional banner, so no session or app surface ever
+# renders a missing/stub list. Idempotent — a no-op when the file exists.
+#
+# This shim NEVER fails the caller: it's a best-effort backstop invoked from
+# runner preambles; a broken venv must not block a scheduled run.
+
+set -uo pipefail
+
+SCOUTCTL_BIN="{{SCOUTCTL_BIN}}"
+if [[ ! -x "$SCOUTCTL_BIN" ]]; then
+    if command -v scoutctl >/dev/null 2>&1; then
+        SCOUTCTL_BIN="$(command -v scoutctl)"
+    else
+        echo "materialize-daily-file.sh: scoutctl not found (looked at ${SCOUTCTL_BIN}) — skipping" >&2
+        exit 0
+    fi
+fi
+
+SCOUT_DATA_DIR="${SCOUT_DATA_DIR:-{{SCOUT_DIR}}}"
+export SCOUT_DATA_DIR
+
+"$SCOUTCTL_BIN" action-items materialize || exit 0

@@ -120,6 +120,7 @@ _CAT1_TEMPLATES = (
     ("scripts/rate-limit-detect.sh", "templates/scripts/rate-limit-detect.sh.tmpl"),
     ("scripts/claude-with-retry.sh", "templates/scripts/claude-with-retry.sh.tmpl"),
     ("scripts/post-session-backfill.sh", "templates/scripts/post-session-backfill.sh.tmpl"),
+    ("scripts/materialize-daily-file.sh", "templates/scripts/materialize-daily-file.sh.tmpl"),
     ("hooks/kb-pre-filter.sh", "templates/hooks/kb-pre-filter.sh.tmpl"),
     (".gitignore", "templates/.gitignore.tmpl"),
 )

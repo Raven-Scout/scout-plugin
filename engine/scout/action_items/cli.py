@@ -286,6 +286,37 @@ def cli_new_prefix(
     sys.stdout.write(prefix + "\n")
 
 
+@app.command("materialize")
+def cli_materialize(
+    date: str | None = typer.Option(
+        None, "--date", help="Target day YYYY-MM-DD (default: today in the configured timezone)."
+    ),
+    data_dir: Path | None = typer.Option(None, "--data-dir", help="Vault root (default: $SCOUT_DATA_DIR or ~/Scout)."),
+) -> None:
+    """Ensure today's daily file exists and is COMPLETE (daily-file completeness invariant).
+
+    If the daily file is missing, copy the most recent prior daily file
+    (up to 7 days back) verbatim under a fresh date header and a provisional
+    banner, so no session or app surface ever renders a missing/stub list.
+    Deterministic and idempotent — a no-op when the file already exists.
+    Runner preambles call this before every session (Pattern #110 backstop).
+    """
+    from scout.action_items.materialize import materialize
+
+    target_date: _dt.date | None = None
+    if date is not None:
+        try:
+            target_date = _dt.date.fromisoformat(date)
+        except ValueError as e:
+            raise ActionItemError(f"--date: invalid date {date!r}") from e
+
+    created = materialize(data_dir=data_dir, date=target_date)
+    if created is None:
+        sys.stdout.write("materialize: nothing to do (daily file exists or no prior file within 7 days)\n")
+    else:
+        sys.stdout.write(f"materialize: created {created}\n")
+
+
 @app.command("backfill-prefixes")
 def cli_backfill_prefixes(
     path: Path | None = typer.Argument(

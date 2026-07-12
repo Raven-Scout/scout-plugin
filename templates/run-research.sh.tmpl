@@ -48,6 +48,14 @@ Important:
 
 echo "=== {{INSTANCE_NAME}} Research run starting at $(date) ===" >> "$LOG_FILE"
 
+# Daily-file completeness invariant — if today's action-items file doesn't
+# exist yet, materialize it verbatim from the most recent daily file so no
+# session (or app surface) ever sees a missing/stub list. No-op when present.
+MATERIALIZE="$SCOUT_DIR/scripts/materialize-daily-file.sh"
+if [ -x "$MATERIALIZE" ]; then
+    "$MATERIALIZE" >> "$LOG_FILE" 2>&1 || true
+fi
+
 # Budget check — skip if we're over the spending threshold
 BUDGET_CHECK="$SCOUT_DIR/scripts/budget-check.sh"
 if [ -x "$BUDGET_CHECK" ]; then
