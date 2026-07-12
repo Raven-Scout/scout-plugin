@@ -96,11 +96,7 @@ def materialize(
             now=now.strftime("%H:%M %Z"),
             prev=prev_date.isoformat(),
         )
-        content = (
-            f"# Action Items — {_human_date(target_date)}\n"
-            f"{banner}\n"
-            f"{_carry_body(prev)}"
-        )
+        content = f"# Action Items — {_human_date(target_date)}\n{banner}\n{_carry_body(prev)}"
         tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_text(content, encoding="utf-8")
         tmp.replace(target)

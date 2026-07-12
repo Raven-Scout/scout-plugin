@@ -291,9 +291,7 @@ def cli_materialize(
     date: str | None = typer.Option(
         None, "--date", help="Target day YYYY-MM-DD (default: today in the configured timezone)."
     ),
-    data_dir: Path | None = typer.Option(
-        None, "--data-dir", help="Vault root (default: $SCOUT_DATA_DIR or ~/Scout)."
-    ),
+    data_dir: Path | None = typer.Option(None, "--data-dir", help="Vault root (default: $SCOUT_DATA_DIR or ~/Scout)."),
 ) -> None:
     """Ensure today's daily file exists and is COMPLETE (daily-file completeness invariant).
 
