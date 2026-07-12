@@ -98,6 +98,23 @@ def test_critical_connectors_filter_by_slot_type():
     assert "github" not in dreaming_critical  # gh used in research, not dreaming
 
 
+def test_preflight_probe_fields_on_seed_connectors():
+    """Preflight wiring (connector-resilience Phase 1): claude.ai-hosted
+    connectors carry harness_server_name; gh rides a bash probe; connectors
+    with neither field are simply not preflight-probed."""
+    reg = load_registry()
+    assert reg["mcp:claude_ai_Slack"].harness_server_name == "claude.ai Slack"
+    assert reg["mcp:claude_ai_Linear"].harness_server_name == "claude.ai Linear"
+    assert reg["mcp:claude_ai_Google_Calendar"].harness_server_name == "claude.ai Google Calendar"
+    assert reg["github"].preflight_command == "gh auth status"
+    assert reg["github"].harness_server_name == ""
+    # Local-bridge / extension connectors don't appear in `claude mcp list`
+    # reliably — shipped un-probed; users opt in via the overlay.
+    assert reg["mcp:whatsapp-mcp"].harness_server_name == ""
+    assert reg["mcp:whatsapp-mcp"].preflight_command == ""
+    assert reg["notify:telegram"].harness_server_name == ""
+
+
 def test_unknown_connector_raises():
     reg = load_registry()
     with pytest.raises(KeyError):

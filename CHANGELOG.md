@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Pre-session connector preflight (connector-resilience Phase 1, #181)** — scheduled runs no longer launch blind when critical connectors are down. A new `scoutctl connectors preflight` gate runs in all three runner templates alongside the budget check, health-checking every connector critical for the slot type at zero model-token cost (`claude mcp list` for MCP connectors matched by a new per-connector `harness_server_name` field; a `preflight_command` bash probe — e.g. `gh auth status` — for CLI-based ones; connectors with neither field are simply not probed). The run is degraded iff **any** critical connector is determinably down; the slot type's `on_degraded` policy — a new `connector_policy` block in `scout-config.yaml` (`skip` | `warn` | `run`, global default + per-slot-type overrides) — then decides: `skip` exits 3 (the runner converts it to an orderly budget-check-style skip and a Telegram/alert-log notification fires), `warn` writes `.scout-cache/connector-degradation-pending.md` for the session to consume (banner the degradation; record no false "nothing found" signals), `run` preserves today's behavior and is the default — existing installs are unaffected until they opt in. The preflight **fails open** on any probe error (a broken probe must never block runs), and because fail-open + glyph parsing means a CLI format change would silently disable the protection, a persisted inconclusive-streak counter alerts after 3 consecutive inconclusive probes. Healthy runs stamp `last_healthy_run` per slot type in `.scout-state/connector-preflight-state.json` so Phase 2 gap records get accurate windows. Phase 2 (gap tracking + post-session reconciliation, gated on #121) and Phase 3 (`/scout-backfill`) are not part of this change.
+
 ## [0.7.3] - 2026-06-23
 
 

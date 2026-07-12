@@ -12,6 +12,13 @@
 #         first_fix: string  (≤180 chars; goes into Slack/Telegram DMs)
 #         detail:    string  (multi-line allowed; goes into connector-health.md)
 #       notes: string (optional)
+#       harness_server_name: string (optional) — matched VERBATIM against
+#         `claude mcp list` output by the pre-session preflight
+#         (scoutctl connectors preflight). Omit for connectors that don't
+#         appear in `claude mcp list` (local bridges, browser extensions).
+#       preflight_command: string (optional) — bash probe run by the
+#         preflight instead of the MCP list (exit 0 = healthy).
+#       A connector with neither probe field is simply not preflight-probed.
 #
 # `key` is the value emitted by hooks/connector_log.py's classify() — i.e.,
 # what the JSONL `connector` field will read as. Hooks compute the key from
@@ -38,6 +45,7 @@ connectors:
     tier: official
     capabilities: [inbound, outbound]
     required_in_types: [briefing, consolidation, dreaming, research]
+    harness_server_name: "claude.ai Slack"
     remediation:
       first_fix: "Reconnect Slack at https://claude.ai/settings/connectors — claude.ai Slack OAuth likely expired."
       detail: |
@@ -52,6 +60,7 @@ connectors:
     tier: official
     capabilities: [inbound]
     required_in_types: [briefing, consolidation, dreaming, research]
+    harness_server_name: "claude.ai Linear"
     remediation:
       first_fix: "Reconnect Linear at https://claude.ai/settings/connectors — claude.ai Linear OAuth likely expired."
       detail: |
@@ -64,6 +73,7 @@ connectors:
     tier: official
     capabilities: [inbound]
     required_in_types: [briefing, consolidation]
+    harness_server_name: "claude.ai Gmail"
     remediation:
       first_fix: "Reconnect Gmail at https://claude.ai/settings/connectors — Google OAuth likely needs refresh."
       detail: |
@@ -77,6 +87,7 @@ connectors:
     tier: official
     capabilities: [inbound]
     required_in_types: [briefing, consolidation]
+    harness_server_name: "claude.ai Google Calendar"
     remediation:
       first_fix: "Reconnect Google Calendar at https://claude.ai/settings/connectors (same Google auth as Gmail)."
       detail: |
@@ -94,6 +105,7 @@ connectors:
     # Sat/Sun. (The "required" list is the safety net — if it WERE called and
     # failed, alerting still fires.)
     required_in_types: [briefing, consolidation]
+    harness_server_name: "claude.ai Granola"
     remediation:
       first_fix: "Reconnect Granola at https://claude.ai/settings/connectors — Granola tokens expire periodically."
       detail: |
@@ -122,6 +134,7 @@ connectors:
     capabilities: [inbound]
     # Same weekday-oriented scope as Granola — Phase 1e weekday-mandatory.
     required_in_types: [briefing, consolidation]
+    harness_server_name: "claude.ai Google Drive"
     remediation:
       first_fix: "Reconnect Google Drive at https://claude.ai/settings/connectors."
       detail: "Google Drive connector — same reconnect flow as Gmail at https://claude.ai/settings/connectors."
@@ -133,6 +146,7 @@ connectors:
     # Used in briefing + consolidation for PR queue review and in research for
     # deep PR/issue dives. Not required for dreaming (introspection-only).
     required_in_types: [briefing, consolidation, research]
+    preflight_command: "gh auth status"
     remediation:
       first_fix: "Run `gh auth status`; if expired, `gh auth login` to re-auth. Token lives in macOS keychain."
       detail: |

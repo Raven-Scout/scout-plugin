@@ -58,6 +58,27 @@ off_peak:
   start: 23
   end: 6
 
+# Connector resilience — what to do when a connector critical for the upcoming
+# slot type is down at session start. Probed by `scoutctl connectors preflight`
+# (via `claude mcp list` + bash probes) before the session launches, at zero
+# model-token cost. Values:
+#   skip — don't run the session at all (an alert fires instead)
+#   warn — run, but tell the session which connectors are dark so it banners
+#          the degradation and records no false "nothing found" signals
+#   run  — today's behavior: no gate
+connector_policy:
+  on_degraded: run
+  # Recommended posture once you opt in (uncomment to enable). briefing and
+  # consolidation are suggested as `warn` rather than `skip` for now: the
+  # `claude mcp list` probe has a known false-positive mode, and until the
+  # gap-tracking safety net (connector-resilience Phase 2) lands, a
+  # false-positive under `skip` would silently drop runs with no recorded gap.
+  # overrides:
+  #   briefing:       warn
+  #   consolidation:  warn
+  #   dreaming:       warn
+  #   research:       run
+
 # Whether Scout keeps itself up to date. Set during /scout-setup; toggle via
 # /scout-update. When enabled, a scheduled run applies sidecar-clean upgrades
 # and notifies you on conflict (auto-apply ships in a later version).

@@ -59,3 +59,33 @@ def test_probe_registry_default_is_tab_separated():
     parts = first.split("\t")
     assert len(parts) == 3
     assert parts[1] in ("bash", "mcp_tool")
+
+
+# ----- `scoutctl connectors preflight` (connector-resilience Phase 1) -------
+
+
+def test_preflight_manual_slot_type_proceeds(tmp_path, monkeypatch):
+    """Manual runs have no critical connectors — the gate is a no-op."""
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    result = runner.invoke(app, ["connectors", "preflight", "--slot-type", "manual"])
+    assert result.exit_code == 0, result.stdout
+
+
+def test_preflight_skip_policy_exits_3(tmp_path, monkeypatch):
+    """Degraded + skip policy → exit 3 (the runner converts this to an
+    orderly skip)."""
+    from scout.scripts import connector_preflight as cp
+
+    monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
+    (tmp_path / "scout-config.yaml").write_text("connector_policy:\n  on_degraded: skip\n")
+    monkeypatch.setattr(cp, "_run_mcp_list", lambda claude_bin, timeout: {})
+    monkeypatch.setattr(cp, "_send_telegram_alert", lambda body: None)
+    # The seed roster's briefing-critical claude.ai connectors all read
+    # MISSING against an empty status map → degraded.
+    result = runner.invoke(app, ["connectors", "preflight", "--slot-type", "briefing"])
+    assert result.exit_code == 3, result.stdout
+
+
+def test_preflight_requires_mode_or_slot_type():
+    result = runner.invoke(app, ["connectors", "preflight"])
+    assert result.exit_code not in (0, 3)
