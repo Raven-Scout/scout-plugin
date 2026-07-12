@@ -10,7 +10,10 @@ slack:
 calendar:
   primary: mcp__claude_ai_Google_Calendar__list_calendars
   fallbacks: []
-gmail:
+# Provider-neutral mail key — must match `requires: email` in phases/connectors/email.md.
+# Gmail is the current (only) provider; legacy configs saying `gmail` are
+# normalized to `email` by scout.scripts.connector_probes.normalize_connector_keys.
+email:
   primary: mcp__claude_ai_Gmail__list_labels
   fallbacks: []
 linear:
@@ -24,6 +27,9 @@ github:
     - github_repos
 granola:
   primary: mcp__claude_ai_Granola__list_meetings
+  fallbacks: []
+fathom:
+  primary: mcp__fathom__list_meetings
   fallbacks: []
 drive:
   primary: mcp__claude_ai_Google_Drive__list_recent_files

@@ -80,10 +80,10 @@ def test_select_filters_mixed_connectors_within_file():
     only_slack = select_sections(sections, enabled_connectors={"slack"})
     assert len(only_slack) == 1
     assert only_slack[0].requires == "slack"
-    only_gmail = select_sections(sections, enabled_connectors={"gmail"})
-    assert len(only_gmail) == 1
-    assert only_gmail[0].requires == "gmail"
-    both = select_sections(sections, enabled_connectors={"slack", "gmail"})
+    only_email = select_sections(sections, enabled_connectors={"email"})
+    assert len(only_email) == 1
+    assert only_email[0].requires == "email"
+    both = select_sections(sections, enabled_connectors={"slack", "email"})
     assert len(both) == 2
 
 
