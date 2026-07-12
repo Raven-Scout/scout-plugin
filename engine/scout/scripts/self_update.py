@@ -13,9 +13,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 
-RAW_MARKETPLACE_URL = (
-    "https://raw.githubusercontent.com/jordanrburger/scout-plugin/main/.claude-plugin/marketplace.json"
-)
+RAW_MARKETPLACE_URL = "https://raw.githubusercontent.com/Raven-Scout/scout-plugin/main/.claude-plugin/marketplace.json"
 
 
 @dataclass(frozen=True)
