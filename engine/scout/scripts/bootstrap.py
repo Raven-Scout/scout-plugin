@@ -99,6 +99,11 @@ _CAT1_FILES_FROM_PLUGIN = {
     "knowledge-base/ontology/__init__.py": "templates/knowledge-base/ontology/__init__.py",
     "action-items/render.py": "templates/action-items/render.py",
     "scripts/recurring-task-status.py": "templates/scripts/recurring-task-status.py",
+    # asana-api CLI wrapper — primary path for the Asana connector (MCP is the
+    # runtime fallback). Staged verbatim into the vault so connector phases can
+    # call `python3 scripts/asana_api.py ...`. Staged straight from the bundled
+    # skill (single source of truth — no templates/ duplicate).
+    "scripts/asana_api.py": "skills/asana-api/scripts/asana_api.py",
 }
 
 # Cat-1 files that are BOTH engine-owned AND user-editable in the vault, so they

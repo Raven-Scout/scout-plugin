@@ -190,9 +190,12 @@ The `.scout-cache/` directory is gitignored — everything in it is recomputed o
 | Connector | What it provides | Required? |
 |-----------|-----------------|-----------|
 | Slack | Message monitoring, outbound tracking, feedback loop | No (enables dreaming feedback) |
+| Google Chat (`gws` CLI) | Space/DM monitoring, outbound tracking, notifications | No |
 | Google Calendar | Meeting context, scheduling verification | No |
 | Gmail | Email tracking, sent mail verification | No |
 | Linear | Issue tracking, status sync | No |
+| Jira (`jtk` CLI) | Issue tracking, JQL search, sprint snapshot, status sync | No |
+| Asana (`asana-api` CLI) | Task tracking, project sections, due-date triage, status sync, comments incl. @mentions | No |
 | GitHub (`gh` CLI) | PR tracking, commit monitoring, review requests | No |
 | Granola | Meeting transcripts | No |
 | Google Drive | Documents, meeting notes | No |

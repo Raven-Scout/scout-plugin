@@ -126,6 +126,54 @@ connectors:
       first_fix: "Reconnect Google Drive at https://claude.ai/settings/connectors."
       detail: "Google Drive connector — same reconnect flow as Gmail at https://claude.ai/settings/connectors."
 
+  asana:cli:
+    display_name: Asana (asana-api CLI)
+    tier: official
+    capabilities: [inbound]
+    required_in: []   # opt-in — only critical for users who choose Asana as their task tracker
+    remediation:
+      first_fix: "Verify the asana-api CLI: `python3 ~/Scout/scripts/asana_api.py whoami` should return your user gid."
+      detail: |
+        Asana is driven by the bundled asana-api CLI (PAT-based REST wrapper) at
+        `~/Scout/scripts/asana_api.py`. The claude.ai Asana MCP server is the
+        runtime fallback when the CLI is unavailable.
+
+        Common failure modes:
+          1. PAT missing/expired — regenerate at https://app.asana.com/0/my-apps and
+             store at `~/.agent-skills/asana/asana_pat` (chmod 600) or export
+             `ASANA_ACCESS_TOKEN`. Verify with `asana_api.py whoami`.
+          2. Workspace switched — update `asana_workspace_gid` in scout-config.yaml.
+          3. Project GID renamed/archived — update `asana_projects` in
+             scout-config.yaml so the task-search calls don't return empty.
+          4. Script not staged — re-run `/scout-update` to re-copy
+             scripts/asana_api.py into the vault.
+
+        Fallback (CLI down): reconnect the Asana MCP at
+        https://claude.ai/settings/connectors.
+
+        Setup walkthrough: engine/scout/docs/connectors/asana-setup.md
+
+  jtk:jira:
+    display_name: Jira (jtk CLI)
+    tier: official
+    capabilities: [inbound]
+    required_in: []   # opt-in — only critical for users who choose Jira as their issue tracker
+    remediation:
+      first_fix: "Run `jtk config test`; if it errors, re-run `jtk init` to refresh API token + base URL."
+      detail: |
+        Jira access is via the local `jtk` CLI (https://github.com/open-cli-collective/atlassian-cli),
+        not an MCP. `jtk` stores Jira Cloud credentials (base URL + email + API token) per the
+        `jtk init` guided flow.
+
+        Common failure modes:
+          1. API token rotated or revoked — re-run `jtk init` and paste a fresh token from
+             https://id.atlassian.com/manage-profile/security/api-tokens.
+          2. `jtk` not on PATH — install via Homebrew/Go per the setup doc.
+          3. Project key in `jira_projects` was renamed in Jira — update scout-config.yaml
+             so the JQL queries don't 400.
+
+        Setup walkthrough: engine/scout/docs/connectors/jira-setup.md
+
   github:
     display_name: GitHub (gh CLI)
     tier: official
@@ -139,6 +187,28 @@ connectors:
         GitHub access is via the local `gh` CLI (not an MCP). Token expiry is the usual
         cause. `gh auth status` shows current state; `gh auth login` refreshes it. After an
         SSO/SAML re-auth, the personal token may need a separate refresh.
+
+  gws:chat:
+    display_name: Google Chat (gws CLI)
+    tier: official
+    capabilities: [inbound, outbound]
+    required_in: []   # opt-in — only critical for users who pick it as their notification channel
+    remediation:
+      first_fix: "Run `gws chat spaces list --params '{\"pageSize\":1}'`; if it errors with auth, run `gws auth login` to refresh scopes."
+      detail: |
+        Google Chat access is via the local `gws` Google Workspace CLI
+        (https://github.com/googleworkspace/cli). The connector reads spaces, DMs,
+        threads, and reactions; the notification phase posts run summaries into the
+        user's self-DM space.
+
+        Common failure modes:
+          1. OAuth token expired — `gws auth login` and re-grant `chat.spaces.readonly`,
+             `chat.messages.readonly`, `chat.messages.create` scopes.
+          2. `gws` not on PATH — reinstall via npm/Homebrew per the setup doc.
+          3. `findDirectMessage` returns 404 — no self-DM exists yet; send a manual
+             message to yourself in Google Chat once, then re-run.
+
+        Setup walkthrough: engine/scout/docs/connectors/google-chat-setup.md
 
   mcp:claude-in-chrome:
     display_name: Chrome (Google Messages)

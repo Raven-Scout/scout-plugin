@@ -38,8 +38,23 @@
       "tier": "official"
     },
     {
+      "key": "asana:cli",
+      "display_name": "Asana (asana-api CLI)",
+      "tier": "official"
+    },
+    {
+      "key": "jtk:jira",
+      "display_name": "Jira (jtk CLI)",
+      "tier": "official"
+    },
+    {
       "key": "github",
       "display_name": "GitHub (gh CLI)",
+      "tier": "official"
+    },
+    {
+      "key": "gws:chat",
+      "display_name": "Google Chat (gws CLI)",
       "tier": "official"
     },
     {
