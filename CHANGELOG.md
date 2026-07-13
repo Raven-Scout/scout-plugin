@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Event-trigger engine v1 (polling)** (`engine/scout/triggers/`, spec `docs/specs/event-triggers.md`) — the engine can now fire on **events**, not just time. Triggers are declared in the vault's `.scout-state/triggers.yaml` (source + enumerated `match.type` + attribute filters + one of three action shapes: `notify` / `run_skill` / `interactive`) and evaluated at the top of every 5-minute `schedule_tick`, before slot dispatch and failure-isolated from it. v1 ships three polling sources — `slack` (Web-API mention search), `github` (`gh api notifications`), and `scout_internal` (the engine's own JSONL event stream) — with the combined-query optimization (one `scan_since()` per source per tick, in-memory trigger×event matching). Dedup/cooldown/daily-cap state lives in `.scout-cache/trigger-fires.json` (sliding recent-ids window; caps reset at midnight ET; mandatory `daily_fire_cap` — the validator rejects unlimited triggers, obvious `scout_internal` fire-cycles, and unknown skills). Every fire is logged to `.scout-logs/trigger-fires-YYYY-MM-DD.jsonl` and emitted as a `trigger.fired` event into the engine event stream. New CLI: `scoutctl trigger {list,show,validate,reload,test,fire-now,stats}`. Gated behind the (off-by-default) `triggers_v1` manifest flag; `linear`/`gmail`/`gcal`/`file` sources and the v2 webhook receiver are deferred.
+
 ## [0.7.3] - 2026-06-23
 
 
