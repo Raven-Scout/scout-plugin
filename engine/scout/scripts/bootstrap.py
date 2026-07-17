@@ -28,6 +28,7 @@ from scout.scripts.bootstrap_lock import (
     acquire_lock_with_wait,
     release_lock,
 )
+from scout.scripts.connector_probes import normalize_connector_keys
 from scout.scripts.migrate_perfile import migrate_perfile
 from scout.scripts.phase_assembly import (
     parse_phase_file,
@@ -52,6 +53,13 @@ class BootstrapConfig:
     connector_inputs: dict[str, str]
     skip_jobs: bool = False
     skip_claude: bool = False
+
+    def __post_init__(self) -> None:
+        # Vaults configured before a probe-key rename (gmail → email) carry the
+        # legacy key in connectors.enabled; normalizing at construction covers
+        # every entrypoint (install / upgrade / migrate-legacy / backport) and
+        # lets upgrade persist the canonical key back into scout-config.yaml.
+        self.enabled_connectors = normalize_connector_keys(self.enabled_connectors)
 
 
 @dataclass

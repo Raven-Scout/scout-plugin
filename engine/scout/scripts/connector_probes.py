@@ -15,6 +15,20 @@ import yaml
 
 from scout.errors import ConfigError
 
+# Legacy probe/config keys and their canonical replacements. The probe key is
+# what gets written into scout-config.yaml `connectors.enabled`, and phase
+# sections are gated on `requires:` matching it exactly — a stale key in an
+# existing vault would silently drop every section it gates (#172: `gmail` vs
+# the phase key `email`).
+CONNECTOR_KEY_ALIASES: dict[str, str] = {
+    "gmail": "email",
+}
+
+
+def normalize_connector_keys(keys: set[str]) -> set[str]:
+    """Map legacy connector keys to their canonical names. Idempotent."""
+    return {CONNECTOR_KEY_ALIASES.get(k, k) for k in keys}
+
 
 class ProbeKind(Enum):
     MCP_TOOL = "mcp_tool"  # primary is an MCP tool name to call

@@ -15,9 +15,9 @@ phase: connector
 name: dummy-mixed
 slot: query
 mode: [briefing]
-requires: gmail
+requires: email
 ---
 
-## Gmail Side
+## Email Side
 
-Gmail {{USER_NAME}}.
+Email {{USER_NAME}}.
