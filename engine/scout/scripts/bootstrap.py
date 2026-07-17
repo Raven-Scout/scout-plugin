@@ -86,6 +86,7 @@ _CAT1_DIR_LAYOUT = (
     "knowledge-base/recurring-tasks",
     "action-items/archive",
     "action-items/meeting-prep",
+    "drafts/archive",
     "meetings",
     "docs",
     "scripts",
@@ -132,6 +133,7 @@ _INSTALL_ONLY_TEMPLATES = (
     ("knowledge-base/review-queue.md", "templates/review-queue.md.tmpl"),
     ("inbox.md", "templates/inbox.md.tmpl"),
     ("meetings/meetings.md", "templates/meetings/meetings.md.tmpl"),
+    ("drafts/README.md", "templates/drafts/README.md.tmpl"),
 )
 
 _CAT1B_RUNNERS = (
