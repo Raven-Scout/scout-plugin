@@ -28,7 +28,7 @@ def _fake_plugin(tmp_path: Path, version: str = "1.2.3") -> Path:
                         "source": "./",
                         "description": "Autonomous knowledge management",
                         "version": version,
-                        "homepage": "https://github.com/jordanrburger/scout-plugin",
+                        "homepage": "https://github.com/Raven-Scout/scout-plugin",
                         "keywords": ["knowledge-management", "briefing"],
                     }
                 ],
