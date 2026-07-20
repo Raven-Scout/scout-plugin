@@ -54,9 +54,10 @@ Create `action-items/action-items-YYYY-MM-DD.md` using today's date. Include:
 
 ## 🔴 Urgent
 
-- [ ] [#XXXX] **[Item title]** — [Description with specific details, not vague summaries]
+- [ ] [#XXXX] **[Short natural imperative title — no ids/status/emoji/dates]** — [Description with specific details, not vague summaries]
   - Source: [Which connector(s) confirmed this]
   - Context: [[wikilink-to-relevant-kb-file]]
+  - Refs: [[people/slug]] · [[PROJ-1234]] · example-org/repo#1234 · #XREF
 
 ## 🟡 To Do
 
@@ -127,6 +128,7 @@ The tag goes **after** the checkbox marker and **before** the bold subject. Exac
 - 2–8 chars, `[A-Z0-9]`, at least one letter. (Pure-numeric like `[#555]` is reserved for GitHub issue refs and is NOT a valid tag.)
 - **Unique within the file** — never give two open tasks the same tag (scout-app's `--by-id` will refuse an ambiguous tag).
 - **Carry-forward keeps the original tag verbatim.** When propagating an item from yesterday into today, copy its `[#TAG]` exactly — do NOT mint a new one. The tag is the task's identity across days.
+- **Carry-forward rewrites the item into the canonical shape.** When carrying an open item into today's file: keep the `[#TAG]` verbatim and preserve every fact, but re-author the line — clean title per the *Clean Title, Prose Body, Refs Block* hard rule below, narrative into the body, all machine refs consolidated into the `- Refs:` sub-bullet, no inline priority emoji. Do NOT preserve legacy formatting for its own sake. This is how the corpus converges; there is no other migration.
 
 **Existing unprefixed lines (legacy carryover):** when you find a task that lacks a `[#TAG]`, give it one on first touch, or run the idempotent one-shot backfill (it leaves already-tagged lines alone):
 ```bash
@@ -139,6 +141,30 @@ grep -nE '^\s*- \[[ x]\] ' "$DAILY_FILE" | grep -vE ' \[#[A-Z0-9]{2,8}\] ' && \
     echo "ERROR: lines missing [#TAG] prefix above — fix before commit" >&2
 ```
 If that grep finds anything, the file is non-compliant and scout-app's writes will fall back to fragile subject-matching for those lines.
+
+### Hard Rule — Clean Title, Prose Body, Refs Block
+
+The **bold segment is the human-readable title** and must read as a short natural imperative phrase — what to do, in plain words. Keep it scannable (aim for a single line).
+
+The bold title MUST NOT contain any of:
+- the `[#TAG]` (it sits *before* the bold, never inside it);
+- Linear ids (`PROJ-1234`), GitHub refs (`#1234`, `owner/repo#1234`), or cross-reference hashtags (`#SHORTCODE`);
+- status words ("MERGED", "DEPLOYED", "created + self-assigned", "done→todo");
+- dates, times, or quoted snippets;
+- emoji of any kind (including priority 🔴🟡🟢);
+- an internal ` — ` / ` – ` separator (that dash separates title from body).
+
+The **body** (after the ` — ` separator, plus `- Source:` / `- Context:` sub-bullets) is human prose: status, dates, quotes, context. Entity wikilinks (`[[people/alex|Alex]]`) may appear inline in the body ONLY where a name reads naturally in a sentence. Bare machine ids never appear in the body prose.
+
+**All machine refs go in ONE `- Refs:` sub-bullet** directly under the task line, ` · `-separated: Linear ids, GitHub refs, Slack permalinks, cross-reference hashtags, and entity wikilinks that are pure references (not part of a sentence). Omit the sub-bullet when a task has no refs.
+
+**Priority is expressed only by which section the item lives in** (🔴 Urgent / 🟡 To Do / 🟢 Watching). Do NOT prepend a priority emoji to a task line.
+
+Good vs bad (anonymized):
+
+    ✅  - [ ] [#REPLYX] **Reply to Alex about her purchase question** — She said 1/8–1/2; still open per the sweep. Loop in [[people/priya|Priya]] on onboarding.
+    ✅    - Refs: [[people/alex]] · [[PROJ-3026]] · example-org/repo#7056 · #XREF
+    ❌  - [ ] [#REPLYX] 🟡 **Reply to Alex — purchase Q still open (Thu 4:55 PM: "1/8 to 1/2") PROJ-3026** _(carries)_ — …
 
 ### Hard Rule — Trim by Demotion, Never by Omission
 
