@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`scout-ask` skill** (`skills/scout-ask/`) — a read-side traversal contract for the KB, closing the gap where every prior skill and phase told a session how to *write* the knowledge base and nothing told an interactive agent how to *read* it. A session opened in the vault (e.g. via the macOS app's Cowork/terminal deeplink) previously had no orientation at all: no vault `CLAUDE.md`, no `.claude/skills`, and the assembled `SKILL.md` / `DREAMING.md` / `RESEARCH.md` at the root are background-run prompts, not reader guidance. Three steps — resolve the entity to its canonical file (`ls knowledge-base/projects/`, not a vault-wide grep, and never a whole read of the ~130k-token `knowledge-base.md` index); read the `**Last verified:**` freshness gate and answer from the record when it is same-day; drill to live sources only when the gate opens, using the source coordinates the synthesis already recorded (Slack thread ts, `gh pr view`, Linear IDs, Drive doc IDs) rather than re-discovering them. Measured against a no-skill baseline on a project-status question (3 reps each): tool calls 9–12 → 3, turns 10–13 → 5, input tokens 417–590k → 184k, wall clock 51–63s → 33–35s, cost $0.65–1.02 → $0.42–0.56, with answer quality preserved and the KB's own `[single-source]` / `[unverified]` hedges carried through. All three with-skill reps converged on the identical call path.
+
 ## [0.8.0] - 2026-07-13
 
 
