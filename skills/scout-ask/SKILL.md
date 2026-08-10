@@ -33,8 +33,8 @@ rg -l -i "<entity>" knowledge-base/projects knowledge-base/people knowledge-base
 
 The first line under the title is `**Last verified:** <timestamp> (<session type>)`. That timestamp is the gate:
 
-- **Within the file's freshness budget** — answer from the file and cite the timestamp. The recorded state *is* the current state; a live re-query returns the same facts and costs several turns. The budget is the one `/scout-status` and the KB pre-filter hook already use: 3 days for a high-priority file, 7 for medium, 14 for low, defaulting to medium when the file carries no priority.
-- **Past its budget, or no `Last verified:` line at all** — answer from the file, say how old it is, and offer to drill.
+- **Recently verified** — answer from the file and cite the timestamp. The recorded state *is* the current state; a live re-query returns the same facts and costs several turns.
+- **Old enough that the answer could mislead, or no `Last verified:` line at all** — answer from the file, say how old it is, and offer to drill.
 
 The file's own hedges are load-bearing and belong in your answer: `[unverified]`, `[single-source]`, "not yet decided — do not record a verdict". Carry them through rather than flattening them into fact.
 
