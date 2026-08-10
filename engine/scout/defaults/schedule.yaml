@@ -9,6 +9,21 @@
 # that aggregation surfaces (connectors.yaml `required_in_types`,
 # alert routing) reference. See:
 #   ~/scout-app/docs/superpowers/specs/2026-05-04-schedule-v2-design.md
+#
+# `on_miss` — what happens when a tick finds the slot's target already past
+# (the machine was asleep, or the 5-min tick simply landed late):
+#
+#   fire      Run it, as long as we're still within `missed_window_hours`
+#             of the target. Past that the slot goes stale and is skipped.
+#   collapse  Same window rule, but among slots of the SAME type that are
+#             all overdue, only the one with the latest target runs — so a
+#             laptop opened at 22:30 runs dreaming-nightly, not the older
+#             dreaming-evening as well.
+#   skip      Deprecated, retained for vaults whose seeded schedule.yaml
+#             still sets it. Now behaves like `fire`; before #193 it could
+#             never fire at all.
+#
+# Prefer `collapse` for any type with more than one slot.
 
 schema_version: 1
 
@@ -73,7 +88,7 @@ slots:
     fires_at_local: "18:30"
     weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     missed_window_hours: 4
-    on_miss: skip
+    on_miss: collapse
     cooldown_minutes: 120
 
   dreaming-nightly:
@@ -82,7 +97,7 @@ slots:
     fires_at_local: "22:00"
     weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     missed_window_hours: 6
-    on_miss: skip
+    on_miss: collapse
     cooldown_minutes: 120
 
   dreaming-weekend-morning:
@@ -91,7 +106,7 @@ slots:
     fires_at_local: "07:00"
     weekdays: [Sat, Sun]
     missed_window_hours: 4
-    on_miss: skip
+    on_miss: collapse
     cooldown_minutes: 120
 
   research:
@@ -100,5 +115,5 @@ slots:
     fires_at_local: "14:00"
     weekdays: [Mon, Tue, Wed, Thu, Fri]
     missed_window_hours: 4
-    on_miss: skip
+    on_miss: collapse
     cooldown_minutes: 240
