@@ -14,7 +14,7 @@ Work the three steps in order. Most questions are done after step 2.
 One cheap listing beats a vault-wide search. For a project or initiative:
 
 ```bash
-ls knowledge-base/projects/          # 8-ish slugs; match the user's words to one
+ls knowledge-base/projects/          # match the user's words to a slug
 ```
 
 Then read `knowledge-base/projects/<slug>/<slug>.md`. That single file is the canonical record — it carries the header status *and* every dated update in reverse-chronological order.
@@ -33,8 +33,8 @@ rg -l -i "<entity>" knowledge-base/projects knowledge-base/people knowledge-base
 
 The first line under the title is `**Last verified:** <timestamp> (<session type>)`. That timestamp is the gate:
 
-- **Verified within the last day or two** — answer from the file and cite the timestamp. The recorded state *is* the current state; a live re-query returns the same facts and costs several turns.
-- **Older, or no `Last verified:` line at all** — answer from the file, say how old it is, and offer to drill.
+- **Within the file's freshness budget** — answer from the file and cite the timestamp. The recorded state *is* the current state; a live re-query returns the same facts and costs several turns. The budget is the one `/scout-status` and the KB pre-filter hook already use: 3 days for a high-priority file, 7 for medium, 14 for low, defaulting to medium when the file carries no priority.
+- **Past its budget, or no `Last verified:` line at all** — answer from the file, say how old it is, and offer to drill.
 
 The file's own hedges are load-bearing and belong in your answer: `[unverified]`, `[single-source]`, "not yet decided — do not record a verdict". Carry them through rather than flattening them into fact.
 
@@ -66,4 +66,4 @@ When you do, **use the reference the KB already recorded** — every synthesis c
 | Vault-wide `grep` for the entity | `ls knowledge-base/projects/` and match the slug |
 | Re-querying Linear/GitHub to confirm what the file states | Check the freshness gate; a same-day timestamp is the confirmation |
 | Loading MCP connector schemas before reading the KB | Read the file first — most questions never need a connector |
-| Reading `knowledge-base.md` to find where something lives | Entity files, then a scoped `rg` |
+| Reading `knowledge-base/knowledge-base.md` to find where something lives | Entity files, then a scoped `rg` |
