@@ -590,3 +590,216 @@ def test_discover_kb_files_does_not_follow_symlink_loop(tmp_path):
     t.join(timeout=10)
     assert not t.is_alive(), "discover_kb_files hung on a symlink loop"
     assert not error, f"discover_kb_files raised: {error}"
+
+
+# -- #26 fixes: the pre-filter could not parse a single date this vault writes -
+#
+# Symptom: `.scout-cache/kb-filter.md` read `Stale: 0 | No date: 31 | Fresh: 0`
+# on every run — 0 of 31 KB files classified, 17 of which carried a date line a
+# human reads without difficulty. A zero-result classification is indistinguish-
+# able from a healthy corpus in the rendered output, so the failure was silent.
+#
+# Three independent causes, each against a convention the vault's own brain
+# files mandate. One test block per cause, plus regression guards.
+
+
+# -- cause 1: ' CEST' tail is not stripped, and must not be read as Eastern ----
+
+
+def test_parse_date_strips_cest_tail():
+    """SKILL.md's *Timezone Handling* section requires KB dates be written in
+    Europe/Prague, so the rule that makes a date correct made it unparseable.
+    14 live files carried a ' CEST' tail that parse_date() returned None for,
+    while the same string with ' ET' parsed fine."""
+    assert parse_date("2026-08-04 12:05 CEST") is not None
+    assert parse_date("2026-08-04 12:05 CET") is not None
+
+
+def test_parse_date_cest_resolves_to_prague_not_eastern():
+    """Stripping the tail is not enough. The pre-#26 code attached tzinfo=ET to
+    every parsed date, so a Prague wall-clock would have been read as a New York
+    one — a silent 6h error in the age arithmetic. The abbreviation must select
+    the zone."""
+    prague = ZoneInfo("Europe/Prague")
+    dt = parse_date("2026-08-04 12:05 CEST")
+    assert dt is not None
+    assert dt.utcoffset() == prague.utcoffset(datetime(2026, 8, 4, 12, 5))
+    # A CEST timestamp is 6h EARLIER in absolute terms than the same wall-clock
+    # read as Eastern — this is the error the naive tail-strip would have hidden.
+    eastern = parse_date("2026-08-04 12:05 ET")
+    assert eastern is not None
+    assert eastern.timestamp() - dt.timestamp() == 6 * 3600
+
+
+def test_parse_date_bare_date_still_defaults_to_eastern():
+    """Regression guard for #53: with no abbreviation present the ET default is
+    unchanged, so every date form the bash original handled keeps its meaning."""
+    from scout.hooks.kb_pre_filter import ET
+
+    dt = parse_date("2026-06-15")
+    assert dt is not None
+    assert dt.utcoffset() == ET.utcoffset(datetime(2026, 6, 15))
+
+
+# -- cause 2: the HH:0x obfuscated-minute convention has no DATE_FORMATS entry -
+
+
+def test_parse_date_accepts_obfuscated_minutes():
+    """Every Scout run writes its own 'Last verified' line with the minute field
+    obfuscated as `HH:Dx`. 9 live files used it; no DATE_FORMATS entry tolerated
+    it. Normalising x -> 0 rounds the timestamp DOWN, which errs toward 'staler'
+    — the safe direction for a staleness check."""
+    dt = parse_date("2026-08-08 13:5x CEST")
+    assert dt is not None
+    assert (dt.hour, dt.minute) == (13, 50)
+
+
+def test_parse_date_obfuscated_minutes_without_timezone():
+    """Two live files (people.md, scout-mistake-audit.md) wrote the obfuscated
+    minute with no tz tail at all."""
+    dt = parse_date("2026-08-09 07:4x")
+    assert dt is not None
+    assert (dt.hour, dt.minute) == (7, 40)
+
+
+def test_parse_date_does_not_corrupt_unrelated_x():
+    """Negative control: the x-normalisation must apply to a time's minute field
+    only, never to an arbitrary 'x' elsewhere in the string."""
+    assert parse_date("xxxx") is None
+    assert parse_date("2026-08-08 1x:30") is None
+
+
+# -- cause 3: the YAML `last_updated:` key was read by nothing ----------------
+
+
+def test_extract_date_string_reads_last_updated_frontmatter(tmp_path):
+    """DREAMING.md instructs every run to maintain a machine-readable
+    `last_updated:` frontmatter key. extract_date_string() only ever grepped the
+    PROSE 'last updated'/'last verified' line, so the property was consumed by
+    nothing — 4 live files carried it and still classified NO_DATE."""
+    f = tmp_path / "a.md"
+    f.write_text('---\nname: "x"\nlast_updated: "2026-08-09"\n---\n\nBody text.\n')
+    assert extract_date_string(f) == "2026-08-09"
+
+
+def test_extract_date_string_frontmatter_unquoted(tmp_path):
+    f = tmp_path / "a.md"
+    f.write_text("---\ntitle: Kai sync\nlast_updated: 2026-08-04\n---\n\nBody.\n")
+    assert extract_date_string(f) == "2026-08-04"
+
+
+def test_extract_date_string_frontmatter_wins_over_prose(tmp_path):
+    """The machine-readable key is authoritative when both are present."""
+    f = tmp_path / "a.md"
+    f.write_text('---\nlast_updated: "2026-08-09"\n---\n\n**Last updated:** 2026-01-01 09:00 CEST (prose)\n')
+    assert extract_date_string(f) == "2026-08-09"
+
+
+def test_extract_date_string_falls_back_to_prose(tmp_path):
+    """Regression guard: files with no frontmatter keep the prose path intact."""
+    f = tmp_path / "a.md"
+    f.write_text("# Title\n\n**Last updated:** 2026-08-05 13:20 CEST\n")
+    assert extract_date_string(f) == "2026-08-05 13:20 CEST"
+
+
+def test_extract_date_string_ignores_last_updated_outside_frontmatter(tmp_path):
+    """Negative control: `last_updated:` mentioned in body prose is NOT
+    frontmatter and must not be harvested as one."""
+    f = tmp_path / "a.md"
+    f.write_text("# Title\n\nWe should add last_updated: 2026-01-01 to these files.\n")
+    assert extract_date_string(f) == ""
+
+
+# -- end-to-end: the three causes together, over vault-shaped input -----------
+
+
+def test_vault_shaped_corpus_actually_classifies(tmp_path, monkeypatch):
+    """The bug's real signature was an all-zero classification. Assert the
+    counts are non-zero over a corpus written the way this vault writes, so a
+    future regression cannot reproduce `Stale: 0 | Fresh: 0` silently."""
+    kb = tmp_path / "knowledge-base"
+    kb.mkdir(parents=True)
+    # Fresh: obfuscated minutes + CEST tail, dated 'now'.
+    (kb / "cli.md").write_text("# CLI\n\n**Last updated:** 2026-08-12 10:1x CEST\n")
+    # Stale: CEST tail, plain minutes, far in the past.
+    (kb / "inbox.md").write_text("# Inbox\n\n**Last verified:** 2026-05-05 20:47 CEST\n")
+    # Fresh via frontmatter only — no prose line anywhere.
+    (kb / "proj.md").write_text('---\nlast_updated: "2026-08-11"\n---\n\nBody.\n')
+    # Genuinely undated — must still be reported as such.
+    (kb / "research-queue.md").write_text("# Queue\n\nNo date here.\n")
+
+    monkeypatch.setattr(kpf.paths, "data_dir", lambda: tmp_path)
+    now = datetime(2026, 8, 12, 11, 0, tzinfo=ZoneInfo("Europe/Prague"))
+    event = run(session_type="dreaming", now=now)
+
+    assert event is not None
+    payload = event.payload
+    assert payload["fresh"] == 2, payload
+    assert payload["stale"] == 1, payload
+    assert payload["no_date"] == 1, payload
+    # The exact string the broken build printed on every run.
+    summary = (tmp_path / ".scout-cache" / "kb-filter.md").read_text()
+    assert "Stale: 0 | No date: 4 | Fresh: 0" not in summary
+
+
+# -- #26 cause 1b: unknown abbreviations, and the AM/PM trap in stripping them -
+
+
+def test_parse_date_strips_unknown_timezone_abbreviation():
+    """#201 argues a fixed enumeration keeps going stale. An abbreviation we
+    cannot name is still stripped so the date parses; it just falls back to the
+    default zone rather than resolving."""
+    for tail in ("BST", "IST", "JST", "AEST"):
+        assert parse_date(f"2026-08-04 12:05 {tail}") is not None, tail
+
+
+def test_parse_date_generic_strip_does_not_eat_am_pm():
+    """Negative control, and the reason the generic strip is not a bare
+    [A-Z]{2,5}: `PM` matches that pattern. Without the guard this truncates the
+    string to 'April 22, 2026 12:34' and the %I:%M %p format stops matching —
+    silently breaking a form the bash original always handled."""
+    dt = parse_date("April 22, 2026 12:34 PM")
+    assert dt is not None
+    assert (dt.hour, dt.minute) == (12, 34)
+    dt_am = parse_date("April 22, 2026 09:15 AM")
+    assert dt_am is not None
+    assert (dt_am.hour, dt_am.minute) == (9, 15)
+
+
+def test_parse_date_generic_strip_leaves_plain_dates_alone():
+    assert parse_date("April 22, 2026") is not None
+    assert parse_date("2026-04-15 09:00") is not None
+
+
+# -- #26 cause 4: the stamped zone comes from config, not a hardcoded constant -
+
+
+def test_parse_date_default_tz_is_overridable():
+    prague = ZoneInfo("Europe/Prague")
+    dt = parse_date("2026-08-04 12:05", default_tz=prague)
+    assert dt is not None
+    assert dt.utcoffset() == prague.utcoffset(datetime(2026, 8, 4, 12, 5))
+
+
+def test_parse_date_explicit_abbreviation_beats_default_tz():
+    """A zone named in the string is authoritative over the vault default."""
+    dt = parse_date("2026-08-04 12:05 EST", default_tz=ZoneInfo("Europe/Prague"))
+    assert dt is not None
+    assert dt.utcoffset() == kpf.ET.utcoffset(datetime(2026, 8, 4, 12, 5))
+
+
+def test_configured_timezone_reads_user_timezone(monkeypatch):
+    monkeypatch.setattr("scout.config.load_config", lambda *a, **k: {"user": {"timezone": "Europe/Prague"}})
+    assert kpf.configured_timezone() == ZoneInfo("Europe/Prague")
+
+
+def test_configured_timezone_falls_back_to_et_on_bad_config(monkeypatch):
+    """A hook must never raise. A malformed or missing zone degrades to ET."""
+    monkeypatch.setattr("scout.config.load_config", lambda *a, **k: {"user": {"timezone": "Not/AZone"}})
+    assert kpf.configured_timezone() is kpf.ET
+
+    def boom(*a, **k):
+        raise RuntimeError("config unreadable")
+
+    monkeypatch.setattr("scout.config.load_config", boom)
+    assert kpf.configured_timezone() is kpf.ET
