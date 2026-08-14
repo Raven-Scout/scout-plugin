@@ -29,6 +29,28 @@ def test_classify_bash_uses_first_token(tmp_path):
     assert classify("Bash", {"command": ""}) == "bash"
 
 
+def test_classify_bash_finds_gh_behind_a_prefix():
+    """Pattern #144 — a prefixed `gh` call must still label as github.
+
+    The first-token reading recorded `cd ~/Scout && gh pr list` as `bash:cd`,
+    so the health alerter saw zero github rows and fired a false CRITICAL
+    against a token that was working. Confirmed 2026-08-13 by an accidental
+    A/B: three prefixed calls → CRITICAL, five bare calls → 0 alerts.
+    """
+    assert classify("Bash", {"command": "cd ~/Scout && gh pr list"}) == "github"
+    assert classify("Bash", {"command": "echo hi; gh release list"}) == "github"
+    assert classify("Bash", {"command": "cat f.json | gh api --input -"}) == "github"
+    assert classify("Bash", {"command": "GH_TOKEN=x gh api /rate_limit"}) == "github"
+    assert classify("Bash", {"command": "/usr/local/bin/gh api /repos/x"}) == "github"
+
+
+def test_classify_bash_non_connector_labelling_is_unchanged():
+    """Only `gh` is rescued; every other command keeps its first-token label."""
+    assert classify("Bash", {"command": "cd ~/Scout && python3 x.py"}) == "bash:cd"
+    assert classify("Bash", {"command": "git -C ~/Scout log --oneline"}) == "bash:git"
+    assert classify("Bash", {"command": "TZ=$(scout-tz.sh) date '+%H'"}) == "bash:date"
+
+
 def test_classify_mcp_extracts_server_segment():
     assert classify("mcp__plugin_slack_slack__slack_send_message", {}) == "mcp:plugin_slack_slack"
     assert classify("mcp__claude_ai_Gmail__search_threads", {}) == "mcp:claude_ai_Gmail"
