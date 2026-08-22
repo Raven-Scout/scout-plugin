@@ -442,7 +442,17 @@ def _apply_miss_rules(candidates: list[SlotCandidate], *, now: _dt.datetime) -> 
         within_window = (now - c.target) <= window
 
         if policy is OnMissPolicy.SKIP:
-            decisions[c.slot_key] = Decision(action="skip", reason="on_miss=skip")
+            # `skip` means "don't fire *late*", not "never fire". Every candidate
+            # reaching this point is already past its target — _compute_due_slots
+            # filters out `target > now` — so skipping unconditionally left no
+            # code path by which a skip-policy slot could ever fire, silently
+            # disabling all dreaming and research sessions (#193). The per-slot
+            # missed_window_hours is what bounds "late"; beyond it the slot goes
+            # stale exactly as it does under `fire`.
+            if within_window:
+                decisions[c.slot_key] = Decision(action="fire")
+            else:
+                decisions[c.slot_key] = Decision(action="skip", reason="stale-after-window")
             continue
 
         if policy is OnMissPolicy.FIRE:

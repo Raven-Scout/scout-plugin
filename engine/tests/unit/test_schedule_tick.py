@@ -14,6 +14,7 @@ from scout.errors import ConfigError
 from scout.events import Event
 from scout.schedule import (
     OnMissPolicy,
+    Schedule,
     Slot,
     SlotRuntime,
     SlotType,
@@ -152,19 +153,113 @@ def test_apply_miss_rules_fire_outside_window_skips():
     assert "stale" in decisions["morning-briefing"].reason
 
 
-def test_apply_miss_rules_skip_policy_always_skips():
-    sched = load_default_schedule()
+def _skip_slot() -> Slot:
+    """A research-shaped `on_miss: skip` slot, independent of the shipped defaults.
+
+    The defaults no longer use `skip` (see #193), but the policy remains
+    supported for vaults whose seeded schedule.yaml still sets it, so these
+    tests synthesize the slot rather than reading it out of the defaults.
+    """
+    return _slot(
+        "research",
+        type_=SlotType.RESEARCH,
+        fires_at="14:00",
+        missed_window_hours=4,
+        on_miss=OnMissPolicy.SKIP,
+        cooldown_minutes=240,
+    )
+
+
+def test_apply_miss_rules_skip_policy_fires_when_exactly_on_time():
+    """Regression for #193: `on_miss: skip` must mean "don't fire *late*", not "never fire".
+
+    `_compute_due_slots` only ever yields candidates whose target has already
+    passed, so a SKIP branch that skips unconditionally leaves no code path by
+    which the slot can fire — every dreaming and research session was
+    permanently inert. `now == target` is the tightest possible case.
+    """
+    et = ZoneInfo("America/New_York")
+    target = datetime(2026, 5, 11, 14, 0, tzinfo=et)
+    candidate = SlotCandidate(
+        slot_key="research",
+        slot=_skip_slot(),
+        target=target,
+        last_fire=None,
+    )
+    decisions = _apply_miss_rules([candidate], now=target)
+    assert decisions["research"].action == "fire"
+
+
+def test_apply_miss_rules_skip_policy_fires_within_window():
+    """A skip-policy slot still fires while inside `missed_window_hours`.
+
+    The 5-minute tick interval means a tick almost never lands exactly on the
+    target, so "on time" has to tolerate at least one tick of latency; the
+    per-slot window is what bounds it.
+    """
     et = ZoneInfo("America/New_York")
     now = datetime(2026, 5, 11, 14, 30, tzinfo=et)
     candidate = SlotCandidate(
         slot_key="research",
-        slot=sched["research"],
+        slot=_skip_slot(),
+        target=datetime(2026, 5, 11, 14, 0, tzinfo=et),
+        last_fire=None,
+    )
+    decisions = _apply_miss_rules([candidate], now=now)
+    assert decisions["research"].action == "fire"
+
+
+def test_apply_miss_rules_skip_policy_skips_after_window():
+    """Beyond `missed_window_hours` a skip-policy slot goes stale, as before."""
+    et = ZoneInfo("America/New_York")
+    # missed_window_hours=4 → 18:00 is the edge; 18:01 is past it.
+    now = datetime(2026, 5, 11, 18, 1, tzinfo=et)
+    candidate = SlotCandidate(
+        slot_key="research",
+        slot=_skip_slot(),
         target=datetime(2026, 5, 11, 14, 0, tzinfo=et),
         last_fire=None,
     )
     decisions = _apply_miss_rules([candidate], now=now)
     assert decisions["research"].action == "skip"
-    assert "on_miss=skip" in decisions["research"].reason
+    assert decisions["research"].reason == "stale-after-window"
+
+
+def test_skip_policy_slot_can_fire_through_composed_pipeline():
+    """Composed-path guard for #193.
+
+    The original test hand-built a `SlotCandidate`, so it never exercised the
+    interaction that caused the bug: `_compute_due_slots` guarantees
+    `now >= target`, which made the unconditional SKIP branch unreachable-by-
+    fire. Driving both functions together is what actually pins the fix.
+    """
+    et = ZoneInfo("America/New_York")
+    sched = Schedule({"research": _skip_slot()})
+    now = datetime(2026, 5, 11, 14, 2, tzinfo=et)  # one tick past target
+    decisions = _apply_miss_rules(_compute_due_slots(sched, {}, now), now=now)
+    assert decisions["research"].action == "fire"
+
+
+def test_default_schedule_has_no_permanently_inert_slots():
+    """Every shipped slot must be able to fire at some tick during a full week.
+
+    Guards the class of bug in #193 at the schedule level: a policy/config
+    combination that can never produce `action="fire"` is a silent total
+    failure of that session type, which is exactly what went unnoticed for
+    three months.
+    """
+    tz = ZoneInfo("America/New_York")
+    sched = load_default_schedule()
+    # Mon 2026-05-11 .. Sun 2026-05-17, sampled every 5 min (the real tick interval).
+    start = datetime(2026, 5, 11, 0, 0, tzinfo=tz)
+    ever_fired: set[str] = set()
+    for step in range(7 * 24 * 12):
+        now = start + timedelta(minutes=5 * step)
+        for key, decision in _apply_miss_rules(_compute_due_slots(sched, {}, now), now=now).items():
+            if decision.action == "fire":
+                ever_fired.add(key)
+    never_fires = set(sched.keys()) - ever_fired
+    assert not never_fires, f"slots that can never fire: {sorted(never_fires)}"
 
 
 def test_apply_miss_rules_collapse_within_type_fires_only_latest():
@@ -628,7 +723,13 @@ def test_slot_fired_event_has_full_payload_per_v0_5_spec(tmp_path, monkeypatch):
 
 
 def test_slot_skipped_event_has_slot_type_and_target_local(tmp_path, monkeypatch):
-    """slot.skipped payload must contain slot_type and target_local per v0.5+ spec."""
+    """slot.skipped payload must contain slot_type and target_local per v0.5+ spec.
+
+    The skip is provoked by staleness: target 00:01 against a frozen 08:05 now is
+    ~8h overdue, well past `missed_window_hours: 1`. (This test previously used
+    `on_miss: skip` with a 24h window, which only skipped because of the #193
+    bug — a slot inside its window now correctly fires.)
+    """
     monkeypatch.setenv("SCOUT_DATA_DIR", str(tmp_path))
     (tmp_path / ".scout-state").mkdir()
     (tmp_path / ".scout-logs").mkdir()
@@ -637,7 +738,7 @@ def test_slot_skipped_event_has_slot_type_and_target_local(tmp_path, monkeypatch
         "schema_version: 1\nslots:\n  research-slot:\n"
         "    type: research\n    runner: run-research.sh\n    fires_at_local: '00:01'\n"
         "    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]\n"
-        "    missed_window_hours: 24\n    on_miss: skip\n    cooldown_minutes: 5\n"
+        "    missed_window_hours: 1\n    on_miss: fire\n    cooldown_minutes: 5\n"
     )
     with (
         patch("scout.scripts.schedule_tick._now", return_value=_FROZEN_NOW),
