@@ -103,7 +103,7 @@ def test_dependent_scripts_call_resolver_not_literal(installed_vault):
     for name in ("write-session-cost.sh", "rate-limit-detect.sh"):
         text = (installed_vault / "scripts" / name).read_text(encoding="utf-8")
         assert "scout-tz.sh" in text, f"{name} must call the resolver"
-        assert '|| echo America/New_York' in text, f"{name} must keep the double fallback"
+        assert "|| echo America/New_York" in text, f"{name} must keep the double fallback"
         assert 'TZ="$SCOUT_TZ"' in text, f"{name} must use the resolved zone"
 
 
