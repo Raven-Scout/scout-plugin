@@ -120,6 +120,9 @@ _CAT_MERGE_FILES = {
 }
 
 _CAT1_TEMPLATES = (
+    # scout-tz.sh first: it is the runtime timezone resolver every other script
+    # (and the assembled brain files) call via TZ="$(scripts/scout-tz.sh)".
+    ("scripts/scout-tz.sh", "templates/scripts/scout-tz.sh.tmpl"),
     ("scripts/budget-check.sh", "templates/scripts/budget-check.sh.tmpl"),
     ("scripts/heartbeat.sh", "templates/scripts/heartbeat.sh.tmpl"),
     ("scripts/pre-session-data.sh", "templates/scripts/pre-session-data.sh.tmpl"),

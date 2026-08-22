@@ -57,7 +57,12 @@ FIRST_MATCH=$(echo "$MATCHES" | head -1 | cut -c1-200)
 
 if [ "$WRITE_TRACKER" = "--write-tracker" ]; then
     TIMESTAMP=$(TZ=UTC date '+%Y-%m-%dT%H:%M:%SZ')
-    TIMESTAMP_ET=$(TZ={{TIMEZONE}} date '+%Y-%m-%d %H:%M %Z')
+    # Localized timezone via scout-tz.sh (timezone-localization, call-site migration);
+    # double fallback to the default so a missing/bad config never goes timezone-blind
+    # (Pattern #29).
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SCOUT_TZ="$("$_SCRIPT_DIR/scout-tz.sh" 2>/dev/null || echo America/New_York)"
+    TIMESTAMP_ET=$(TZ="$SCOUT_TZ" date '+%Y-%m-%d %H:%M %Z')
     mkdir -p "$(dirname "$TRACKER_FILE")"
     ESCAPED_MATCH=$(echo "$FIRST_MATCH" | sed 's/"/\\"/g' | tr -d '\n')
     echo "{\"ts\":\"$TIMESTAMP\",\"ts_et\":\"$TIMESTAMP_ET\",\"type\":\"rate_limit\",\"signal\":\"$ESCAPED_MATCH\",\"log_file\":\"$(basename "$LOG_FILE")\"}" >> "$TRACKER_FILE"

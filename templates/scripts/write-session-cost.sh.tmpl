@@ -20,7 +20,14 @@ BUDGET_SPENT_RAW="${3:-0}"
 EXIT_CODE="${4:-0}"
 SOURCE="${5:-session}"
 TIMESTAMP=$(TZ=UTC date '+%Y-%m-%dT%H:%M:%SZ')
-TIMESTAMP_LOCAL=$(TZ={{TIMEZONE}} date '+%Y-%m-%d %H:%M %Z')
+# Localized timestamp — resolve the configured timezone via scout-tz.sh.
+# Double fallback to America/New_York: scout-tz.sh itself falls back to the default
+# on bad/missing config, and the `|| echo` guards a missing/unreadable resolver — so
+# this can never go timezone-blind (preserves Pattern #29: always one explicit TZ,
+# never bare `date`).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCOUT_TZ="$("$SCRIPT_DIR/scout-tz.sh" 2>/dev/null || echo America/New_York)"
+TIMESTAMP_LOCAL=$(TZ="$SCOUT_TZ" date '+%Y-%m-%d %H:%M %Z')
 
 # Numeric validation — falls back to 0 if the arg isn't a plain number.
 # Prevents malformed JSON when the caller accidentally passes a summary string,
