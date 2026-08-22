@@ -8,6 +8,9 @@
 #   - "Stream idle timeout - partial response received"
 #   - "Connection closed mid-response"             (socket torn down mid-stream,
 #                                                    e.g. machine slept overnight)
+#   - "went to sleep mid-response"                  (lid-close/clamshell sleep;
+#                                                    idle sleep surfaces as the
+#                                                    line above instead)
 #   - "529 Overloaded"                              (Anthropic upstream temp)
 #
 # Does NOT retry on:
@@ -48,7 +51,7 @@ if [ "${SCOUT_RETRY_DISABLE:-0}" = "1" ]; then
 fi
 
 # Pipe-separated grep -E regex. Keep narrow — anything matched here triggers a retry.
-TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|Connection closed mid-response|529 Overloaded'
+TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect to API \(ECONNRESET\)|Unable to connect to API \(ConnectionRefused\)|Stream idle timeout|Connection closed mid-response|went to sleep mid-response|529 Overloaded'
 
 # Auth-failure class (HTTP 401/403). NOT retried — re-authentication needs a human —
 # but surfaced with a concrete remediation instead of the opaque "not classified"
