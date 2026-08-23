@@ -16,13 +16,42 @@ LOCK_FILE="$LOG_DIR/.scout-session.lock"
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# Concurrency guard — only one {{INSTANCE_NAME}} session at a time
+# Concurrency guard — only one {{INSTANCE_NAME}} session at a time.
+# Liveness alone is not enough: a holder that is alive but not progressing
+# (host slept mid-run, wedged network call) passes `kill -0` forever and
+# would silently block every subsequent slot. Real sessions finish in
+# minutes, so a holder past LOCK_MAX_AGE_SECS is wedged by definition —
+# reap it and take over, and record the reap in failures.log so the
+# takeover is visible to audit surfaces (not just this run's log).
+LOCK_MAX_AGE_SECS="${SCOUT_LOCK_MAX_AGE_SECS:-7200}"   # 2h ceiling, env-overridable
 if [ -f "$LOCK_FILE" ]; then
     LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
     if kill -0 "$LOCK_PID" 2>/dev/null; then
-        echo "=== Another {{INSTANCE_NAME}} session running (PID $LOCK_PID) — skipping ===" >> "$LOG_FILE"
-        exit 0
+        # Lock age = seconds since the holder wrote the lock at session start.
+        # Sourced from the lock file's mtime: macOS ps has no `etimes` keyword,
+        # so elapsed-seconds-of-PID is not portable. GNU stat first (errors on
+        # BSD), BSD stat second; unknown age → treat the holder as fresh.
+        LOCK_MTIME=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || stat -f %m "$LOCK_FILE" 2>/dev/null || echo "")
+        LOCK_AGE=""
+        case "$LOCK_MTIME" in
+            ''|*[!0-9]*) ;;
+            *) LOCK_AGE=$(( $(date +%s) - LOCK_MTIME )) ;;
+        esac
+        if [ -n "$LOCK_AGE" ] && [ "$LOCK_AGE" -gt "$LOCK_MAX_AGE_SECS" ]; then
+            echo "=== Reaping wedged {{INSTANCE_NAME}} session (PID $LOCK_PID, lock held ${LOCK_AGE}s > ${LOCK_MAX_AGE_SECS}s) ===" >> "$LOG_FILE"
+            echo "Reaped wedged session PID $LOCK_PID after ${LOCK_AGE}s at $(date)" >> "$LOG_DIR/failures.log"
+            kill -TERM "$LOCK_PID" 2>/dev/null || true
+            sleep 5
+            # KILL before removing the lock: a KILLed holder cannot run its
+            # EXIT trap, so it cannot delete the lock this run is about to own.
+            kill -KILL "$LOCK_PID" 2>/dev/null || true
+            rm -f "$LOCK_FILE"
+        else
+            echo "=== Another {{INSTANCE_NAME}} session running (PID $LOCK_PID) — skipping ===" >> "$LOG_FILE"
+            exit 0
+        fi
     else
+        # Stale lock file — previous session crashed
         rm -f "$LOCK_FILE"
     fi
 fi
