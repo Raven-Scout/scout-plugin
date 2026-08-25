@@ -31,9 +31,9 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
-from zoneinfo import ZoneInfo
 
 from scout import paths
+from scout.config import resolve_timezone
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
@@ -81,9 +81,13 @@ def _utc_ts() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _et_ts() -> str:
-    """ET local timestamp like '2026-04-28 16:00 EDT' (matches bash line 37)."""
-    return datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M %Z")
+def _local_ts() -> str:
+    """Configured-zone timestamp like '2026-04-28 16:00 EDT' (#207).
+
+    The emitted JSONL field stays named ``ts_et`` — it is a persisted schema
+    key that downstream consumers grep for; only the zone became configurable.
+    """
+    return datetime.now(resolve_timezone()).strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _tracker_path() -> Path:
@@ -113,7 +117,7 @@ def _zero_row(
     """
     return {
         "ts": _utc_ts(),
-        "ts_et": _et_ts(),
+        "ts_et": _local_ts(),
         "session_id": session_id,
         "scout_mode": scout_mode,
         "cwd": cwd,
@@ -322,7 +326,7 @@ def run(*, stdin: IO[str] | None = None) -> Event | None:
 
     record = {
         "ts": _utc_ts(),
-        "ts_et": _et_ts(),
+        "ts_et": _local_ts(),
         "session_id": session_id,
         "scout_mode": scout_mode,
         "cwd": cwd,

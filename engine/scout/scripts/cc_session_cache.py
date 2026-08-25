@@ -29,10 +29,13 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from scout import config as scout_config
 from scout import paths
 
 DEFAULT_HOURS_LOOKBACK = 24
-DEFAULT_TZ = "America/New_York"
+# Kept as a named export for back-compat; the runtime default is the
+# CONFIGURED zone (tz_name=None -> scout.config.resolve_timezone, #207).
+DEFAULT_TZ = scout_config.DEFAULT_TIMEZONE
 CACHE_FILENAME = "cc-sessions.cache.json"
 OUTPUT_FILENAME = "cc-sessions.md"
 
@@ -313,7 +316,7 @@ def run(
     *,
     hours: int = DEFAULT_HOURS_LOOKBACK,
     instance_name: str = "Scout",
-    tz_name: str = DEFAULT_TZ,
+    tz_name: str | None = None,
     extra_exclude_suffixes: Iterable[str] = (),
     data_dir: Path | None = None,
     cc_projects_dir: Path | None = None,
@@ -330,7 +333,9 @@ def run(
     cache_dir = paths.cache_dir(target)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    tz = ZoneInfo(tz_name)
+    # Explicit tz_name wins (invalid names fall back inside the resolver);
+    # None means "the vault's configured zone" (#207).
+    tz = scout_config.timezone_or_default(tz_name) if tz_name else scout_config.resolve_timezone(target)
     now_dt = now or datetime.now(tz=tz)
     cutoff_ts = (now_dt - timedelta(hours=hours)).timestamp()
 
@@ -379,7 +384,7 @@ def main(
     *,
     hours: int = DEFAULT_HOURS_LOOKBACK,
     instance_name: str = "Scout",
-    tz_name: str = DEFAULT_TZ,
+    tz_name: str | None = None,
 ) -> int:
     """CLI entry — never raises. Prints the summary path so runner logs show
     where the cache landed."""

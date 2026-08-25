@@ -4,7 +4,7 @@ Direct port of ~/Scout/hooks/connector-log.sh. Behavior identical:
   - Short-circuits when SCOUT_MODE is unset (interactive sessions).
   - Emits one row to .scout-logs/connector-calls-YYYY-MM-DD.jsonl per call.
   - Tag-classifies tool_name → connector key (preserves bash classify() exactly).
-  - ET-date-stamps the JSONL filename (TZ=America/New_York).
+  - Date-stamps the JSONL filename in the configured timezone (#207).
   - Truncates error snippets at 160 chars (matches bash original).
   - Never raises — hooks must never break a session.
 
@@ -19,9 +19,9 @@ import os
 import sys
 from datetime import UTC, datetime
 from typing import IO, Any
-from zoneinfo import ZoneInfo
 
 from scout import paths
+from scout.config import today as config_today
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
@@ -159,7 +159,7 @@ def run(*, stdin: IO[str] | None = None) -> Event | None:
     if err_snippet:
         record["err"] = err_snippet
 
-    et_date = _et_date()
+    et_date = _local_date()
     log_dir = paths.data_dir() / ".scout-logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     out_path = log_dir / f"connector-calls-{et_date}.jsonl"
@@ -187,9 +187,9 @@ def run(*, stdin: IO[str] | None = None) -> Event | None:
     )
 
 
-def _et_date() -> str:
-    """Eastern-Time date string YYYY-MM-DD."""
-    return datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+def _local_date() -> str:
+    """Configured-zone date string YYYY-MM-DD (scout.config.today, #207)."""
+    return config_today().isoformat()
 
 
 def main() -> int:

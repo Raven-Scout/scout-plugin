@@ -526,15 +526,20 @@ def test_main_default_session_type(tmp_path, monkeypatch):
 # -- #53 fixes ----------------------------------------------------------------
 
 
-def test_parse_date_returns_tz_aware_et():
-    """#53: parse_date must return an ET-aware datetime so callers can't drift
-    across DST by forgetting to attach tzinfo."""
-    from scout.hooks.kb_pre_filter import ET, parse_date
+def test_parse_date_returns_tz_aware():
+    """#53: parse_date must return a zone-aware datetime so callers can't drift
+    across DST by forgetting to attach tzinfo. Default zone is the configured
+    one, which in a hermetic test env is the packaged default (#207)."""
+    from zoneinfo import ZoneInfo
 
+    from scout.config import DEFAULT_TIMEZONE
+    from scout.hooks.kb_pre_filter import parse_date
+
+    default_zone = ZoneInfo(DEFAULT_TIMEZONE)
     dt = parse_date("2026-06-15")
     assert dt is not None
     assert dt.tzinfo is not None
-    assert dt.utcoffset() == ET.utcoffset(dt.replace(tzinfo=None))
+    assert dt.utcoffset() == default_zone.utcoffset(dt.replace(tzinfo=None))
 
 
 def test_classify_reads_file_only_once_per_call(tmp_path):

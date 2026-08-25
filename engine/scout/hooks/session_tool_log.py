@@ -31,9 +31,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
-from zoneinfo import ZoneInfo
 
 from scout import paths
+from scout.config import today as config_today
 from scout.events import Event, now_iso
 from scout.hooks.connector_log import classify
 from scout.ids import new_ulid
@@ -201,8 +201,9 @@ def extract_tool_calls(rows: Iterable[dict[str, Any]]) -> list[ToolCallRecord]:
 # ----- emit JSONL ----------------------------------------------------------
 
 
-def _et_date() -> str:
-    return datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+def _local_date() -> str:
+    """Configured-zone date string YYYY-MM-DD (scout.config.today, #207)."""
+    return config_today().isoformat()
 
 
 def _is_error(tool_response: dict[str, Any]) -> tuple[bool, str]:
@@ -238,7 +239,7 @@ def write_records(
     if not records:
         return 0
     log_dir.mkdir(parents=True, exist_ok=True)
-    out_path = log_dir / f"connector-calls-{_et_date()}.jsonl"
+    out_path = log_dir / f"connector-calls-{_local_date()}.jsonl"
     written = 0
     try:
         with out_path.open("a", encoding="utf-8") as f:

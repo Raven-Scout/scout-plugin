@@ -395,12 +395,18 @@ def launch_runner(runner: Path, *, vault: Path, log_path: Path) -> int:
 # ----- driver -------------------------------------------------------------
 
 
-def _log_line(log_path: Path, reason: str, tz_name: str = "America/New_York") -> None:
-    """Append a timestamped reason line to the heartbeat log."""
-    try:
-        from zoneinfo import ZoneInfo
+def _log_line(log_path: Path, reason: str, tz_name: str | None = None) -> None:
+    """Append a timestamped reason line to the heartbeat log.
 
-        ts = datetime.now(tz=ZoneInfo(tz_name))
+    ``tz_name=None`` resolves the configured zone (#207). Imported lazily so
+    pyyaml stays off this module's import path (see module docstring on cold
+    starts) and is only paid when a line is actually logged.
+    """
+    try:
+        from scout.config import resolve_timezone, timezone_or_default
+
+        zone = timezone_or_default(tz_name) if tz_name else resolve_timezone()
+        ts = datetime.now(tz=zone)
         stamp = ts.strftime("%Y-%m-%d %H:%M %Z")
     except Exception:
         stamp = datetime.now().isoformat(timespec="minutes")
@@ -429,6 +435,12 @@ def run(
     config_path = target / _CONFIG_FILENAME
     log_path = paths.logs_dir(target) / "heartbeat.log"
 
+    # Resolve the vault's configured zone once for every log stamp this tick
+    # (lazy import — keeps pyyaml off the module import path; #207).
+    from scout.config import resolve_timezone as _resolve_tz
+
+    log_tz = _resolve_tz(target).key
+
     config = load_config(config_path)
     n = now or datetime.now(UTC)
     stats = read_tracker_stats(tracker_path, now=n)
@@ -449,22 +461,22 @@ def run(
     )
 
     if decision.action == "skip":
-        _log_line(log_path, f"skipped: {decision.reason}")
+        _log_line(log_path, f"skipped: {decision.reason}", tz_name=log_tz)
         return EXIT_SKIPPED
 
     runner = decision.runner
     assert runner is not None  # "launch" always has a runner
     if dry_run:
-        _log_line(log_path, f"dry_run: would launch {decision.session_type} ({decision.reason})")
+        _log_line(log_path, f"dry_run: would launch {decision.session_type} ({decision.reason})", tz_name=log_tz)
         print(f"would_launch {runner}")
         return EXIT_LAUNCHED
 
     try:
         pid = launch_runner(runner, vault=target, log_path=log_path)
     except OSError as exc:
-        _log_line(log_path, f"launch_failed: {exc}")
+        _log_line(log_path, f"launch_failed: {exc}", tz_name=log_tz)
         return EXIT_ERROR
-    _log_line(log_path, f"launched {decision.session_type} PID={pid} ({decision.reason})")
+    _log_line(log_path, f"launched {decision.session_type} PID={pid} ({decision.reason})", tz_name=log_tz)
     return EXIT_LAUNCHED
 
 

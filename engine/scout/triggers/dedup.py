@@ -13,8 +13,10 @@ Backing file: ``.scout-cache/trigger-fires.json``, keyed by trigger id::
       }
     }
 
-``fires_today_date`` is the ET date (America/New_York) — daily caps reset at
-00:00 ET, NOT 00:00 UTC, matching the rest of Scout's day-boundary semantics.
+``fires_today_date`` is the date in the CONFIGURED timezone
+(scout.config.resolve_timezone) — daily caps reset at the user's local
+midnight, NOT 00:00 UTC, matching the rest of Scout's day-boundary
+semantics (#207).
 
 ``is_new`` consults both ``last_seen_event_id`` and a sliding window of the
 100 most recent fired event ids, so non-monotonic event ids can't re-fire.
@@ -32,8 +34,15 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from scout.config import resolve_timezone
+
 DEFAULT_RECENT_WINDOW = 100
-DAY_BOUNDARY_ZONE = ZoneInfo("America/New_York")
+
+
+def day_boundary_zone() -> ZoneInfo:
+    """The configured day-boundary zone (resolved per call, not at import,
+    so env/config changes and hermetic tests see the current value)."""
+    return resolve_timezone()
 
 
 def _parse_iso_z(ts: str) -> dt.datetime:
@@ -127,7 +136,7 @@ class DedupStore:
     # ----- internals -------------------------------------------------------
 
     def _day(self, now: dt.datetime) -> str:
-        return now.astimezone(DAY_BOUNDARY_ZONE).date().isoformat()
+        return now.astimezone(day_boundary_zone()).date().isoformat()
 
     def _save(self) -> None:
         """Atomic write (tmp + rename). Best-effort — never raises."""

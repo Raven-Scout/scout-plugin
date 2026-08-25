@@ -123,7 +123,7 @@ def test_add_comment_render_round_trip(tmp_path: Path, monkeypatch: pytest.Monke
     daily = data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("# Action Items\n\n## To Do\n\n- [ ] 🔴 Followup with vendor\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     add_comment(by_subject="vendor", comment="left a voicemail", data_dir=data_dir)
 
