@@ -24,7 +24,7 @@ def test_load_config_returns_defaults_when_no_user_override(clean_env: None, fak
 
 def test_user_config_overrides_defaults(clean_env: None, fake_data_dir: Path) -> None:
     _write(
-        fake_data_dir / ".scout-config.yaml",
+        fake_data_dir / "scout-config.yaml",
         {"budgets": {"daily_budget_estimate_usd": 999}},
     )
     cfg = config.load_config(fake_data_dir)
@@ -35,7 +35,7 @@ def test_user_config_overrides_defaults(clean_env: None, fake_data_dir: Path) ->
 
 def test_deep_merge_preserves_sibling_keys(clean_env: None, fake_data_dir: Path) -> None:
     _write(
-        fake_data_dir / ".scout-config.yaml",
+        fake_data_dir / "scout-config.yaml",
         {"user": {"email": "test@example.com"}},
     )
     cfg = config.load_config(fake_data_dir)
@@ -46,7 +46,7 @@ def test_deep_merge_preserves_sibling_keys(clean_env: None, fake_data_dir: Path)
 
 def test_env_var_overrides_user_config(clean_env: None, fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write(
-        fake_data_dir / ".scout-config.yaml",
+        fake_data_dir / "scout-config.yaml",
         {"user": {"email": "user@example.com"}},
     )
     monkeypatch.setenv("SCOUT_USER_EMAIL", "env@example.com")
@@ -54,13 +54,26 @@ def test_env_var_overrides_user_config(clean_env: None, fake_data_dir: Path, mon
     assert cfg["user"]["email"] == "env@example.com"
 
 
-def test_invalid_yaml_raises_config_error(clean_env: None, fake_data_dir: Path) -> None:
-    (fake_data_dir / ".scout-config.yaml").write_text("key: [unclosed")
+def test_invalid_yaml_degrades_to_defaults(
+    clean_env: None, fake_data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#207: the vault layer warns and degrades instead of raising — a stale
+    file must not block a run now that the layer is actually live. (_read_yaml
+    itself still raises ConfigError; see test_config_vault_file.py.)"""
+    (fake_data_dir / "scout-config.yaml").write_text("key: [unclosed")
+    cfg = config.load_config(fake_data_dir)
+    assert cfg["schema_version"] == 1
+    assert "Invalid YAML" in capsys.readouterr().err
     with pytest.raises(ConfigError, match="Invalid YAML"):
-        config.load_config(fake_data_dir)
+        config._read_yaml(fake_data_dir / "scout-config.yaml")
 
 
-def test_non_mapping_yaml_raises_config_error(clean_env: None, fake_data_dir: Path) -> None:
-    (fake_data_dir / ".scout-config.yaml").write_text("- a\n- b\n")
+def test_non_mapping_yaml_degrades_to_defaults(
+    clean_env: None, fake_data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (fake_data_dir / "scout-config.yaml").write_text("- a\n- b\n")
+    cfg = config.load_config(fake_data_dir)
+    assert cfg["schema_version"] == 1
+    assert "YAML mapping" in capsys.readouterr().err
     with pytest.raises(ConfigError, match="YAML mapping"):
-        config.load_config(fake_data_dir)
+        config._read_yaml(fake_data_dir / "scout-config.yaml")

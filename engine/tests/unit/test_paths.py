@@ -80,7 +80,8 @@ def test_derived_paths_under_data_dir(tmp_path: Path) -> None:
     assert paths.logs_dir(tmp_path) == tmp_path / ".scout-logs"
     assert paths.cache_dir(tmp_path) == tmp_path / ".scout-cache"
     assert paths.state_dir(tmp_path) == tmp_path / ".scout-state"
-    assert paths.config_path(tmp_path) == tmp_path / ".scout-config.yaml"
+    # The UNDOTTED file — the one /scout-setup and bootstrap write (#207/#202).
+    assert paths.config_path(tmp_path) == tmp_path / "scout-config.yaml"
     assert paths.kb_dir(tmp_path) == tmp_path / "knowledge-base"
     assert paths.action_items_dir(tmp_path) == tmp_path / "action-items"
 

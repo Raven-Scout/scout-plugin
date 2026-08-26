@@ -27,7 +27,7 @@ from typing import Any
 from scout import paths
 
 # Defaults — mirror budget-check.sh defaults so behavior is preserved when no
-# .scout-config.yaml is present.
+# scout-config.yaml is present.
 DEFAULT_WINDOW_HOURS = 5
 DEFAULT_DAILY_BUDGET_USD = 50.0
 DEFAULT_SKIP_THRESHOLD_PCT = 80.0
@@ -78,7 +78,7 @@ _CONFIG_LINE_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\s][^#]*?)
 
 
 def load_config(config_path: Path) -> BudgetConfig:
-    """Parse the four scalar keys this check cares about from .scout-config.yaml.
+    """Parse the four scalar keys this check cares about from scout-config.yaml.
 
     Missing file or unparseable rows fall back to defaults — matches the bash
     `grep ... | awk` pattern which silently no-ops on missing keys.
@@ -216,9 +216,14 @@ def run(*, verbose: bool = False, data_dir: Path | None = None) -> int:
     """
     target = data_dir or paths.data_dir()
     tracker_path = paths.logs_dir(target) / "usage-tracker.jsonl"
-    config = load_config(paths.config_path(target))
+    config_path = paths.config_path(target)
+    config = load_config(config_path)
     decision = decide(tracker_path, config)
     if verbose:
+        # Say WHICH file supplied the numbers — the silent-defaults fallback
+        # is what kept #202 invisible for months.
+        state = "" if config_path.exists() else " (missing — using engine defaults)"
+        print(f"[budget-check] config: {config_path}{state}")
         print(f"[budget-check] {decision.reason}")
         print(
             f"[budget-check] window: {config.window_hours}h, "
