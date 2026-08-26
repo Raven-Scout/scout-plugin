@@ -257,6 +257,16 @@ def test_non_mapping_yaml_warns_and_falls_back(
     assert "scout-config" in capsys.readouterr().err
 
 
+def test_binary_corrupted_file_warns_and_falls_back(
+    clean_env: None, fake_data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Invalid UTF-8 (disk corruption, wrong file) must degrade, not raise."""
+    (fake_data_dir / "scout-config.yaml").write_bytes(b"\xff\xfe\x00\x01 not yaml")
+    cfg = config.load_config(fake_data_dir)
+    assert cfg["user"]["timezone"] == config.DEFAULT_TIMEZONE
+    assert "scout-config" in capsys.readouterr().err
+
+
 def test_type_mismatched_section_warns_and_keeps_defaults(
     clean_env: None, fake_data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

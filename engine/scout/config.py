@@ -150,7 +150,8 @@ def load_config(data_dir: Path | None = None) -> dict[str, Any]:
     user_path = paths.config_path(data_dir)
     try:
         user_overrides = _read_yaml(user_path)
-    except ConfigError as e:
+    except (ConfigError, OSError, UnicodeDecodeError) as e:
+        # OSError: permissions/races; UnicodeDecodeError: binary corruption.
         _warn(f"ignoring unreadable {user_path.name}: {e} — running on packaged defaults")
         user_overrides = {}
     env_overrides = _env_overrides()
