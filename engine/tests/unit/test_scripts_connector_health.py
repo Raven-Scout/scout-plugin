@@ -607,12 +607,19 @@ def test_cleanup_old_jsonl_only_when_requested(fake_data_dir, monkeypatch):
 # ----- Connector model integration -----------------------------------------
 
 
-def test_outbound_only_connectors_excluded_from_warnings(fake_data_dir, monkeypatch):
-    """notify:telegram is outbound-only — it should never be an alerting subject."""
+def test_telegram_is_alertable_now_that_it_reads_inbound(fake_data_dir, monkeypatch):
+    """notify:telegram gained `inbound` in #215 and so became an alerting subject.
+
+    It was excluded while outbound-only, on the sound reasoning that a failed
+    *send* does not fail a run. That reasoning does not survive the connector
+    gaining a read side: a vault with `feedback.surfaces: [telegram]` has this
+    connector as its ONLY feedback surface, and a silent read failure there
+    loses every reply the user wrote — with a ~24h expiry that makes the loss
+    permanent rather than deferred. That is precisely an alertable condition.
+    """
     monkeypatch.setattr(chr_mod, "_default_now", _frozen_now)
     log_dir = fake_data_dir / ".scout-logs"
 
-    # Even with high-error notify:telegram calls, no WARNING should fire.
     _seed_session(
         log_dir,
         sid="s1",
@@ -634,7 +641,35 @@ def test_outbound_only_connectors_excluded_from_warnings(fake_data_dir, monkeypa
     event = chr_mod.run(data_dir=fake_data_dir)
     alerts = event.payload["alerts"]
     tg_alerts = [a for a in alerts if a["connector_key"] == "notify:telegram"]
-    assert tg_alerts == []
+    assert tg_alerts, "a 4/5-error feedback surface must alert"
+
+
+def test_outbound_only_connectors_are_excluded_from_warnings():
+    """The rule itself, against a synthetic connector.
+
+    Asserted directly on `_alertable_registry` rather than through a seeded run
+    because after #215 the shipped registry contains no outbound-only connector
+    to point at — and a test whose subject has quietly ceased to exist passes
+    for the wrong reason.
+    """
+    from scout.connectors import Capability
+
+    registry = chr_mod.load_registry() if hasattr(chr_mod, "load_registry") else None
+    del registry  # only the filter is under test
+
+    class _C:
+        def __init__(self, caps):
+            self.capabilities = caps
+
+    reg = {
+        "notify:pager": _C([Capability.OUTBOUND]),
+        "notify:telegram": _C([Capability.OUTBOUND, Capability.INBOUND]),
+        "slack": _C([Capability.INBOUND]),
+        "meta:thing": _C([Capability.META]),
+    }
+    alertable = chr_mod._alertable_registry(reg)
+    assert "notify:pager" not in alertable
+    assert {"notify:telegram", "slack", "meta:thing"} <= set(alertable)
 
 
 # osascript injection hardening (#51). Connector names come from user YAML and

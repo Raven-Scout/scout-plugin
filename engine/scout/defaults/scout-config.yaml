@@ -22,6 +22,19 @@ features:
   connector_health: true
   dreaming: true
 
+# Surfaces the feedback harvest reads, in read order. A vault that moves its
+# wrap notification to Telegram must move the harvest with it, or it publishes
+# on one surface and reads replies from another — issue #215.
+#
+# Telegram is read first regardless of order when both are listed: Telegram
+# drops unconsumed updates after ~24h, so a missed read there destroys the
+# signal, while Slack history is permanent and can be re-read tomorrow.
+#
+# Counts are always reported PER SURFACE, never merged — one number cannot
+# distinguish "both surfaces quiet" from "one surface unread".
+feedback:
+  surfaces: [slack]   # any of: slack, telegram
+
 auto_update:
   enabled: false
   channel: stable

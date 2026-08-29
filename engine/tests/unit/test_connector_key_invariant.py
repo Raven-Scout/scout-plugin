@@ -21,7 +21,7 @@ from scout.scripts.connector_probes import (
     load_registry,
     normalize_connector_keys,
 )
-from scout.scripts.phase_assembly import parse_phase_file, select_sections
+from scout.scripts.phase_assembly import parse_phase_file, requires_members, select_sections
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 PHASES_ROOT = REPO_ROOT / "phases"
@@ -33,12 +33,18 @@ def _shipped_probe_keys() -> set[str]:
 
 
 def _phase_requires() -> dict[str, set[Path]]:
-    """Every non-null `requires:` key in shipped phases → the files using it."""
+    """Every non-null `requires:` key in shipped phases → the files using it.
+
+    An ``any-of(a, b)`` expression contributes **each member separately**, not
+    the raw string. Checking the expression as a unit would let a typo inside a
+    disjunction pass — and the section would still assemble whenever the other
+    member happened to be enabled, so the broken key would never surface.
+    """
     out: dict[str, set[Path]] = {}
     for pf in sorted(PHASES_ROOT.rglob("*.md")):
         for section in parse_phase_file(pf):
-            if section.requires is not None:
-                out.setdefault(section.requires, set()).add(pf.relative_to(PHASES_ROOT))
+            for key in requires_members(section.requires):
+                out.setdefault(key, set()).add(pf.relative_to(PHASES_ROOT))
     return out
 
 

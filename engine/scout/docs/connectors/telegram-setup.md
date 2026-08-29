@@ -1,10 +1,12 @@
-# Telegram outbound — operator setup
+# Telegram — operator setup
 
-Telegram outbound lets a Scout session push notifications to your phone — same
-fan-out pattern as the session-wrap Slack DM, but to a Telegram chat instead.
-It is **outbound only by design** in v0.4: Scout sends; you receive. There is
-no return-bridge yet (inbound replies as feedback signals are v0.7+ territory
-per the event-architecture spec).
+Telegram lets a Scout session push notifications to your phone — same fan-out
+pattern as the session-wrap Slack DM, but to a Telegram chat instead — and read
+your replies back as feedback signals.
+
+**Both directions use the same bot and the same token.** Setup below configures
+outbound (steps 1-6); inbound needs nothing further beyond the token and is
+covered in §8.
 
 The integration uses a Telegram **bot account** that you create via
 [@BotFather](https://t.me/BotFather), paired with a single chat-id (yours).
@@ -163,6 +165,66 @@ escalates with `action_required`; a routine briefing posts `info`.
 The runner stays bash-only in Plan 4; Plan 7 will Pythonize it. Either
 way, the integration point is `scoutctl notify telegram`.
 
+## 8. Inbound — reading your replies
+
+Reply to any Scout message in the Telegram chat and the next dreaming session
+harvests it as a feedback signal:
+
+```bash
+scoutctl notify telegram-read --since "2026-08-29T09:36:01Z"   # ISO or unix epoch
+scoutctl notify telegram-read --json                            # machine-readable
+```
+
+**Turn it on** by adding `telegram` to `feedback.surfaces` in your
+`scout-config.yaml`:
+
+```yaml
+feedback:
+  surfaces: [telegram, slack]   # or [telegram] alone to replace the Slack DM
+```
+
+**If you move the wrap to Telegram, move this with it.** The surface Scout
+publishes on and the surface it reads replies from are configured separately.
+When they drift apart nothing errors — the harvest keeps reporting a clean
+`0 feedback signals`, which is true, correctly sourced, and no longer an answer
+to the question being asked. That was issue #215.
+
+### Three things worth knowing
+
+**It never consumes the queue.** `getUpdates` is called without an `offset`, so
+re-reads are idempotent and a session that dies after reading loses nothing.
+There is deliberately no flag to consume: passing an offset deletes updates
+*permanently*, with nothing on disk as a second copy.
+
+**Updates expire after ~24h.** Telegram drops unconsumed updates after about a
+day. Unlike Slack, whose history is permanent, a missed read here **destroys**
+the signal rather than deferring it — which is why the harvest reads Telegram
+before Slack, and why a `0 inbound` result is a statement about the last day
+only.
+
+**Empty is not the same as silent.** Four states return an empty list: genuine
+silence, a registered webhook (which blocks `getUpdates` entirely), a competing
+consumer, and an auth failure. The command tells them apart using
+`pending_update_count` from `getWebhookInfo` as an independent witness, and
+**exits non-zero on the three that are faults** so a caller can never report
+"0 feedback signals" off a call that was blocked.
+
+| Exit | Meaning |
+|---|---|
+| `0` | The call executed against an unblocked queue — the count is real, including `0` |
+| `1` | Fault: webhook registered, competing consumer, or API error. Report the fault, not a count. |
+| `10` | Missing or insecurely-permissioned token |
+
+**Authorship needs no test.** In a private chat `getUpdates` returns only
+incoming messages — the bot's own sends never come back — so everything it
+prints is you. Replies arrive with their parent attached (`reply_to_message`),
+so a reply to a specific wrap is already joined to the wrap it answers.
+
+**Reactions are unverified.** `message_reaction` is requested, but live delivery
+to a private-chat bot has not been confirmed against a real reaction. Never read
+"0 reactions" as an observation about you — it is unverified capability, not
+measured silence.
+
 ## Tier semantics
 
 | Flag                        | Telegram `disable_notification` | Phone behavior     |
@@ -190,6 +252,8 @@ order is sequential.
 | `HTTP error: 400 Bad Request: chat not found`                     | Wrong chat-id, or you never DM'd the bot (step 3 missed).                   |
 | Bot reachable but no message arrives                              | Check phone notification settings — silent push respects Do Not Disturb.    |
 | `getUpdates` returns empty `result`                              | No recent activity in the chat. Send the bot a message; retry within 24h.   |
+| `telegram-read` exits 1: *a webhook is registered*                | Something set a webhook on the bot; `getUpdates` is blocked until it is deleted (`deleteWebhook`). |
+| `telegram-read` exits 1: *0 returned but N pending*               | Another process is consuming the queue — a second Scout install, or a bot framework sharing the token. |
 
 To rotate the token: in BotFather, `/revoke` against the bot, get a new
 token, overwrite `~/.scout-secrets/telegram-bot-token`. The chat-id stays
@@ -197,11 +261,9 @@ valid across token rotations.
 
 ## See also
 
-- [`whatsapp-setup.md`](whatsapp-setup.md) — sibling connector doc for the
-  inbound side. Bidirectional Telegram (inbound replies as feedback
-  signals) is v0.7+ per the event-architecture spec; it'll mirror the
-  privacy posture documented in `whatsapp-setup.md` §6 (the lethal
-  trifecta) once we're there.
+- [`whatsapp-setup.md`](whatsapp-setup.md) — sibling connector doc, whose §6
+  (the lethal trifecta) documents the privacy posture that applies to any
+  inbound surface, Telegram included.
 - `engine/scout/connectors.yaml` — the `notify:telegram` row that registers
   this connector with the manifest.
 - Telegram Bot API reference: <https://core.telegram.org/bots/api#sendmessage>.

@@ -1,0 +1,289 @@
+"""Unit tests for scout.scripts.telegram_inbound (issue #215).
+
+Four of these are **negative controls whose pre-fix answer was "0 signals"** —
+the whole point of the module is that an empty list at the call site has four
+causes and only one of them is silence:
+
+  1. A webhook is registered while a real message is present  → fault, exit 1
+  2. 0 updates returned while getWebhookInfo reports 3 pending → fault, exit 1
+  3. getUpdates returns ok:false (401)                        → fault, exit 1
+  4. The network call raises                                  → fault, exit 1
+
+Plus the positive path, the never-consume guarantee, authorship handling,
+reply/reaction flattening, --since parsing (including the ISO form
+last-fire.json actually stores), and the CLI exit-code contract.
+
+All HTTP is mocked — no live Telegram traffic.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
+
+import pytest
+from typer.testing import CliRunner
+
+from scout import cli
+from scout.errors import ConfigError
+from scout.scripts import telegram_inbound as ti
+
+FAKE_TOKEN = "FAKE_TOKEN_123:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+TZ = ZoneInfo("UTC")
+
+# 2026-08-29 09:36:01 UTC
+EPOCH = 1787996161
+
+
+def _write_token(tmp_path: Path) -> Path:
+    p = tmp_path / "telegram-bot-token"
+    p.write_text(FAKE_TOKEN)
+    p.chmod(0o600)
+    return p
+
+
+@pytest.fixture
+def secrets(tmp_path, monkeypatch):
+    """Point the shared secret reader at a tmp dir with a valid token."""
+    _write_token(tmp_path)
+    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr(ti, "_tz", lambda: TZ)
+    return tmp_path
+
+
+def _resp(payload: dict, status: int = 200) -> MagicMock:
+    r = MagicMock()
+    r.status_code = status
+    r.reason = "OK" if status == 200 else "Unauthorized"
+    r.json.return_value = payload
+    r.text = json.dumps(payload)
+    return r
+
+
+def _hook(url: str = "", pending: int = 0) -> dict:
+    return {"ok": True, "result": {"url": url, "pending_update_count": pending}}
+
+
+def _message(text: str = "do the thing", *, is_bot: bool = False, reply: str | None = None) -> dict:
+    msg = {
+        "message_id": 42,
+        "date": EPOCH,
+        "from": {"id": 7, "first_name": "David", "last_name": "Esner", "is_bot": is_bot},
+        "text": text,
+    }
+    if reply:
+        msg["reply_to_message"] = {"text": reply}
+    return {"update_id": 1001, "message": msg}
+
+
+def _updates(*items: dict) -> dict:
+    return {"ok": True, "result": list(items)}
+
+
+# ----- positive path --------------------------------------------------------
+
+
+def test_reads_inbound_message(secrets):
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(_message()))]):
+        rep = ti.read()
+    assert rep.ok and rep.status == ti.STATUS_OK
+    assert rep.reported == 1
+    assert rep.items[0]["text"] == "do the thing"
+    assert rep.items[0]["author"] == "David Esner"
+
+
+def test_never_passes_offset(secrets):
+    """The queue must never be consumed: no `offset` may reach getUpdates."""
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(_message()))]) as g:
+        ti.read()
+    params = g.call_args_list[1].kwargs["params"]
+    assert "offset" not in params
+    assert json.loads(params["allowed_updates"]) == ti.ALLOWED_UPDATES
+
+
+def test_reply_carries_its_parent(secrets):
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_message("wrong", reply="Scout Digest — Saturday")))],
+    ):
+        rep = ti.read()
+    assert rep.items[0]["replying_to"] == "Scout Digest — Saturday"
+
+
+def test_bot_authored_items_are_excluded_not_assumed_absent(secrets):
+    """A group upgrade would start returning bot messages; assert, don't assume."""
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_message(is_bot=True), _message("real")))],
+    ):
+        rep = ti.read()
+    assert rep.fetched == 2 and rep.inbound == 1
+    assert rep.items[0]["text"] == "real"
+
+
+def test_reaction_update_is_flattened(secrets):
+    rx = {
+        "update_id": 1002,
+        "message_reaction": {
+            "message_id": 42,
+            "date": EPOCH,
+            "user": {"id": 7, "first_name": "David", "is_bot": False},
+            "new_reaction": [{"emoji": "👍"}],
+        },
+    }
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(rx))]):
+        rep = ti.read()
+    assert rep.items[0]["kind"] == "reaction"
+    assert rep.items[0]["reactions"] == ["👍"]
+
+
+def test_genuine_silence_is_ok_not_fault(secrets):
+    """The one empty state that IS silence: no webhook, nothing pending."""
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates())]):
+        rep = ti.read()
+    assert rep.ok and rep.reported == 0 and rep.fault is None
+    assert "0 inbound message(s)" in ti.render(rep)
+    assert "~24h" in ti.render(rep)  # the retention caveat must survive
+
+
+# ----- negative controls: pre-fix, every one of these read as "0 signals" ----
+
+
+def test_negative_control_webhook_registered_with_real_message(secrets):
+    """A webhook blocks getUpdates. A message exists. Pre-fix: '0 signals'."""
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[_resp(_hook(url="https://example.test/hook", pending=1)), _resp(_updates(_message()))],
+    ):
+        rep = ti.read()
+    assert not rep.ok and "webhook is registered" in rep.fault
+    assert "NOT zero feedback" in ti.render(rep)
+
+
+def test_negative_control_zero_returned_while_pending_nonzero(secrets):
+    """A competing consumer. Pre-fix: '0 signals'."""
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook(pending=3)), _resp(_updates())]):
+        rep = ti.read()
+    assert not rep.ok and "3 pending" in rep.fault
+
+
+def test_negative_control_get_updates_401(secrets):
+    """Revoked token. Pre-fix: '0 signals'."""
+    unauthorized = _resp({"ok": False, "description": "Unauthorized"}, status=401)
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), unauthorized]):
+        rep = ti.read()
+    assert not rep.ok and "getUpdates failed" in rep.fault
+
+
+def test_negative_control_network_error(secrets):
+    """Timeout/DNS. Pre-fix: '0 signals'."""
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[_resp(_hook()), ti.requests.RequestException("timed out")],
+    ):
+        rep = ti.read()
+    assert not rep.ok and "getUpdates failed" in rep.fault
+
+
+def test_token_never_appears_in_a_fault_string(secrets):
+    """The URL embeds the token; a 401 is exactly what operators debug live."""
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[_resp(_hook()), ti.requests.RequestException(f"boom {FAKE_TOKEN}")],
+    ):
+        rep = ti.read()
+    assert FAKE_TOKEN not in (rep.fault or "")
+    assert "<REDACTED>" in rep.fault
+
+
+# ----- secrets contract -----------------------------------------------------
+
+
+def test_missing_token_raises_config_error(tmp_path, monkeypatch):
+    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    with pytest.raises(ConfigError):
+        ti.read()
+
+
+def test_insecure_token_permissions_raise_config_error(tmp_path, monkeypatch):
+    p = tmp_path / "telegram-bot-token"
+    p.write_text(FAKE_TOKEN)
+    p.chmod(0o644)
+    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    with pytest.raises(ConfigError):
+        ti.read()
+
+
+# ----- --since parsing ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "1787996161",
+        "2026-08-29T09:36:01+00:00",
+        "2026-08-29T09:36:01Z",  # last-fire.json's own form
+        "2026-08-29 09:36:01",
+        "2026-08-29 09:36",
+        "2026-08-29",
+    ],
+)
+def test_since_accepts_every_form_the_caller_possesses(raw):
+    assert isinstance(ti.parse_since(raw, TZ), int)
+
+
+def test_since_rejects_garbage_loudly():
+    with pytest.raises(ValueError):
+        ti.parse_since("not a time", TZ)
+
+
+def test_since_filters_output_only_not_the_fetch(secrets):
+    """The pending cross-check stays honest regardless of the window asked for."""
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(_message()))]) as g:
+        rep = ti.read(since=str(EPOCH + 3600))
+    assert rep.fetched == 1 and rep.inbound == 1 and rep.reported == 0
+    assert "since" not in g.call_args_list[1].kwargs["params"]
+
+
+# ----- CLI exit-code contract -----------------------------------------------
+
+
+def test_cli_exits_0_on_genuine_silence(secrets):
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates())]):
+        res = CliRunner().invoke(cli.app, ["notify", "telegram-read"])
+    assert res.exit_code == 0
+    assert "0 inbound" in res.stdout
+
+
+def test_cli_exits_1_on_fault(secrets):
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook(pending=3)), _resp(_updates())]):
+        res = CliRunner().invoke(cli.app, ["notify", "telegram-read"])
+    assert res.exit_code == 1
+    assert "NOT zero feedback" in res.stdout
+
+
+def test_cli_exits_10_on_missing_secrets(tmp_path, monkeypatch):
+    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    res = CliRunner().invoke(cli.app, ["notify", "telegram-read"])
+    assert res.exit_code == ConfigError.exit_code
+
+
+def test_cli_bad_since_prints_refusal_to_stdout_not_only_stderr(secrets):
+    """A caller piping stdout alone must not read the refusal as '0 inbound'."""
+    res = CliRunner().invoke(cli.app, ["notify", "telegram-read", "--since", "garbage"])
+    assert res.exit_code == 1
+    assert "NOT zero feedback" in res.stdout
+
+
+def test_cli_json_is_parsable(secrets):
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(_message()))]):
+        res = CliRunner().invoke(cli.app, ["notify", "telegram-read", "--json"])
+    assert res.exit_code == 0
+    assert json.loads(res.stdout)["reported"] == 1
