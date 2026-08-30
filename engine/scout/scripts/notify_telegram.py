@@ -45,7 +45,21 @@ from scout.ids import new_ulid
 
 TELEGRAM_API = "https://api.telegram.org"
 MAX_MESSAGE_LEN = 4096  # Telegram hard limit per sendMessage
-SECRETS_DIR = Path.home() / ".scout-secrets"
+
+
+def secrets_dir() -> Path:
+    """Resolve the secrets directory on every call.
+
+    This was a module-level ``Path.home() / ".scout-secrets"``. Bound at
+    import time, it captured whatever ``HOME`` was set when the module was
+    first imported — and under pytest that is *collection* time, before the
+    autouse hermetic-``HOME`` fixture runs. One test module imports this one
+    at module level, so the whole session kept the developer's real secrets
+    path and a hermetic unit test delivered a live Telegram push to their
+    phone. Resolving per call means ``HOME`` is read when it is authoritative.
+    """
+    return Path.home() / ".scout-secrets"
+
 
 VALID_TIERS = ("info", "action_required")
 DEFAULT_TIMEOUT = 10.0
@@ -55,7 +69,7 @@ DEFAULT_TIMEOUT = 10.0
 
 
 def _read_secret(name: str) -> str:
-    """Read a secret file from ``SECRETS_DIR``.
+    """Read a secret file from ``secrets_dir()``.
 
     Raises ``ConfigError`` (exit code 10) with an actionable message if the
     file is missing, unreadable, empty, or has insecure permissions. The
@@ -68,7 +82,7 @@ def _read_secret(name: str) -> str:
     every other process on the host, so refusing to read it is the
     right default.
     """
-    path = SECRETS_DIR / name
+    path = secrets_dir() / name
     if not path.exists():
         raise ConfigError(
             f"Missing secret: {path}. Create it (mode 600) — see engine/scout/docs/connectors/telegram-setup.md."

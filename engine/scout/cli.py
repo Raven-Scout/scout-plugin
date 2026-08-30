@@ -1101,14 +1101,20 @@ _register_triggers()
 
 
 def _register_notify() -> None:
-    """scoutctl notify {telegram} — outbound notification commands.
+    """scoutctl notify {telegram, telegram-read} — the two directions of one surface.
 
-    `notify:telegram` is registered in connectors.yaml with capabilities=[outbound].
-    The Claude session calls `scoutctl notify telegram` from inside its prompt at
-    session-wrap time (Bash tool). Plan 7 will Pythonize the runner; for v0.4 the
-    CLI command IS the integration point.
+    `notify:telegram` is registered in connectors.yaml with
+    capabilities=[outbound, inbound]. The Claude session calls `scoutctl notify
+    telegram` from inside its prompt at session-wrap time, and `scoutctl notify
+    telegram-read` during feedback harvest (both via the Bash tool). Plan 7 will
+    Pythonize the runner; for now the CLI commands ARE the integration point.
+
+    `telegram-read` lives under `notify` rather than in a new top-level group
+    because it is the read side of the same connector and the same secret — an
+    operator who has one configured has both, and splitting them across groups
+    would imply two things to set up.
     """
-    notify_app = typer.Typer(help="Outbound notifications (Telegram, etc.).")
+    notify_app = typer.Typer(help="Notifications (Telegram send + inbound read).")
     app.add_typer(notify_app, name="notify")
 
     @notify_app.command("telegram")
@@ -1180,6 +1186,66 @@ def _register_notify() -> None:
         # send() so this stdout is always pure JSON and parsable by tests
         # / downstream scripts.
         typer.echo(_json.dumps(asdict(ev), indent=2))
+
+    @notify_app.command("telegram-read")
+    def cli_notify_telegram_read(
+        since: str = typer.Option(
+            None,
+            "--since",
+            help=(
+                "Only report items at/after this time: a unix epoch, or any ISO-8601 "
+                "form (including the 'T'-separated stamp last-fire.json stores). "
+                "Naive values are read in the local timezone. Filters OUTPUT only — "
+                "the fetch is always the full retained window."
+            ),
+        ),
+        use_json: bool = typer.Option(
+            False,
+            "--json",
+            help="Emit the report as JSON instead of prose.",
+        ),
+    ) -> None:
+        """Read inbound Telegram messages (feedback harvest). Never consumes the queue.
+
+        Exit codes: 0 = the call executed against an unblocked queue (whether or
+        not anything was found); 1 = a fault (webhook registered, competing
+        consumer, API error) — **not** an empty harvest; 10 = missing or
+        insecure secrets.
+
+        The non-zero exit on a fault is the point of the command. A registered
+        webhook, a competing consumer and an auth failure all return an empty
+        list at the call site, and only genuine silence may be reported as
+        "0 feedback signals".
+        """
+        import json as _json
+        from dataclasses import asdict
+
+        from scout.errors import ConfigError as _ConfigError
+        from scout.scripts.telegram_inbound import read, render
+
+        try:
+            report = read(since=since)
+        except _ConfigError as e:
+            typer.echo(f"scoutctl notify telegram-read: {e}", err=True)
+            raise typer.Exit(code=_ConfigError.exit_code) from e
+        except ValueError as e:
+            # A --since the parser cannot read must never reach the caller as an
+            # empty report. Echo into the report stream as well as stderr: a
+            # caller piping stdout alone would otherwise see the exact shape of
+            # "0 inbound".
+            typer.echo("=== TELEGRAM FEEDBACK ===\n")
+            typer.echo(f"  ERROR — {e}")
+            typer.echo("  This is NOT zero feedback. Nothing was read; do not report a signal count.")
+            typer.echo(f"scoutctl notify telegram-read: {e}", err=True)
+            raise typer.Exit(code=1) from e
+
+        if use_json:
+            typer.echo(_json.dumps(asdict(report), indent=2, ensure_ascii=False))
+        else:
+            typer.echo(render(report, since=since))
+
+        if not report.ok:
+            raise typer.Exit(code=1)
 
 
 _register_notify()

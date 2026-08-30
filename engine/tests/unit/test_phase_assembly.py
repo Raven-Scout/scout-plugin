@@ -176,3 +176,60 @@ def test_all_shipped_phase_files_parse():
         except Exception as e:  # noqa: BLE001
             failures.append(f"{pf.relative_to(phases_root)}: {type(e).__name__}: {e}")
     assert not failures, "Unparseable phase files:\n" + "\n".join(failures)
+
+
+# ----- requires: any-of(...) (issue #215) -----------------------------------
+#
+# The disjunction exists so a phase can require *a* surface rather than *the*
+# surface. Under the old single-string rule, a vault that moved its wrap to
+# Telegram and dropped Slack lost the entire feedback phase at assembly time —
+# nothing at runtime could report the absence, because the text was gone.
+
+
+def _any_of_file(tmp_path: Path, expr: str) -> Path:
+    p = tmp_path / "any_of.md"
+    p.write_text(f"---\nphase: mode\nname: x\nslot: dreaming-phase-1\nmode: []\nrequires: {expr}\n---\n\nbody\n")
+    return p
+
+
+def test_any_of_kept_when_first_member_enabled(tmp_path):
+    sections = parse_phase_file(_any_of_file(tmp_path, "any-of(slack, notify:telegram)"))
+    assert select_sections(sections, enabled_connectors={"slack"}) == sections
+
+
+def test_any_of_kept_when_only_second_member_enabled(tmp_path):
+    """The telegram-only vault #215 is about."""
+    sections = parse_phase_file(_any_of_file(tmp_path, "any-of(slack, notify:telegram)"))
+    assert select_sections(sections, enabled_connectors={"notify:telegram"}) == sections
+
+
+def test_any_of_dropped_when_no_member_enabled(tmp_path):
+    sections = parse_phase_file(_any_of_file(tmp_path, "any-of(slack, notify:telegram)"))
+    assert select_sections(sections, enabled_connectors={"gmail"}) == []
+
+
+def test_any_of_tolerates_whitespace(tmp_path):
+    sections = parse_phase_file(_any_of_file(tmp_path, "any-of(  slack ,notify:telegram  )"))
+    assert select_sections(sections, enabled_connectors={"notify:telegram"}) == sections
+
+
+def test_empty_any_of_is_rejected_at_parse_not_silently_false(tmp_path):
+    """`any-of()` would otherwise drop the section forever with no diagnostic."""
+    with pytest.raises(ValueError, match="any-of"):
+        parse_phase_file(_any_of_file(tmp_path, "any-of()"))
+
+
+def test_bare_string_requires_is_unchanged(tmp_path):
+    """Regression guard: the plain form must not start being read as a disjunction."""
+    sections = parse_phase_file(_any_of_file(tmp_path, "slack"))
+    assert select_sections(sections, enabled_connectors={"slack"}) == sections
+    assert select_sections(sections, enabled_connectors={"notify:telegram"}) == []
+
+
+def test_feedback_phase_survives_a_telegram_only_vault():
+    """End-to-end on the shipped fragment, not a fixture."""
+    phases_root = Path(__file__).parent.parent.parent.parent / "phases"
+    sections = parse_phase_file(phases_root / "modes" / "feedback-processing.md")
+    assert select_sections(sections, enabled_connectors={"notify:telegram"}, modes={"dreaming"})
+    assert select_sections(sections, enabled_connectors={"slack"}, modes={"dreaming"})
+    assert select_sections(sections, enabled_connectors=set(), modes={"dreaming"}) == []

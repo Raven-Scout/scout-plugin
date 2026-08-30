@@ -25,7 +25,13 @@ SUPPORTED_MATCH_TYPES: list[str] = ["mention"]
 
 SEARCH_URL = "https://slack.com/api/search.messages"
 TOKEN_FILENAME = "slack-search-token"
-SECRETS_DIR = Path.home() / ".scout-secrets"
+
+
+def secrets_dir() -> Path:
+    """Resolve the secrets directory per call — see notify_telegram.secrets_dir."""
+    return Path.home() / ".scout-secrets"
+
+
 DEFAULT_TIMEOUT = 15.0
 PAGE_SIZE = 100
 
@@ -46,7 +52,7 @@ def _default_http_get(url: str, *, params: dict, headers: dict, timeout: float) 
 
 def _read_token() -> str:
     """Read the Slack search token (mode-600 enforced, Telegram-secret style)."""
-    path = SECRETS_DIR / TOKEN_FILENAME
+    path = secrets_dir() / TOKEN_FILENAME
     if not path.exists():
         raise ConfigError(f"Missing secret: {path}. Create it (mode 600) with a Slack token that has search:read.")
     mode = path.stat().st_mode & 0o777

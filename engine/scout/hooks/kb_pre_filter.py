@@ -1,6 +1,11 @@
 """UserPromptSubmit hook — pre-session KB staleness scorer.
 
-Direct port of ~/Scout/hooks/kb-pre-filter.sh. Behavior identical:
+Port of ~/Scout/hooks/kb-pre-filter.sh. Behavior is identical except for the
+date-recognition widening in #26 (CET/CEST tails, the `HH:0x` obfuscated-minute
+convention, and the YAML `last_updated:` frontmatter key) — a strict superset:
+every string the bash parses still parses to the same instant, and the added
+forms are ones the bash silently classified NO_DATE.
+
   - Walks $SCOUT_DATA_DIR/knowledge-base/, classifying each *.md file
     as STALE / NO_DATE / FRESH against a per-file freshness budget.
   - Writes $SCOUT_DATA_DIR/.scout-cache/kb-filter.md so the SCOUT skill
@@ -35,6 +40,46 @@ from scout.ids import new_ulid
 # wall-clock dates with `date -j -f ... +%s`, then subtracts UTC-epoch seconds.
 # We must replicate the UTC-epoch arithmetic to stay correct across DST.
 ET = ZoneInfo("America/New_York")
+
+# Central European Time. #26: the vault's own brain files mandate Europe/Prague
+# for every date they write, so the rule that made a date correct was the rule
+# that made it unparseable here.
+PRAGUE = ZoneInfo("Europe/Prague")
+
+# Timezone abbreviations that may tail a date line, mapped to the zone each
+# denotes. Stripping the tail is not sufficient — the abbreviation has to select
+# the zone, or a Prague wall-clock gets read as an Eastern one and the age
+# arithmetic is silently 6h wrong. Absent any abbreviation the ET default is
+# retained, so every date form the bash original handled keeps its meaning.
+TZ_ABBREVIATIONS: dict[str, ZoneInfo] = {
+    "ET": ET,
+    "EDT": ET,
+    "EST": ET,
+    "CET": PRAGUE,
+    "CEST": PRAGUE,
+}
+
+# Matches a trailing *known* timezone abbreviation (and anything after it).
+# Longest alternatives first so CEST is not partially consumed as CET.
+TZ_TAIL_RE = re.compile(r"\s+(CEST|EDT|EST|CET|ET)\b.*$", re.IGNORECASE)
+
+# Fallback for abbreviations outside the map (BST, IST, JST, …). An explicit
+# enumeration goes stale, so anything that *looks* like a trailing abbreviation
+# is stripped and the configured default zone is used for it — we can strip a
+# zone we cannot name, we just can't resolve it.
+#
+# Case-sensitive on purpose: matching lowercase would let this eat ordinary
+# words. The AM/PM guard is load-bearing — `PM` is itself [A-Z]{2}, so without
+# it this silently truncates "April 22, 2026 12:34 PM" and breaks the
+# `%B %d, %Y %I:%M %p` format that the bash original handled.
+GENERIC_TZ_TAIL_RE = re.compile(r"\s+(?!AM\b|PM\b)[A-Z]{2,5}\b.*$")
+
+# The obfuscated-minute convention every Scout run writes into its own
+# "Last verified" line: the minute's units digit is rendered as a literal `x`
+# (e.g. `13:5x`). Normalising x -> 0 rounds the timestamp DOWN, which errs
+# toward "staler" — the safe direction for a staleness check. Anchored on a
+# real HH:M pair so an unrelated `x` in the string is never touched.
+OBFUSCATED_MINUTE_RE = re.compile(r"\b(\d{1,2}:[0-5])x\b", re.IGNORECASE)
 
 # Per-filename freshness budget (in hours). Bash lines 33-37.
 FRESHNESS_OVERRIDES: dict[str, int] = {
@@ -99,6 +144,28 @@ def _read_head(path: Path, n: int = HEAD_SCAN_LINES) -> list[str]:
 # -- public API --------------------------------------------------------------
 
 
+def configured_timezone() -> ZoneInfo:
+    """Resolve the vault's configured `user.timezone`, falling back to ET.
+
+    #26 cause 4: parse results were stamped `tzinfo=ET` unconditionally, so even
+    a date that *did* parse was labelled US Eastern — a 6h skew against the
+    freshness budgets in a Europe/Prague vault. An explicit abbreviation in the
+    date string still wins over this; this is only the default for bare dates
+    that carry no zone of their own.
+
+    Never raises — a hook must not block a session on a malformed config.
+    """
+    try:
+        from scout import config
+
+        name = (config.load_config().get("user") or {}).get("timezone")
+        if name:
+            return ZoneInfo(str(name))
+    except Exception:
+        pass
+    return ET
+
+
 def freshness_hours_for(path: Path, *, lines: list[str] | None = None) -> int:
     """Compute the freshness budget (hours) for a KB file.
 
@@ -127,10 +194,36 @@ def freshness_hours_for(path: Path, *, lines: list[str] | None = None) -> int:
     return DEFAULT_FRESHNESS_HOURS
 
 
+def _frontmatter_last_updated(lines: list[str]) -> str:
+    """Return the YAML `last_updated:` value from a leading `---` block.
+
+    Returns "" when the file has no frontmatter block or no such key.
+
+    #26: DREAMING.md instructs every run to maintain this machine-readable key,
+    but nothing ever read it — extract_date_string() only grepped the *prose*
+    "Last updated"/"Last verified" line, so files carrying only the frontmatter
+    property classified NO_DATE. Deliberately restricted to a real frontmatter
+    block, and anchored at the start of the line, so a body mention of
+    `last_updated:` is never harvested as one.
+    """
+    if not lines or lines[0].strip() != "---":
+        return ""
+    for raw in lines[1:]:
+        if raw.strip() == "---":
+            break
+        m = re.match(r"\s*last_updated\s*:\s*(.*)$", raw, re.IGNORECASE)
+        if m:
+            return m.group(1).strip().strip("\"'").strip()
+    return ""
+
+
 def extract_date_string(path: Path, *, lines: list[str] | None = None) -> str:
     """Extract the cleaned date string from a "Last Updated" / "Last Verified" line.
 
     Bash lines 99-106 — heavy sed cleanup. Replicates:
+    Ahead of the bash path, the YAML `last_updated:` frontmatter key is consulted
+    first when present (#26) — see _frontmatter_last_updated.
+
       1. head -25 | grep -i 'last updated\\|last verified' | head -1
       2. strip ** markers
       3. strip everything up through the first ':' followed by space
@@ -143,6 +236,13 @@ def extract_date_string(path: Path, *, lines: list[str] | None = None) -> str:
     the file twice per classify (#78).
     """
     head = lines if lines is not None else _read_head(path)
+
+    # The machine-readable frontmatter key is authoritative when present; the
+    # prose line below is the fallback for files that don't carry it (#26).
+    frontmatter = _frontmatter_last_updated(head)
+    if frontmatter:
+        return frontmatter
+
     line = ""
     for raw in head:
         # Single space (not \s+) for strict bash parity — bash uses literal " ".
@@ -167,8 +267,12 @@ def extract_date_string(path: Path, *, lines: list[str] | None = None) -> str:
     return line.strip()
 
 
-def parse_date(s: str) -> datetime | None:
+def parse_date(s: str, *, default_tz: ZoneInfo | None = None) -> datetime | None:
     """Parse a date string against the 5 known formats. Returns None on failure.
+
+    `default_tz` is the zone assumed for a date carrying no recognisable
+    abbreviation of its own; it defaults to ET so existing callers are
+    unaffected. run() passes the vault's configured zone (#26 cause 4).
 
     Bash lines 53-77 — also strips ' at ', ' ET'/' EDT'/' EST' tails, and
     parentheticals in its own pre-clean. We trust extract_date_string to have
@@ -179,15 +283,30 @@ def parse_date(s: str) -> datetime | None:
         return None
     cleaned = s.replace("**", "")
     cleaned = re.sub(r"\s+at\s+", " ", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+(ET|EDT|EST).*$", "", cleaned, flags=re.IGNORECASE)
+
+    # Strip the timezone tail, letting the abbreviation pick the zone (#26).
+    # A named abbreviation beats the configured default; an unrecognised one is
+    # still stripped, but can only fall back to the default.
+    tzinfo = default_tz or ET
+    tz_match = TZ_TAIL_RE.search(cleaned)
+    if tz_match:
+        tzinfo = TZ_ABBREVIATIONS[tz_match.group(1).upper()]
+        cleaned = cleaned[: tz_match.start()]
+    else:
+        generic = GENERIC_TZ_TAIL_RE.search(cleaned)
+        if generic:
+            cleaned = cleaned[: generic.start()]
+
     cleaned = re.sub(r"\s*\(.*$", "", cleaned)
+    # Resolve the `HH:0x` obfuscated-minute convention before strptime (#26).
+    cleaned = OBFUSCATED_MINUTE_RE.sub(r"\g<1>0", cleaned)
     cleaned = cleaned.strip()
     if not cleaned:
         return None
 
     for fmt in DATE_FORMATS:
         try:
-            return datetime.strptime(cleaned, fmt).replace(tzinfo=ET)
+            return datetime.strptime(cleaned, fmt).replace(tzinfo=tzinfo)
         except ValueError:
             continue
     return None
@@ -239,7 +358,13 @@ def discover_kb_files(scout_dir: Path) -> list[Path]:
     return candidates
 
 
-def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str, Any]]:
+def classify(
+    path: Path,
+    now: datetime,
+    scout_dir: Path,
+    *,
+    default_tz: ZoneInfo | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Classify a single file as STALE / FRESH / NO_DATE.
 
     Returns (label, details). For STALE/FRESH, details has age_hours,
@@ -255,7 +380,7 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
     if not datestr:
         return ("NO_DATE", {"rel": rel})
 
-    parsed = parse_date(datestr)
+    parsed = parse_date(datestr, default_tz=default_tz)
     if parsed is None:
         return ("NO_DATE", {"rel": rel})
 
@@ -340,6 +465,9 @@ def run(
         now = datetime.now(ZoneInfo("America/New_York"))
     now_et = now.strftime("%Y-%m-%d %H:%M ET")
 
+    # Resolve the configured zone once per run, not once per file (#26/#78).
+    default_tz = configured_timezone()
+
     files = discover_kb_files(scout_dir)
     stale: list[dict[str, Any]] = []
     no_date: list[dict[str, Any]] = []
@@ -347,7 +475,7 @@ def run(
 
     for f in files:
         try:
-            label, details = classify(f, now, scout_dir)
+            label, details = classify(f, now, scout_dir, default_tz=default_tz)
         except Exception:
             # One bad file must not block the rest. Treat as NO_DATE.
             label = "NO_DATE"

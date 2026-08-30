@@ -67,7 +67,7 @@ Check DMs received by {{USER_NAME}} from frequent contacts. Inbound DMs often co
 
 ### Replies on {{INSTANCE_NAME}}'s Own DM Threads (mandatory)
 
-{{USER_NAME}} often replies *inside the thread* of a {{INSTANCE_NAME}} notification DM rather than starting a new message — those replies are invisible to a flat DM/mention search and silently drop task-asks. For **every** message {{INSTANCE_NAME}} (the bot) sent into the `{{USER_SLACK_ID}}` DM within the lookback window, call `slack_read_thread` on that message's timestamp and read all replies. This mirrors the dreaming Step 1a feedback harvest, but here the goal is **action items**: any reply that asks {{INSTANCE_NAME}} to do something, corrects a fact, or assigns a task becomes a candidate action item (a direct task-ask is 🔴 for today).
+{{USER_NAME}} often replies *inside the thread* of a {{INSTANCE_NAME}} notification DM rather than starting a new message — those replies are invisible to a flat DM/mention search and silently drop task-asks. For **every** message {{INSTANCE_NAME}} (the bot) sent into the `{{USER_SLACK_ID}}` DM within the lookback window, call `slack_read_thread` on that message's timestamp and read all replies. This mirrors the dreaming Step 1c feedback harvest, but here the goal is **action items**: any reply that asks {{INSTANCE_NAME}} to do something, corrects a fact, or assigns a task becomes a candidate action item (a direct task-ask is 🔴 for today).
 
 **Coverage assertion:** do not claim "0 inbound" / "quiet window" until you have confirmed every in-window bot DM had its thread read. State the count checked (e.g., "read threads on 4 bot DMs since last run") so the coverage is auditable.
 

@@ -3,7 +3,7 @@ phase: mode
 name: feedback-processing
 slot: dreaming-phase-1
 mode: [dreaming]
-requires: slack
+requires: any-of(slack, notify:telegram)
 ---
 
 ## Phase 1: Feedback Processing
@@ -12,7 +12,49 @@ This is the self-improvement loop. Harvest feedback from {{USER_NAME}}'s reactio
 
 ***
 
-### Step 1a: Harvest Feedback from Slack
+### Step 1a: Determine which surfaces to harvest
+
+**Read `feedback.surfaces` from `scout-config.yaml` before reading anything.** It lists the surfaces to harvest, and it exists because the surface {{INSTANCE_NAME}} *publishes* the wrap on and the surface it *reads replies from* are configured independently and can drift apart. When they drift, nothing errors: the read still executes, still returns well-formed results, and still reports a clean `0 feedback signals` — true, correctly sourced, and no longer an answer to the question being asked.
+
+**Harvest every surface listed, and read Telegram first when it is one of them.** Telegram drops unconsumed updates after ~24h, so a missed read there *destroys* the signal; Slack history is permanent and can be re-read tomorrow.
+
+**Report counts per surface — `Telegram: N · Slack: M` — never a merged total.** One number cannot distinguish *"both surfaces quiet"* from *"one surface unread"*, and the second is the failure this step exists to catch.
+
+**Cross-check the config against where the wrap actually went.** If the last run's wrap was sent with `scoutctl notify telegram` and `feedback.surfaces` does not list `telegram`, stop and report that as a finding — it is the exact drift described above, live.
+
+***
+
+### Step 1b: Harvest Feedback from Telegram
+
+*Skip this step only if `telegram` is absent from `feedback.surfaces`.*
+
+```bash
+scoutctl notify telegram-read --since "<last dreaming session timestamp, ISO or epoch>"
+```
+
+The reader **never consumes the queue** — re-reads are idempotent, so running it twice is safe and running it in a session that later fails loses nothing.
+
+**Read its exit code, and never report a signal count off a non-zero one.** Four distinct states return an empty list at the Bot API call site — genuine silence, a registered webhook (`getUpdates` is blocked while one is set), a competing consumer, and an auth failure — and only the first is silence. The command distinguishes them for you:
+
+| Exit | Meaning | What you may report |
+|---|---|---|
+| `0` | The call executed against an unblocked queue | The count it printed, including `0` |
+| `1` | A fault — webhook registered, competing consumer, or API error | **Nothing.** Report the fault itself as a finding. `0 signals` is unsupported. |
+| `10` | Missing or insecurely-permissioned secrets | **Nothing.** Report the misconfiguration. |
+
+**Do not apply an authorship test here.** In a private chat `getUpdates` returns only *incoming* messages — the bot's own sends never come back — so every item printed is {{USER_NAME}}. The Slack self-DM footer test would discard real feedback if applied to this surface.
+
+**Replies arrive with their parent attached.** A `↳ replying to:` line means the item is feedback *on that specific wrap*; there is no second call to make and no thread to forget to open.
+
+**A `0 inbound` result is a statement about the last ~24h only,** not about the run window if that window is older. If the gap since the last dreaming session exceeds 24h, say so rather than reporting the window as quiet.
+
+**Reactions are unverified capability.** `message_reaction` is requested, but live delivery to a private-chat bot has not been confirmed against a real reaction. Never report *"0 reactions"* as an observation about {{USER_NAME}}.
+
+***
+
+### Step 1c: Harvest Feedback from Slack
+
+*Skip this step only if `slack` is absent from `feedback.surfaces`.*
 
 Read the bot's DM conversation with {{USER_NAME}} using `slack_read_channel` with channel_id `{{USER_SLACK_ID}}`.
 
@@ -30,9 +72,11 @@ Read the bot's DM conversation with {{USER_NAME}} using `slack_read_channel` wit
 
 Skip messages not authored by {{INSTANCE_NAME}}. Only harvest feedback on the bot's own outputs.
 
+**A thread read that errors is not a thread with no replies.** If `slack_read_thread` returns an error object, retry it before concluding anything — an un-executed call must never contribute to a `0 signals` count.
+
 ***
 
-### Step 1b: Classify Feedback Signals
+### Step 1d: Classify Feedback Signals
 
 Categorize every piece of harvested feedback into one of these signal types:
 
@@ -50,9 +94,9 @@ Categorize every piece of harvested feedback into one of these signal types:
 
 ***
 
-### Step 1c: Cross-Reference with Mistake Audit
+### Step 1e: Cross-Reference with Mistake Audit
 
-Read `knowledge-base/scout-mistake-audit.md`. For every negative or correction signal from Step 1b:
+Read `knowledge-base/scout-mistake-audit.md`. For every negative or correction signal from Step 1d:
 
 **If the signal matches an existing pattern in the mistake audit:**
 - Increment the occurrence count for that pattern.
@@ -75,13 +119,13 @@ Read `knowledge-base/scout-mistake-audit.md`. For every negative or correction s
 
 ***
 
-### Step 1d: Determine and Apply Improvements
+### Step 1f: Determine and Apply Improvements
 
 Based on the classified signals and mistake audit updates, determine what changes to make. Use this autonomy table:
 
 | Target File | Autonomy Level | Action |
 |---|---|---|
-| `knowledge-base/scout-mistake-audit.md` | **Direct edit** | Apply updates from Step 1c immediately |
+| `knowledge-base/scout-mistake-audit.md` | **Direct edit** | Apply updates from Step 1e immediately |
 | KB files (content corrections) | **Direct edit** | Fix factual errors identified by feedback (e.g., wrong status, wrong person, outdated info) |
 | `DREAMING.md` | **Direct edit** | Improve dreaming behavior based on patterns (e.g., adjust scoring weights, add checklist items) |
 | `SKILL.md` | **Direct edit (transparency + reversibility)** | Self-apply additive, feedback-aligned, or pattern-closing edits directly, committed with a clear message so the change is reviewable and `git revert`-able. See gate criteria below. |
@@ -98,7 +142,7 @@ Based on the classified signals and mistake audit updates, determine what change
 
 ***
 
-### Step 1e: Handle Proposals
+### Step 1g: Handle Proposals
 
 **First: apply approved AND ripe opt-out proposals.**
 
@@ -119,7 +163,7 @@ Clear the reminder when the back-port PR merges. The apply creates the debt; the
 
 **Then: apply additive improvements directly; file proposals only for gated changes.**
 
-For each improvement that targets `SKILL.md` (from Step 1d):
+For each improvement that targets `SKILL.md` (from Step 1f):
 - **Additive / feedback-aligned / pattern-closing** → apply directly to `SKILL.md` and commit with a descriptive, revertable message. No proposal needed. (If the harness blocks the commit, fall back to an opt-out proposal per the Harness fallback note above.)
 - **Large / structural / behavior-removing / uncertain / governance-or-safety-gating** → write a proposal using the format below (opt-out for the first four; governance/safety changes get `Status: Pending` and require an explicit `Approved`):
 
@@ -136,7 +180,7 @@ For each improvement that targets `SKILL.md` (from Step 1d):
 
 ***
 
-### Step 1f: Commit
+### Step 1h: Commit
 
 If Phase 1 made any changes (mistake audit updates, KB fixes, dreaming improvements, applied proposals, new proposals):
 

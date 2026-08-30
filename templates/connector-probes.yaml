@@ -37,3 +37,15 @@ drive:
 claude_sessions:
   primary: bash
   command: "test -d ~/.claude/projects"
+# Telegram is the one connector detected by a local secret rather than an MCP
+# namespace or a CLI login: the bot token IS the credential, and its presence is
+# exactly the condition under which both directions work. Probing the Bot API
+# instead would turn setup into a network call that fails for reasons unrelated
+# to whether the operator has configured anything.
+#
+# Registered so a vault can enable it — without a probe entry the key cannot be
+# selected by /scout-setup, and `phases/modes/feedback-processing.md` gates on it
+# via `requires: any-of(slack, notify:telegram)`.
+notify:telegram:
+  primary: bash
+  command: "test -r ~/.scout-secrets/telegram-bot-token"

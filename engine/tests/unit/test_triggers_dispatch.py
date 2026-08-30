@@ -160,6 +160,19 @@ def test_interactive_appends_needs_attention_artifact(fake_data_dir: Path):
     assert artifact.read_text().count("## ") == 2
 
 
+def test_interactive_push_names_the_absolute_artifact_path(fake_data_dir: Path):
+    """The push said "waiting in needs-attention.md" — a bare filename, whose
+    only available reading is "in your vault". When the writing process used a
+    different vault the pointer was dead, and nothing could correct the user.
+    """
+    telegram = _FakeTelegram()
+    trigger = _trigger(ActionKind.INTERACTIVE)
+    dispatch(trigger, _event(), vault=fake_data_dir, send_telegram=telegram)
+
+    body = telegram.calls[0]["body"]
+    assert str(fake_data_dir / "needs-attention.md") in body
+
+
 def test_interactive_without_telegram_is_still_ok(fake_data_dir: Path):
     trigger = _trigger(ActionKind.INTERACTIVE)
     outcome = dispatch(trigger, _event(), vault=fake_data_dir, send_telegram=_FakeTelegram(fail=True))

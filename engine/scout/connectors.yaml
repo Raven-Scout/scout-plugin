@@ -184,18 +184,25 @@ connectors:
         Setup docs: engine/scout/docs/connectors/whatsapp-setup.md
 
   notify:telegram:
-    display_name: Telegram (outbound)
+    display_name: Telegram (outbound + inbound)
     tier: official
-    capabilities: [outbound]
-    required_in_types: []   # outbound notifier — never required for any slot type
+    capabilities: [outbound, inbound]
+    required_in_types: []   # notifier — never required for any slot type
     remediation:
-      first_fix: "Check `~/.scout-secrets/telegram-bot-token` exists (mode 600); test with `scoutctl notify telegram --tier info --body 'health check'`."
+      first_fix: "Check `~/.scout-secrets/telegram-bot-token` exists (mode 600); test with `scoutctl notify telegram --tier info --body 'health check'` and `scoutctl notify telegram-read`."
       detail: |
-        Telegram outbound is a Bot API curl wrapped behind `scoutctl notify telegram`.
+        Telegram is a Bot API wrapper in both directions:
+          - outbound: `scoutctl notify telegram`      (sendMessage)
+          - inbound:  `scoutctl notify telegram-read` (getUpdates, never consumes)
+
         Token + numeric chat ID stored in ~/.scout-secrets/ (gitignored, mode 600).
+        The inbound reader needs only the token; the chat ID is outbound-only.
 
         Setup walkthrough: engine/scout/docs/connectors/telegram-setup.md
         (one-time @BotFather flow + chat-ID capture).
 
-        Bidirectional Telegram (the inbound return-bridge for replies as feedback
-        signals) is v0.7 territory per the v0.5+ event-architecture spec.
+        If a vault sets `feedback.surfaces: [telegram]` in scout-config.yaml this
+        connector is the ONLY feedback surface, so a failure here loses every reply
+        silently. Two properties follow: `telegram-read` exits non-zero rather than
+        reporting zero when the queue is blocked, and updates expire after ~24h — a
+        missed read destroys the signal instead of deferring it.

@@ -27,6 +27,28 @@ def _hermetic_env(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.
             monkeypatch.delenv(key, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _no_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Block outbound HTTP unless a test opts in with ``@pytest.mark.allow_network``.
+
+    ``_hermetic_env`` isolates the filesystem, but a module-level constant that
+    had already captured the real ``HOME`` let a unit test read live Telegram
+    credentials and message the developer for real. The action that sent it
+    swallows every exception, so nothing failed and nothing was logged. Cutting
+    egress at the adapter turns that silent success into a loud error.
+    """
+    if request.node.get_closest_marker("allow_network"):
+        return
+
+    def _blocked(self, req, *args, **kwargs):  # noqa: ANN001, ANN202
+        raise RuntimeError(
+            f"outbound HTTP blocked in tests: {req.method} {req.url} — "
+            "mark the test @pytest.mark.allow_network if this is intended."
+        )
+
+    monkeypatch.setattr("requests.adapters.HTTPAdapter.send", _blocked)
+
+
 @pytest.fixture
 def fake_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """A writable tmp data dir wired up via SCOUT_DATA_DIR."""
