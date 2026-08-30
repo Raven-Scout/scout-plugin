@@ -88,4 +88,5 @@ markers = [
     "perf: performance tests (may be skipped in fast CI runs)",
     "concurrency: tests involving multiple processes/threads",
     "slow: tests taking > 1 second",
+    "allow_network: test genuinely needs outbound HTTP (default is blocked)",
 ]

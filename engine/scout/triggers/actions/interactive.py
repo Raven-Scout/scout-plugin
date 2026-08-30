@@ -55,7 +55,10 @@ def run(
     # The push is best-effort — the artifact is the durable surface.
     notified: list[str] = []
     try:
-        send_telegram(tier="action_required", body=f"{summary}\n→ waiting in {ARTIFACT_FILENAME}")
+        # The path is absolute on purpose: a bare filename reads as "in your
+        # vault", which is a dead pointer whenever the writing process
+        # resolved a different vault than the reader will open.
+        send_telegram(tier="action_required", body=f"{summary}\n→ waiting in {artifact}")
         notified.append("telegram")
     except Exception:  # noqa: BLE001 — missing secrets must not lose the artifact
         pass

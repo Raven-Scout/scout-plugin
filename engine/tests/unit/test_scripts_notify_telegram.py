@@ -66,7 +66,7 @@ def secrets_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     d.mkdir()
     _write_secret(d / "telegram-bot-token", FAKE_TOKEN)
     _write_secret(d / "telegram-chat-id", FAKE_CHAT_ID)
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
     return d
 
 
@@ -74,7 +74,7 @@ def secrets_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def empty_secrets_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Hermetic secrets dir with NO credentials present."""
     d = tmp_path / "secrets"
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
     return d
 
 
@@ -133,7 +133,7 @@ def test_send_missing_chat_id_raises_config_error(tmp_path: Path, monkeypatch: p
     d.mkdir()
     _write_secret(d / "telegram-bot-token", FAKE_TOKEN)
     # chat-id deliberately absent
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
 
     with pytest.raises(ConfigError) as exc_info:
         notify_telegram.send(tier="info", body="test")
@@ -400,7 +400,7 @@ def test_read_secret_rejects_insecure_permissions(tmp_path: Path, monkeypatch: p
     bad = d / "telegram-bot-token"
     bad.write_text(FAKE_TOKEN)
     bad.chmod(0o644)  # world-readable — DEFAULT umask outcome, not safe
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
 
     with pytest.raises(ConfigError) as exc_info:
         notify_telegram._read_secret("telegram-bot-token")
@@ -419,7 +419,7 @@ def test_read_secret_rejects_group_readable_mode_640(tmp_path: Path, monkeypatch
     bad = d / "telegram-bot-token"
     bad.write_text(FAKE_TOKEN)
     bad.chmod(0o640)
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
 
     with pytest.raises(ConfigError, match="insecure permissions"):
         notify_telegram._read_secret("telegram-bot-token")
@@ -432,6 +432,19 @@ def test_read_secret_accepts_mode_600(tmp_path: Path, monkeypatch: pytest.Monkey
     ok = d / "telegram-bot-token"
     ok.write_text(FAKE_TOKEN)
     ok.chmod(0o600)
-    monkeypatch.setattr(notify_telegram, "SECRETS_DIR", d)
+    monkeypatch.setattr(notify_telegram, "secrets_dir", lambda: d)
 
     assert notify_telegram._read_secret("telegram-bot-token") == FAKE_TOKEN
+
+
+# ----- 12. Secrets dir is resolved at call time, not import time ------------
+
+
+def test_secrets_dir_resolves_home_at_call_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A module-level ``Path.home()`` captured the developer's real HOME during
+    pytest *collection*, before the hermetic-HOME fixture could run — which let
+    a hermetic test read live credentials and push a real Telegram message.
+    Resolving per call closes that window.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert notify_telegram.secrets_dir() == tmp_path / ".scout-secrets"

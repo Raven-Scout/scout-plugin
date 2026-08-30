@@ -218,3 +218,18 @@ def test_trigger_stats_rolls_up_fire_logs(fake_data_dir: Path):
     assert data["by_trigger"]["slack_mention_alex"]["error"] == 1
     assert data["by_trigger"]["gh_reviews"]["total"] == 1
     assert data["by_day"][today] == 3
+
+
+def test_trigger_fire_now_reports_no_telegram_delivery_when_hermetic(fake_data_dir: Path):
+    """`trigger fire-now` runs the real interactive action, whose push is
+    best-effort and swallows every exception. Under a hermetic HOME there are
+    no credentials, so a delivered push means the action reached outside the
+    test sandbox and messaged a real person.
+    """
+    _write_triggers(fake_data_dir, [_internal_trigger()])
+    result = runner.invoke(app, ["trigger", "fire-now", "slot_failures"])
+    assert result.exit_code == 0, result.output
+
+    log = next(iter((fake_data_dir / ".scout-logs").glob("trigger-fires-*.jsonl")))
+    row = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    assert row["detail"]["notified"] == [], f"real push escaped the sandbox: {row['detail']}"

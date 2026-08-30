@@ -48,7 +48,7 @@ def _write_token(tmp_path: Path) -> Path:
 def secrets(tmp_path, monkeypatch):
     """Point the shared secret reader at a tmp dir with a valid token."""
     _write_token(tmp_path)
-    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr("scout.scripts.notify_telegram.secrets_dir", lambda: tmp_path)
     monkeypatch.setattr(ti, "_tz", lambda: TZ)
     return tmp_path
 
@@ -207,7 +207,7 @@ def test_token_never_appears_in_a_fault_string(secrets):
 
 
 def test_missing_token_raises_config_error(tmp_path, monkeypatch):
-    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr("scout.scripts.notify_telegram.secrets_dir", lambda: tmp_path)
     with pytest.raises(ConfigError):
         ti.read()
 
@@ -216,7 +216,7 @@ def test_insecure_token_permissions_raise_config_error(tmp_path, monkeypatch):
     p = tmp_path / "telegram-bot-token"
     p.write_text(FAKE_TOKEN)
     p.chmod(0o644)
-    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr("scout.scripts.notify_telegram.secrets_dir", lambda: tmp_path)
     with pytest.raises(ConfigError):
         ti.read()
 
@@ -270,7 +270,7 @@ def test_cli_exits_1_on_fault(secrets):
 
 
 def test_cli_exits_10_on_missing_secrets(tmp_path, monkeypatch):
-    monkeypatch.setattr("scout.scripts.notify_telegram.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr("scout.scripts.notify_telegram.secrets_dir", lambda: tmp_path)
     res = CliRunner().invoke(cli.app, ["notify", "telegram-read"])
     assert res.exit_code == ConfigError.exit_code
 
