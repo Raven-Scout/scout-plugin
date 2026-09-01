@@ -32,7 +32,7 @@ def test_edit_comment_by_index_replaces_body_only(fake_data_dir: Path, monkeypat
         fake_data_dir,
         "- [ ] [#A3F7] task\n  - alex: first draft\n  - alex: second draft\n",
     )
-    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = edit_comment(
         by_id="A3F7",
@@ -59,7 +59,7 @@ def test_edit_comment_preserves_original_indent(fake_data_dir: Path, monkeypatch
         fake_data_dir,
         "- [ ] [#A3F7] task\n    - alice: nested note\n",
     )
-    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     edit_comment(
         by_id="A3F7",
@@ -74,7 +74,7 @@ def test_edit_comment_preserves_original_indent(fake_data_dir: Path, monkeypatch
 def test_edit_comment_rejects_empty_text(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _register_prefix(fake_data_dir)
     _make_daily(fake_data_dir, "- [ ] [#A3F7] task\n  - alex: original\n")
-    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     with pytest.raises(ActionItemError, match="new-text must not be empty"):
         edit_comment(by_id="A3F7", index=1, new_text="   ", data_dir=fake_data_dir)
@@ -86,7 +86,7 @@ def test_edit_comment_by_text_substring(fake_data_dir: Path, monkeypatch: pytest
         fake_data_dir,
         "- [ ] [#A3F7] task\n  - alex: ping vendor\n  - alex: legal sign-off\n",
     )
-    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.edit_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     edit_comment(
         by_id="A3F7",

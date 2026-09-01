@@ -10,9 +10,12 @@ ACTION_ITEMS_DIR = SCOUT_DIR / "action-items"
 
 
 def action_items_path(date: datetime.date | None = None) -> Path:
-    """Return the action items file path for a given date (defaults to today)."""
+    """Return the action items file path for a given date (defaults to today
+    in the configured timezone — scout.config.today, #207)."""
     if date is None:
-        date = datetime.date.today()
+        from scout.config import today
+
+        date = today()
     filename = f"action-items-{date.isoformat()}.md"
     return ACTION_ITEMS_DIR / filename
 

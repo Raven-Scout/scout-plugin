@@ -165,9 +165,9 @@ def session_cc_cache_cmd(
         help="Instance name suffix to exclude (skip Scout's own sessions).",
     ),
     timezone: str = typer.Option(
-        "America/New_York",
+        None,
         "--timezone",
-        help="IANA zone for the rendered timestamps.",
+        help="IANA zone for the rendered timestamps (default: the vault's configured timezone).",
     ),
 ) -> None:
     """Refresh .scout-cache/cc-sessions.md with metadata from recent CC sessions."""

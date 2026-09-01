@@ -23,13 +23,15 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
+from scout import config as scout_config
 from scout import paths
 
 OUTPUT_FILENAME = "session-context.json"
 KB_DATES_CACHE_FILENAME = "kb-dates.cache.json"
-DEFAULT_TZ = "America/New_York"
+# Kept as a named export for back-compat; the runtime default is the
+# CONFIGURED zone (tz_name=None -> scout.config.resolve_timezone, #207).
+DEFAULT_TZ = scout_config.DEFAULT_TIMEZONE
 DEFAULT_GIT_LOG_LOOKBACK = "12 hours ago"
 PR_LIST_LIMIT = 10
 KB_HEAD_SCAN_LINES = 5
@@ -262,7 +264,7 @@ def gather(
     session_type: str,
     *,
     scout_dir: Path | None = None,
-    tz_name: str = DEFAULT_TZ,
+    tz_name: str | None = None,
     now: datetime | None = None,
 ) -> SessionContext:
     """Collect all routine pre-session data into a :class:`SessionContext`.
@@ -271,7 +273,9 @@ def gather(
     ontology parser. Each upstream call is wrapped to never raise.
     """
     target = scout_dir or paths.data_dir()
-    tz = ZoneInfo(tz_name)
+    # Explicit tz_name wins (invalid names fall back inside the resolver);
+    # None means "the vault's configured zone" (#207).
+    tz = scout_config.timezone_or_default(tz_name) if tz_name else scout_config.resolve_timezone(target)
     now_dt = now or datetime.now(tz=tz)
     generated_at = now_dt.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
 

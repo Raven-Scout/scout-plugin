@@ -41,7 +41,7 @@ def test_snooze_by_id_inserts_until_subbullet(fake_data_dir: Path, monkeypatch: 
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## In Progress\n\n- [ ] [#A3F7] 🔴 Submit Lever feedback\n- [ ] 🟡 Other unrelated task\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = snooze(by_id="A3F7", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
 
@@ -60,7 +60,7 @@ def test_snooze_by_subject_fallback(fake_data_dir: Path, monkeypatch: pytest.Mon
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## To Do\n\n- [ ] 🔴 Followup with vendor on contract\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = snooze(by_subject="vendor", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
     assert "- snoozed-until: 2026-05-01" in daily.read_text()
@@ -72,7 +72,7 @@ def test_snooze_by_id_unknown_prefix_raises(fake_data_dir: Path, monkeypatch: py
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("- [ ] x\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     with pytest.raises(ActionItemError, match="prefix.*not found"):
         snooze(by_id="ZZZZ", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
@@ -85,7 +85,7 @@ def test_snooze_event_id_and_ts_well_formed(fake_data_dir: Path, monkeypatch: py
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("- [ ] [#A3F7] task\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = snooze(by_id="A3F7", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
     assert len(event.id) == 26
@@ -102,7 +102,7 @@ def test_snooze_records_from_kind_in_marker(fake_data_dir: Path, monkeypatch: py
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## 🔴 Urgent\n\n- [ ] [#A3F7] 🔴 task\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = snooze(
         by_id="A3F7",
@@ -123,7 +123,7 @@ def test_snooze_omits_from_kind_when_not_provided(fake_data_dir: Path, monkeypat
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("- [ ] [#A3F7] task\n")
-    monkeypatch.setattr("scout.action_items.snooze._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.snooze._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = snooze(by_id="A3F7", until=dt.date(2026, 5, 1), data_dir=fake_data_dir)
 

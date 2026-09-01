@@ -23,6 +23,7 @@ from pathlib import Path
 
 import yaml
 
+from scout import config as scout_config
 from scout.scripts.bootstrap_doctor import DoctorReport, run_doctor
 from scout.scripts.bootstrap_lock import (
     acquire_lock_with_wait,
@@ -167,7 +168,10 @@ def _template_vars(cfg: BootstrapConfig) -> dict[str, str]:
         "PLATFORM": cfg.platform,
         "MAX_BUDGET": cfg.connector_inputs.get("max_budget", "5.00"),
         "CLAUDE_BIN": cfg.connector_inputs.get("claude_bin", "/usr/local/bin/claude"),
-        "TODAY_DATE": _dt.date.today().isoformat(),
+        # Today in the timezone being installed (NOT the host clock, and not
+        # config.today(): during a fresh install the vault's scout-config.yaml
+        # does not exist yet, so the merged config cannot answer). #207.
+        "TODAY_DATE": _dt.datetime.now(scout_config.timezone_or_default(cfg.timezone)).date().isoformat(),
         "AUTO_UPDATE_ENABLED": cfg.connector_inputs.get("auto_update_enabled", "false"),
     }
 
@@ -227,7 +231,10 @@ def _unique_backup_path(target: Path) -> Path:
     of the day; on a second same-day run, appends ``-1``, ``-2``, ... so an
     earlier run's backup of a different hand-edit is never clobbered (#62).
     """
-    today = _dt.date.today().isoformat()
+    # Configured-zone date (ambient vault resolution) — cosmetic filename
+    # suffix, but it must not flip a day earlier/later than every other
+    # surface near midnight (#207).
+    today = scout_config.today().isoformat()
     base = target.with_name(f"{target.name}.bak.{today}")
     if not base.exists():
         return base

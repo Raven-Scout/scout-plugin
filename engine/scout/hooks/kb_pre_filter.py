@@ -28,13 +28,21 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from scout import paths
+from scout.config import resolve_timezone
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
-# Eastern Time — bash uses this implicitly via the system TZ when parsing
-# wall-clock dates with `date -j -f ... +%s`, then subtracts UTC-epoch seconds.
-# We must replicate the UTC-epoch arithmetic to stay correct across DST.
-ET = ZoneInfo("America/New_York")
+
+def _boundary_zone() -> ZoneInfo:
+    """Configured zone for freshness math (was hardcoded ET; #207).
+
+    The bash original used the system TZ implicitly when parsing wall-clock
+    dates with `date -j -f ... +%s`, then subtracted UTC-epoch seconds. We
+    replicate the UTC-epoch arithmetic to stay correct across DST — but the
+    zone is now the configured one, resolved per run.
+    """
+    return resolve_timezone()
+
 
 # Per-filename freshness budget (in hours). Bash lines 33-37.
 FRESHNESS_OVERRIDES: dict[str, int] = {
@@ -167,13 +175,16 @@ def extract_date_string(path: Path, *, lines: list[str] | None = None) -> str:
     return line.strip()
 
 
-def parse_date(s: str) -> datetime | None:
+def parse_date(s: str, tz: ZoneInfo | None = None) -> datetime | None:
     """Parse a date string against the 5 known formats. Returns None on failure.
 
     Bash lines 53-77 — also strips ' at ', ' ET'/' EDT'/' EST' tails, and
     parentheticals in its own pre-clean. We trust extract_date_string to have
     already cleaned the string, but apply the same minimal pre-clean here for
     parity (callers may pass raw strings).
+
+    The wall-clock date is interpreted in ``tz`` (default: the configured
+    zone). Callers in a loop should resolve the zone once and pass it in.
     """
     if not s:
         return None
@@ -185,9 +196,10 @@ def parse_date(s: str) -> datetime | None:
     if not cleaned:
         return None
 
+    zone = tz or _boundary_zone()
     for fmt in DATE_FORMATS:
         try:
-            return datetime.strptime(cleaned, fmt).replace(tzinfo=ET)
+            return datetime.strptime(cleaned, fmt).replace(tzinfo=zone)
         except ValueError:
             continue
     return None
@@ -239,7 +251,7 @@ def discover_kb_files(scout_dir: Path) -> list[Path]:
     return candidates
 
 
-def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str, Any]]:
+def classify(path: Path, now: datetime, scout_dir: Path, tz: ZoneInfo | None = None) -> tuple[str, dict[str, Any]]:
     """Classify a single file as STALE / FRESH / NO_DATE.
 
     Returns (label, details). For STALE/FRESH, details has age_hours,
@@ -255,18 +267,19 @@ def classify(path: Path, now: datetime, scout_dir: Path) -> tuple[str, dict[str,
     if not datestr:
         return ("NO_DATE", {"rel": rel})
 
-    parsed = parse_date(datestr)
+    zone = tz or _boundary_zone()
+    parsed = parse_date(datestr, tz=zone)
     if parsed is None:
         return ("NO_DATE", {"rel": rel})
 
-    # Bash interprets the wall-clock date in ET via `date -j -f` then subtracts
-    # UTC-epoch seconds. We must do the same: parse_date now returns an ET-aware
-    # datetime; attach ET to `now` if naive, then subtract via .timestamp() to
-    # get UTC-elapsed seconds (NOT wall-clock seconds — same-zone aware
-    # subtraction in Python returns wall-clock delta, which drifts 1h across DST
-    # boundaries).
-    now_et = now if now.tzinfo is not None else now.replace(tzinfo=ET)
-    age_seconds = now_et.timestamp() - parsed.timestamp()
+    # Bash interpreted the wall-clock date in the system zone via `date -j -f`
+    # then subtracted UTC-epoch seconds. We do the same in the configured zone:
+    # parse_date returns a zone-aware datetime; attach the zone to `now` if
+    # naive, then subtract via .timestamp() to get UTC-elapsed seconds (NOT
+    # wall-clock seconds — same-zone aware subtraction in Python returns
+    # wall-clock delta, which drifts 1h across DST boundaries).
+    now_aware = now if now.tzinfo is not None else now.replace(tzinfo=zone)
+    age_seconds = now_aware.timestamp() - parsed.timestamp()
     age_hours = int(age_seconds // 3600)
     budget = freshness_hours_for(path, lines=head_lines)
 
@@ -336,9 +349,12 @@ def run(
     if not kb_root.is_dir():
         return None
 
+    # Resolve the configured zone ONCE per run and thread it through — the
+    # classify loop would otherwise re-read the config per KB file.
+    zone = _boundary_zone()
     if now is None:
-        now = datetime.now(ZoneInfo("America/New_York"))
-    now_et = now.strftime("%Y-%m-%d %H:%M ET")
+        now = datetime.now(zone)
+    now_et = now.strftime("%Y-%m-%d %H:%M %Z")
 
     files = discover_kb_files(scout_dir)
     stale: list[dict[str, Any]] = []
@@ -347,7 +363,7 @@ def run(
 
     for f in files:
         try:
-            label, details = classify(f, now, scout_dir)
+            label, details = classify(f, now, scout_dir, tz=zone)
         except Exception:
             # One bad file must not block the rest. Treat as NO_DATE.
             label = "NO_DATE"

@@ -35,16 +35,16 @@ FILTER_OPTIONS = ["all", "🔴", "🟡", "🟢", "open", "done"]
 def _make_tui_note_line(note_text: str) -> str:
     """Format a TUI note line with a local timestamp.
 
-    Preserves the same format that the old tui/writer.py add_note used:
-      - **[TUI note, YYYY-MM-DD HH:MM AM/PM ET]:** <text>
-    Uses ZoneInfo("America/New_York") so DST transitions track correctly
-    (the source script's hardcoded UTC-4 silently drifted by one hour
-    November–March).
+    Preserves the same shape the old tui/writer.py add_note used:
+      - **[TUI note, YYYY-MM-DD HH:MM AM/PM <zone>]:** <text>
+    The zone is the CONFIGURED one (scout.config.resolve_timezone, #207) and
+    the label is the real %Z abbreviation (the old hardcoded "ET" + UTC-4
+    silently drifted by one hour November–March).
     """
-    from zoneinfo import ZoneInfo
+    from scout.config import resolve_timezone
 
-    now = _dt.datetime.now(ZoneInfo("America/New_York"))
-    timestamp = now.strftime("%Y-%m-%d %I:%M %p ET")
+    now = _dt.datetime.now(resolve_timezone())
+    timestamp = now.strftime("%Y-%m-%d %I:%M %p %Z")
     return f"  - **[TUI note, {timestamp}]:** {note_text}"
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-from scout import paths
+from scout import config, paths
 from scout.action_items._common import resolve_target
 from scout.action_items.parser import parse_file
 from scout.action_items.writer import flip_checkbox
@@ -18,9 +18,12 @@ from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
 
-def _today() -> dt.date:
-    """Indirection so tests can monkeypatch the date without freezing time."""
-    return dt.date.today()
+def _today(data_dir: Path | None = None) -> dt.date:
+    """Today in the configured day-boundary zone (scout.config.today, #207).
+
+    Indirection so tests can monkeypatch the date without freezing time.
+    """
+    return config.today(data_dir)
 
 
 def mark_done(
@@ -39,7 +42,7 @@ def mark_done(
     haven't been prefixed yet) — open tasks normally, done tasks when
     undoing (#116).
     """
-    target_path = paths.action_items_daily_path(data=data_dir, date=date or _today())
+    target_path = paths.action_items_daily_path(data=data_dir, date=date or _today(data_dir))
 
     # Parse if file exists; otherwise pass empty items list and let
     # resolve_target produce the right error (unknown prefix for by_id,

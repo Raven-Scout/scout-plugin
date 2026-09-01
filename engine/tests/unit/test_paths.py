@@ -87,7 +87,7 @@ def test_derived_paths_under_data_dir(tmp_path: Path) -> None:
 
 def test_action_items_daily_path_default_today(fake_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     today = dt.date(2026, 4, 24)
-    monkeypatch.setattr(paths, "_today", lambda: today)
+    monkeypatch.setattr(paths, "_today", lambda *a, **kw: today)
     p = paths.action_items_daily_path(data=fake_data_dir)
     assert p.name == "action-items-2026-04-24.md"
     assert p.parent == fake_data_dir / "action-items"

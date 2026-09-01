@@ -8,11 +8,12 @@ the user's crontab. Atomic rewrite via NamedTemporaryFile so a failed
 
 from __future__ import annotations
 
-import datetime as _dt
 import os
 import subprocess
 import tempfile
 from pathlib import Path
+
+from scout import config as scout_config
 
 TEMPLATE = Path(__file__).parent.parent / "defaults" / "cron-managed-block.tmpl"
 BLOCK_OPEN = "# >>> scout-managed >>>"
@@ -96,7 +97,9 @@ def _backup(previous: str, backup_dir: Path) -> None:
     """
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)
-        today = _dt.date.today().isoformat()
+        # Configured-zone date (scout.config.today) so the backup suffix
+        # agrees with every other daily stamp (#207).
+        today = scout_config.today().isoformat()
         (backup_dir / f".crontab.scout-bak.{today}").write_text(previous, encoding="utf-8")
     except OSError as e:
         # Best-effort — don't mask the successful crontab apply.

@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-from scout import paths
+from scout import config, paths
 from scout.action_items._common import (
     list_comment_lines,
     resolve_target,
@@ -30,8 +30,12 @@ from scout.events import Event, now_iso
 from scout.ids import new_ulid
 
 
-def _today() -> dt.date:
-    return dt.date.today()
+def _today(data_dir: Path | None = None) -> dt.date:
+    """Today in the configured day-boundary zone (scout.config.today, #207).
+
+    Indirection so tests can monkeypatch the date without freezing time.
+    """
+    return config.today(data_dir)
 
 
 def delete_comment(
@@ -43,7 +47,7 @@ def delete_comment(
     date: dt.date | None = None,
     data_dir: Path | None = None,
 ) -> Event:
-    target_path = paths.action_items_daily_path(data=data_dir, date=date or _today())
+    target_path = paths.action_items_daily_path(data=data_dir, date=date or _today(data_dir))
 
     items = parse_file(target_path) if target_path.exists() else []
     match, item_ulid, via = resolve_target(

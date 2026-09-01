@@ -79,18 +79,26 @@ def require_data_dir(data: Path | None = None) -> Path:
     return d
 
 
-def _today() -> _dt.date:
-    """Indirection so tests can monkeypatch the date without freezing time."""
-    return _dt.date.today()
+def _today(data: Path | None = None) -> _dt.date:
+    """Today in the configured day-boundary zone (scout.config.today).
+
+    Indirection so tests can monkeypatch the date without freezing time.
+    Imported lazily: scout.config imports scout.paths, so a module-level
+    import here would be circular.
+    """
+    from scout.config import today
+
+    return today(data)
 
 
 def action_items_daily_path(data: Path | None = None, date: _dt.date | None = None) -> Path:
-    """Return the daily action-items markdown path for `date` (default today).
+    """Return the daily action-items markdown path for `date` (default: today
+    in the configured timezone — see scout.config.today, #207).
 
     Filename format matches the existing ~/Scout convention:
     `action-items-YYYY-MM-DD.md` under the data dir's `action-items/`.
     """
-    d = date or _today()
+    d = date or _today(data)
     return action_items_dir(data) / f"action-items-{d.isoformat()}.md"
 
 

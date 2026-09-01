@@ -8,11 +8,12 @@ is safe to run on every upgrade.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+from scout import config as scout_config
 
 DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 
@@ -315,7 +316,8 @@ def migrate_perfile(vault: Path, default_date: str | None = None) -> dict:
     if not needs_migration(vault):
         return {"migrated": False}
 
-    default_date = default_date or _dt.date.today().isoformat()
+    # Configured-zone today for this vault (scout.config.today, #207).
+    default_date = default_date or scout_config.today(vault).isoformat()
 
     docs = vault / "docs"
     wishlist_out = docs / "wishlist"

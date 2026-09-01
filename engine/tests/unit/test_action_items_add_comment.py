@@ -37,7 +37,7 @@ def test_add_comment_by_id_inserts_subbullet(fake_data_dir: Path, monkeypatch: p
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## In Progress\n\n- [ ] [#A3F7] 🔴 Submit Lever feedback\n- [ ] 🟡 Other unrelated task\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = add_comment(by_id="A3F7", comment="Hiring manager confirmed", data_dir=fake_data_dir)
 
@@ -60,7 +60,7 @@ def test_add_comment_custom_author_prefix(fake_data_dir: Path, monkeypatch: pyte
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## To Do\n\n- [ ] 🔴 Followup with vendor on contract\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = add_comment(by_subject="vendor", comment="test", author="Vaclav Nosek", data_dir=fake_data_dir)
     assert "  - Vaclav Nosek: test" in daily.read_text()
@@ -71,7 +71,7 @@ def test_add_comment_by_subject_fallback(fake_data_dir: Path, monkeypatch: pytes
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("## To Do\n\n- [ ] 🔴 Followup with vendor on contract\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = add_comment(by_subject="vendor", comment="Email sent 4/26", data_dir=fake_data_dir)
     assert "  - scout: Email sent 4/26" in daily.read_text()
@@ -83,7 +83,7 @@ def test_add_comment_by_id_unknown_prefix_raises(fake_data_dir: Path, monkeypatc
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("- [ ] x\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     with pytest.raises(ActionItemError, match="prefix.*not found"):
         add_comment(by_id="ZZZZ", comment="x", data_dir=fake_data_dir)
@@ -96,7 +96,7 @@ def test_add_comment_event_id_and_ts_well_formed(fake_data_dir: Path, monkeypatc
     daily = fake_data_dir / "action-items" / "action-items-2026-04-26.md"
     daily.parent.mkdir(parents=True, exist_ok=True)
     daily.write_text("- [ ] [#A3F7] task\n")
-    monkeypatch.setattr("scout.action_items.add_comment._today", lambda: dt.date(2026, 4, 26))
+    monkeypatch.setattr("scout.action_items.add_comment._today", lambda *a, **kw: dt.date(2026, 4, 26))
 
     event = add_comment(by_id="A3F7", comment="x", data_dir=fake_data_dir)
     assert len(event.id) == 26

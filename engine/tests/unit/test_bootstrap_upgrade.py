@@ -262,12 +262,8 @@ def test_unique_backup_path_never_clobbers_same_day(tmp_path, monkeypatch):
     distinct paths, so the first hand-edit's backup is never overwritten."""
     import scout.scripts.bootstrap as bs
 
-    class _FixedDate(_dt.date):
-        @classmethod
-        def today(cls):
-            return cls(2026, 6, 15)
-
-    monkeypatch.setattr(bs._dt, "date", _FixedDate)
+    # Backup names come from the configured-zone day boundary now (#207).
+    monkeypatch.setattr(bs.scout_config, "today", lambda *a, **kw: _dt.date(2026, 6, 15))
 
     target = tmp_path / "run-scout.sh"
 

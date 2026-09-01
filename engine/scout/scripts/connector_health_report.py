@@ -11,10 +11,9 @@ Direct port of ``~/Scout/scripts/connector-health-report.sh``. Rules preserved:
 Connector roster sourced from :mod:`scout.connectors` (Task 1) — replaces the
 hardcoded CRITICAL / OPTIONAL / REQUIRED_IN / REMEDIATION dicts in the bash.
 
-Note on timezone: the bash original hardcoded ``-4`` (EDT only). This port uses
-``zoneinfo.ZoneInfo("America/New_York")`` which auto-handles DST. The displayed
-abbreviations match in EDT and become correct in EST (the bash silently rendered
-"ET" with the wrong offset in winter). This is a behavioral upgrade.
+Note on timezone: the bash original hardcoded ``-4`` (EDT only); an earlier
+port hardcoded ``America/New_York``. Timestamps now render in the CONFIGURED
+zone (scout.config.resolve_timezone, #207) with the real ``%Z`` abbreviation.
 """
 
 from __future__ import annotations
@@ -31,12 +30,18 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from scout import paths
+from scout.config import resolve_timezone
 from scout.connectors import Capability, Connector, ConnectorRegistry, load_registry
 from scout.events import Event, now_iso
 from scout.ids import new_ulid
 from scout.schedule import SlotType
 
-ET = ZoneInfo("America/New_York")
+
+def _zone() -> ZoneInfo:
+    """Configured display/day-boundary zone (was hardcoded ET; #207)."""
+    return resolve_timezone()
+
+
 DEFAULT_WINDOW_DAYS = 14
 DEFAULT_RETAIN_DAYS = 30
 DEFAULT_MATRIX_DEPTH = 10
@@ -290,7 +295,7 @@ def recent_error_sample(records: list[dict[str, Any]], c: str, limit: int = 140)
 def fmt_ts(ts: datetime | None) -> str:
     if not ts:
         return "never"
-    return ts.astimezone(ET).strftime("%b %-d %H:%M ET")
+    return ts.astimezone(_zone()).strftime("%b %-d %H:%M %Z")
 
 
 def compute_critical_alerts(
@@ -435,7 +440,7 @@ def render_health_md(
         "",
         "Parent: [[knowledge-base]]",
         "",
-        f"**Last updated:** {now.astimezone(ET).strftime('%Y-%m-%d %H:%M ET')}",
+        f"**Last updated:** {now.astimezone(_zone()).strftime('%Y-%m-%d %H:%M %Z')}",
         f"**Window:** last 14 days, scheduled scout runs only (`{len(recent)}` of `{len(session_list)}` shown).",
         "",
     ]
@@ -470,7 +475,7 @@ def render_health_md(
 
     headers: list[str] = []
     for sid in recent_ids:
-        ts = sessions_by_id[sid][0]["_ts"].astimezone(ET)
+        ts = sessions_by_id[sid][0]["_ts"].astimezone(_zone())
         mode = sessions_by_id[sid][0].get("mode", "?")
         headers.append(f"{ts.strftime('%m-%d %H%M')}<br/>{_compact_mode(mode)}")
 
@@ -534,7 +539,7 @@ def render_pending_alerts_md(
 ) -> str:
     lines = [
         f"🔴 **Connector alerts** (from scout run `{current_mode}` at "
-        f"{now.astimezone(ET).strftime('%b %-d %H:%M ET')}):"
+        f"{now.astimezone(_zone()).strftime('%b %-d %H:%M %Z')}):"
     ]
     for a in alerts:
         icon = "🔴" if a.level == "CRITICAL" else "⚠️"
@@ -651,7 +656,7 @@ def run(
 
     pending_path.parent.mkdir(parents=True, exist_ok=True)
     if alerts:
-        ts_str = n.astimezone(ET).strftime("%Y-%m-%d %H:%M:%S ET")
+        ts_str = n.astimezone(_zone()).strftime("%Y-%m-%d %H:%M:%S %Z")
         try:
             with alerts_path.open("a", encoding="utf-8") as f:
                 for a in alerts:

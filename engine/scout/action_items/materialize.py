@@ -23,13 +23,11 @@ from __future__ import annotations
 
 import datetime as _dt
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from scout import paths
-from scout.config import load_config
+from scout.config import resolve_timezone
 
 LOOKBACK_DAYS = 7
-DEFAULT_TZ = "America/New_York"
 
 _BANNER = (
     "**Mechanical carry-forward** — materialized at {now} from "
@@ -37,19 +35,6 @@ _BANNER = (
     "briefing/consolidation rewrites this file in full; until then every open "
     "item below carries as-is so nothing is invisible."
 )
-
-
-def _configured_tz(data_dir: Path | None) -> ZoneInfo:
-    """User timezone from the merged config; falls back to DEFAULT_TZ.
-
-    Mirrors pre_session_data's fallback rather than raising — the backstop
-    must never block a run over a config problem.
-    """
-    try:
-        tz_name = load_config(data_dir).get("user", {}).get("timezone") or DEFAULT_TZ
-        return ZoneInfo(tz_name)
-    except Exception:
-        return ZoneInfo(DEFAULT_TZ)
 
 
 def _human_date(d: _dt.date) -> str:
@@ -77,7 +62,9 @@ def materialize(
     Returns the created path, or None when there was nothing to do (the file
     already exists, or no prior daily file exists within LOOKBACK_DAYS).
     """
-    tz = _configured_tz(data_dir)
+    # resolve_timezone never raises — the backstop must never block a run
+    # over a config problem (fallback lives inside the resolver; #207).
+    tz = resolve_timezone(data_dir)
     now = _dt.datetime.now(tz)
     target_date = date or now.date()
     target = paths.action_items_daily_path(data_dir, date=target_date)
