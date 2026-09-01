@@ -85,6 +85,32 @@ def test_retries_on_connection_closed_mid_response(tmp_path: Path) -> None:
     assert _attempts(scout_dir) == 2, "wrapper should have retried after the dropped connection"
 
 
+def test_retries_on_sleep_mid_response(tmp_path: Path) -> None:
+    """Lid-close/clamshell sleep must be retried like any other sleep death.
+
+    Regression context: a lid-close mid-run makes the CLI emit "Your computer
+    went to sleep mid-response" — a different string from the idle-sleep
+    "Connection closed mid-response" already covered — so the wrapper
+    hard-failed with zero retries and the whole session's work was discarded.
+    """
+    scout_dir = tmp_path / "Scout"
+    scout_dir.mkdir()
+    script = _render(TEMPLATE, scout_dir)
+    fake = _fake_claude(
+        scout_dir,
+        first_attempt_output=(
+            "API Error: Your computer went to sleep mid-response. The response above may be incomplete."
+        ),
+        first_attempt_exit=1,
+    )
+    log_file = scout_dir / "run.log"
+
+    result = _run(script, fake, log_file)
+
+    assert result.returncode == 0, log_file.read_text()
+    assert _attempts(scout_dir) == 2, "wrapper should have retried after the lid-close sleep"
+
+
 def test_existing_transient_pattern_still_retries(tmp_path: Path) -> None:
     """Guard: editing the regex alternation must not break a pre-existing pattern."""
     scout_dir = tmp_path / "Scout"
