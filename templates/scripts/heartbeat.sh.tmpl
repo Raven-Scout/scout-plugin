@@ -36,4 +36,4 @@ if [[ "${1:-}" == "--dry-run" ]]; then
     DRY_RUN_FLAG=("--dry-run")
 fi
 
-exec "$SCOUTCTL_BIN" heartbeat run "${DRY_RUN_FLAG[@]}"
+exec "$SCOUTCTL_BIN" heartbeat run ${DRY_RUN_FLAG[@]+"${DRY_RUN_FLAG[@]}"}
