@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
+
 
 ### Changed
 - **The vault's `scout-config.yaml` is actually read** (`engine/scout/config.py`, `engine/scout/paths.py`) — `paths.config_path()` resolved to `.scout-config.yaml`, a dotfile no code path has ever written, so the entire user-override layer was silently dead for every vault. It now resolves to the undotted file `/scout-setup` and bootstrap write. **Configured budgets, thresholds and timezone reach their consumers for the first time**, so a legacy or hand-calibrated vault will see enforcement move off the silent 50/5h/80 defaults onto whatever its `plan:`/`thresholds:` block says. Legacy key shapes are normalized on read (top-level `timezone` → `user.timezone`; `connectors.inputs.github_username`/`user_slack_id` → `user.*`) and the vault file is never rewritten. The layer is read tolerantly: unreadable YAML, a non-mapping, a permission error or non-UTF-8 degrades to packaged defaults with a one-line stderr warning instead of killing an unattended run, and a scalar where the defaults define a mapping is ignored rather than clobbering the subtree. Budget knobs are bounds-checked — an out-of-range value (`rate_limit_window_hours: 0` or negative, `skip_threshold_pct` outside 0–100) falls back to its default with a warning rather than silently disabling the governor; `daily_budget_estimate_usd: 0` remains legal. Both hot-path config readers now share one section-aware scanner (`engine/scout/scripts/_config_scan.py`), so a key only counts under its own parent. (#207, #202)
