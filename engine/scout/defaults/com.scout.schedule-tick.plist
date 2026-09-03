@@ -3,11 +3,18 @@
 <!--
   com.scout.schedule-tick.plist — runs `scoutctl schedule tick` every 5 min.
 
-  Installed by `scoutctl schedule install-plist`, which fills __USER_HOME__
-  and __SCOUTCTL_BIN__ at install time. __SCOUTCTL_BIN__ defaults to
-  ~/scout-plugin/.venv/bin/scoutctl (canonical layout) but falls back to
-  the venv that ran the install command so non-canonical layouts work too.
+  Installed by `scoutctl schedule install-plist`, which fills the USER_HOME
+  and SCOUTCTL_BIN placeholders (spelled with surrounding double underscores
+  in the values below) at install time. SCOUTCTL_BIN resolves to
+  .venv/bin/scoutctl under the running engine's plugin root, so canonical
+  clones, dev trees, and marketplace installs all work.
   Replaces the 7 per-slot legacy plists deleted in Task 11.
+
+  Never write the placeholder tokens verbatim in this comment: install-time
+  substitution is a whole-file replace, and a substituted path containing a
+  double hyphen (e.g. a marketplace install under an "owner"+"repo" dir
+  joined by two hyphens) is illegal inside an XML comment no matter how it
+  is escaped.
 -->
 <plist version="1.0">
 <dict>
