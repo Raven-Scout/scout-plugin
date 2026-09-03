@@ -52,8 +52,12 @@ if [ -z "$MATCHES" ]; then
     exit 1
 fi
 
-# Rate limit detected — extract the first matching line for context
-FIRST_MATCH=$(echo "$MATCHES" | head -1 | cut -c1-200)
+# Rate limit detected — extract the first matching line for context.
+# No pipe into `head`: it exits after one line and SIGPIPEs the writer (141), which
+# `pipefail` would promote to the assignment's status and `set -e` would turn into a
+# 141 exit — read by the caller as "no rate limit". $MATCHES is unbounded (every
+# matching line in a 100-line tail), so it can outgrow the pipe buffer.
+FIRST_MATCH=$(head -1 <<<"$MATCHES" | cut -c1-200)
 
 if [ "$WRITE_TRACKER" = "--write-tracker" ]; then
     TIMESTAMP=$(TZ=UTC date '+%Y-%m-%dT%H:%M:%SZ')

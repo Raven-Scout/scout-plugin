@@ -77,8 +77,16 @@ while :; do
         exit "$exit_code"
     fi
 
-    if ! tail -50 "$LOG_FILE" | grep -qE "$TRANSIENT_PATTERNS"; then
-        if tail -50 "$LOG_FILE" | grep -qE "$AUTH_PATTERNS"; then
+    # Snapshot the tail once, then match against the variable. `tail … | grep -q`
+    # SIGPIPEs the writer (141) as soon as grep matches, and `pipefail` makes 141 the
+    # pipeline's status — which would silently reclassify a transient failure as
+    # "not transient" and skip the retry this wrapper exists for. A 50-line tail is
+    # bounded in lines, not bytes, so it can outgrow the pipe buffer on a chatty run.
+    # `|| true` keeps an unreadable log from aborting the wrapper under `set -e`,
+    # so the real claude exit code still reaches the caller (prior behavior).
+    LOG_TAIL="$(tail -50 "$LOG_FILE" 2>/dev/null || true)"
+    if ! grep -qE "$TRANSIENT_PATTERNS" <<<"$LOG_TAIL"; then
+        if grep -qE "$AUTH_PATTERNS" <<<"$LOG_TAIL"; then
             {
                 echo "=== Authentication failure (HTTP 401/403) — no retry (exit $exit_code) ==="
                 echo "    Claude Code's API credentials were rejected. This blocks every scheduled {{INSTANCE_NAME}} run until re-authenticated."
