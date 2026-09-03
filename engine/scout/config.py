@@ -2,14 +2,25 @@
 
 Precedence (low → high, later overrides earlier):
   1. Engine defaults (scout/defaults/scout-config.yaml, shipped with package)
-  2. User overrides ($SCOUT_DATA_DIR/.scout-config.yaml)
+  2. The vault's scout-config.yaml ($SCOUT_DATA_DIR/scout-config.yaml — the
+     file /scout-setup and bootstrap write; NO dot, see #207/#202)
   3. SCOUT_* environment variables (whitelisted keys)
+
+The vault file doubles as bootstrap state (version stamps, connectors,
+schedule, plan) and predates the canonical schema, so layer 2 is read
+tolerantly: legacy key shapes are normalized on read (never rewritten on
+disk), unreadable YAML degrades to defaults with a stderr warning, and a
+scalar where the defaults define a mapping is ignored with a warning instead
+of clobbering the subtree. This layer was silently dead for every existing
+vault until #207 — tolerance keeps switching it on from turning a stale or
+hand-mangled file into a crash.
 """
 
 from __future__ import annotations
 
 import datetime as _dt
 import os
+import sys
 from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any
@@ -72,14 +83,80 @@ def _read_packaged_defaults() -> dict[str, Any]:
         return _read_yaml(path)
 
 
+def _warn(msg: str) -> None:
+    """One-line stderr warning. The silent-defaults fallback is what kept
+    #202 invisible for so long — degradation must be loud enough to spot in
+    --verbose output and run logs, but must never raise."""
+    print(f"scout-config: {msg}", file=sys.stderr)
+
+
+def _normalize_legacy_keys(overrides: dict[str, Any]) -> dict[str, Any]:
+    """Map the key shapes bootstrap actually writes onto the canonical schema
+    (#207 §2). Read-side only — the vault file is never rewritten, so
+    existing vaults need no migration. Explicit canonical ``user.*`` keys
+    always win; legacy keys only fill gaps.
+
+      timezone (top level)               → user.timezone
+      connectors.inputs.github_username  → user.github_username
+      connectors.inputs.user_slack_id    → user.slack_user_id
+    """
+    out = dict(overrides)
+    raw_user = out.get("user")
+    user: dict[str, Any] = dict(raw_user) if isinstance(raw_user, dict) else {}
+
+    def fill(canonical: str, value: object) -> None:
+        if isinstance(value, str) and value and not user.get(canonical):
+            user[canonical] = value
+
+    fill("timezone", out.get("timezone"))
+    connectors = out.get("connectors")
+    inputs = connectors.get("inputs") if isinstance(connectors, dict) else None
+    if isinstance(inputs, dict):
+        fill("github_username", inputs.get("github_username"))
+        fill("slack_user_id", inputs.get("user_slack_id"))
+
+    if user:
+        out["user"] = user
+    return out
+
+
+def _merge_user_layer(defaults: dict[str, Any], overrides: dict[str, Any], _path: str = "") -> dict[str, Any]:
+    """Deep merge with a guard: where the DEFAULTS define a mapping, a
+    non-mapping override is ignored with a warning instead of replacing the
+    subtree (a stale ``user: oops`` must not take user.timezone down with
+    it). Keys unknown to the defaults — bootstrap state like ``plugin`` or
+    ``schedule`` — merge through silently."""
+    result = dict(defaults)
+    for key, value in overrides.items():
+        where = f"{_path}{key}"
+        if key in result and isinstance(result[key], dict):
+            if isinstance(value, dict):
+                result[key] = _merge_user_layer(result[key], value, f"{where}.")
+            else:
+                _warn(f"ignoring '{where}': expected a mapping, got {type(value).__name__} — using defaults")
+        else:
+            result[key] = value
+    return result
+
+
 def load_config(data_dir: Path | None = None) -> dict[str, Any]:
-    """Load the three-layer merged config."""
+    """Load the three-layer merged config.
+
+    Never raises on a bad VAULT file — the packaged defaults must scream
+    (a broken wheel is a bug), but the user layer warns and degrades so a
+    stale or hand-mangled scout-config.yaml cannot block a run.
+    """
     defaults = _read_packaged_defaults()
     user_path = paths.config_path(data_dir)
-    user_overrides = _read_yaml(user_path)
+    try:
+        user_overrides = _read_yaml(user_path)
+    except (ConfigError, OSError, UnicodeDecodeError) as e:
+        # OSError: permissions/races; UnicodeDecodeError: binary corruption.
+        _warn(f"ignoring unreadable {user_path.name}: {e} — running on packaged defaults")
+        user_overrides = {}
     env_overrides = _env_overrides()
 
-    merged = _deep_merge(defaults, user_overrides)
+    merged = _merge_user_layer(defaults, _normalize_legacy_keys(user_overrides))
     merged = _deep_merge(merged, env_overrides)
     return merged
 

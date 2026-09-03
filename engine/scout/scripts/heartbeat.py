@@ -9,7 +9,7 @@ all three derived values plus the pgrep / git-status side checks.
 
 Gating order (preserved from bash):
   1. Another ``claude .*scout-`` process already running → skip
-  2. Off-peak detection from ``.scout-config.yaml`` (used by gate 5)
+  2. Off-peak detection from ``scout-config.yaml`` (used by gate 5)
   3. Budget check (delegates to ``scoutctl budget check`` so its tracker
      parse is shared with #87's optimization)
   4. Minimum gap since last session (default 120 min)
@@ -36,9 +36,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from scout import paths
+from scout.scripts._config_scan import scan_overrides
 
 # Defaults mirror heartbeat.sh constants so behavior is preserved when no
-# .scout-config.yaml is present.
+# scout-config.yaml is present.
 DEFAULT_OFF_PEAK_START = 23
 DEFAULT_OFF_PEAK_END = 6
 DEFAULT_MIN_GAP_MINUTES = 120
@@ -51,15 +52,22 @@ EXIT_SKIPPED = 0  # bash returns 0 on intentional skip too
 EXIT_ERROR = 1
 
 _TRACKER_FILENAME = "usage-tracker.jsonl"
-_CONFIG_FILENAME = ".scout-config.yaml"
 _RESEARCH_QUEUE_REL = "knowledge-base/research-queue.md"
 _RESEARCH_QUEUE_DIR_REL = "knowledge-base/research-queue"
 
-_CONFIG_LINE_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\s][^#]*?)\s*(?:#.*)?$")
-
+# Flat spellings — back-compat with hand-made override files.
 _CONFIG_KEYS = {
     "off_peak_start": "off_peak_start",
     "off_peak_end": "off_peak_end",
+}
+
+# The shape /scout-setup actually writes (templates/scout-config.yaml.tmpl):
+#   off_peak:
+#     start: 23
+#     end: 6
+_NESTED_CONFIG_KEYS = {
+    ("off_peak", "start"): "off_peak_start",
+    ("off_peak", "end"): "off_peak_end",
 }
 
 
@@ -77,10 +85,13 @@ class HeartbeatConfig:
 
 
 def load_config(config_path: Path) -> HeartbeatConfig:
-    """Parse only the two scalar keys heartbeat cares about from .scout-config.yaml.
+    """Parse only the off-peak keys heartbeat cares about from scout-config.yaml.
 
     Missing file or unparseable values silently fall back to defaults, matching
-    the bash original's tolerant ``grep | awk`` pattern.
+    the bash original's tolerant ``grep | awk`` pattern. The scan is the shared
+    two-level reader (still no pyyaml on this hot path): it understands both the
+    nested ``off_peak: {start, end}`` shape /scout-setup writes and the flat
+    ``off_peak_start/off_peak_end`` spellings.
     """
     if not config_path.exists():
         return HeartbeatConfig()
@@ -89,14 +100,7 @@ def load_config(config_path: Path) -> HeartbeatConfig:
     except OSError:
         return HeartbeatConfig()
     overrides: dict[str, int] = {}
-    for line in text.splitlines():
-        m = _CONFIG_LINE_RE.match(line)
-        if not m:
-            continue
-        yaml_key, raw_value = m.group(1), m.group(2).strip().strip("\"'")
-        field_name = _CONFIG_KEYS.get(yaml_key)
-        if field_name is None:
-            continue
+    for field_name, raw_value in scan_overrides(text, flat_keys=_CONFIG_KEYS, nested_keys=_NESTED_CONFIG_KEYS).items():
         try:
             overrides[field_name] = int(raw_value)
         except (TypeError, ValueError):
@@ -432,7 +436,9 @@ def run(
     """
     target = data_dir or paths.data_dir()
     tracker_path = paths.logs_dir(target) / _TRACKER_FILENAME
-    config_path = target / _CONFIG_FILENAME
+    # Through paths.config_path — heartbeat's own hardcoded dotted filename
+    # was the file-that-nothing-writes half of #207 (comment thread).
+    config_path = paths.config_path(target)
     log_path = paths.logs_dir(target) / "heartbeat.log"
 
     # Resolve the vault's configured zone once for every log stamp this tick

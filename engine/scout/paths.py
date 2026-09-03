@@ -52,7 +52,16 @@ def state_dir(data: Path | None = None) -> Path:
 
 
 def config_path(data: Path | None = None) -> Path:
-    return (data or data_dir()) / ".scout-config.yaml"
+    """The vault's config file — ``scout-config.yaml``, NO dot.
+
+    This is the file /scout-setup and bootstrap actually write. The loader
+    historically pointed at ``.scout-config.yaml``, a dotfile no code path
+    ever wrote, which silently disabled the whole user-override layer
+    (#207/#202). The undotted file holds bootstrap state (version stamps,
+    connectors, schedule) alongside user overrides; scout.config.load_config
+    normalizes its legacy key shapes on read.
+    """
+    return (data or data_dir()) / "scout-config.yaml"
 
 
 def kb_dir(data: Path | None = None) -> Path:
