@@ -287,3 +287,18 @@ def test_cli_json_is_parsable(secrets):
         res = CliRunner().invoke(cli.app, ["notify", "telegram-read", "--json"])
     assert res.exit_code == 0
     assert json.loads(res.stdout)["reported"] == 1
+
+
+def test_flatten_handles_a_falsy_edited_message():
+    """A present-but-empty `edited_message` must not fall through to `message`.
+
+    The guard admits the update on the key alone, so `update.get("edited_message")
+    or update["message"]` raised KeyError whenever the value was falsy — an
+    update shape Telegram is free to send and the reader cannot refuse.
+    """
+    flat = ti._flatten({"update_id": 1, "edited_message": {}}, TZ)
+    assert flat is not None
+    assert flat["kind"] == "edited_message"
+    assert flat["update_id"] == 1
+    assert flat["text"] == ""
+    assert flat["is_bot"] is False

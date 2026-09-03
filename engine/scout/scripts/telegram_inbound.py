@@ -135,7 +135,10 @@ def _flatten(update: dict[str, Any], tz: ZoneInfo) -> dict[str, Any] | None:
     """Reduce one update to the fields the harvest phase classifies on."""
     if "message" in update or "edited_message" in update:
         edited = "edited_message" in update
-        msg = update.get("edited_message") or update["message"]
+        # Select on the key the guard admitted the update on, not on truthiness:
+        # `update.get("edited_message") or update["message"]` fell through to a
+        # key that need not exist whenever the value was falsy (`{}`).
+        msg = update["edited_message"] if edited else update["message"]
         frm = msg.get("from", {})
         replied = msg.get("reply_to_message")
         return {
