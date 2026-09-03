@@ -89,3 +89,32 @@ markers = [
     "concurrency: tests involving multiple processes/threads",
     "slow: tests taking > 1 second",
 ]
+
+# Coverage is opt-in per-invocation (`pytest --cov=scout`), not wired into
+# addopts — the perf tests measure cold-start latency and coverage's tracer
+# skews those numbers. CI runs a dedicated coverage job; see
+# .github/workflows/test.yml.
+[tool.coverage.run]
+source = ["scout"]
+branch = true
+omit = [
+    # Trivial `python -m scout` shim; its one branch is the __main__ guard.
+    "scout/__main__.py",
+]
+
+[tool.coverage.report]
+# The engine ships as a scheduled, unattended runner: an uncovered failure
+# path is one that first executes at 03:00 with no one watching. The suite
+# currently sits at ~99% statement+branch; the floor is set just under that so
+# a genuinely-untestable line doesn't fail a build, while a new module landing
+# without tests does. Raise it as gaps close — never lower it to make a build
+# pass.
+fail_under = 98
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@(typing\\.)?overload",
+]
