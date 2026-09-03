@@ -70,7 +70,7 @@ def _message(text: str = "do the thing", *, is_bot: bool = False, reply: str | N
     msg = {
         "message_id": 42,
         "date": EPOCH,
-        "from": {"id": 7, "first_name": "David", "last_name": "Esner", "is_bot": is_bot},
+        "from": {"id": 7, "first_name": "Alex", "last_name": "Example", "is_bot": is_bot},
         "text": text,
     }
     if reply:
@@ -91,7 +91,7 @@ def test_reads_inbound_message(secrets):
     assert rep.ok and rep.status == ti.STATUS_OK
     assert rep.reported == 1
     assert rep.items[0]["text"] == "do the thing"
-    assert rep.items[0]["author"] == "David Esner"
+    assert rep.items[0]["author"] == "Alex Example"
 
 
 def test_never_passes_offset(secrets):
@@ -131,7 +131,7 @@ def test_reaction_update_is_flattened(secrets):
         "message_reaction": {
             "message_id": 42,
             "date": EPOCH,
-            "user": {"id": 7, "first_name": "David", "is_bot": False},
+            "user": {"id": 7, "first_name": "Alex", "is_bot": False},
             "new_reaction": [{"emoji": "👍"}],
         },
     }
