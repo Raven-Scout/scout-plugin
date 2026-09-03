@@ -230,13 +230,42 @@ def test_a_parser_error_is_surfaced_and_does_not_crash(tmp_path: Path, monkeypat
     _run(body)
 
 
+def test_a_resolver_that_raises_at_construction_yields_an_empty_dashboard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A resolver that fails before `on_mount` must not take the app down.
+
+    `ScoutApp.on_mount` constructs the screen, so a raise in `__init__` escapes
+    into the app's mount handler rather than into `refresh_items`' guard. The
+    screen must instead reach the same empty state the refresh path produces.
+    """
+
+    def boom() -> Path:
+        raise OSError("action-items dir is unreadable")
+
+    monkeypatch.setattr("scout.tui.screens.dashboard.latest_action_items_path", boom)
+
+    async def body() -> None:
+        async with ScoutApp().run_test() as pilot:
+            screen = pilot.app.screen
+            assert isinstance(screen, DashboardScreen)
+            assert screen.all_items == []
+            assert _labels(screen) == []
+            # `_update_list` renders `self.filepath.name`, so it must have run
+            # to completion against the placeholder rather than a None.
+            assert "0 shown, 0 actionable, 0 total" in _status(screen)
+
+    _run(body)
+
+
 def test_a_vault_that_disappears_under_a_refresh_empties_the_list(daily: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`refresh_items` guards FileNotFoundError so an `r` press (or a return
     from the note modal) after the vault moves warns instead of crashing.
 
-    Note: `DashboardScreen.__init__` calls the same resolver *unguarded*, so a
-    resolver that fails at construction time still takes the app down — this
-    test covers the guarded refresh path only.
+    This covers the refresh path; the construction path is covered by
+    `test_a_resolver_that_raises_at_construction_yields_an_empty_dashboard`.
+    `DashboardScreen.__init__` no longer resolves at all, so `refresh_items` is
+    the single place that handles a resolution failure.
     """
 
     async def body() -> None:

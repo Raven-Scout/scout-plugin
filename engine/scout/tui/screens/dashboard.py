@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -30,6 +31,12 @@ STATUS_DISPLAY = {
 }
 
 FILTER_OPTIONS = ["all", "🔴", "🟡", "🟢", "open", "done"]
+
+# Display-only stand-in for the action-items file until refresh_items resolves
+# the real one. Never a write target: the write paths (action_mark_done,
+# action_add_note) are gated on a selected item, and an unresolved path always
+# comes with an empty list, so nothing is selectable.
+UNRESOLVED_PATH = Path("(no action-items file)")
 
 
 def _make_tui_note_line(note_text: str) -> str:
@@ -115,7 +122,11 @@ class DashboardScreen(Screen):
     def __init__(self) -> None:
         super().__init__()
         self.all_items: list[ActionItem] = []
-        self.filepath = latest_action_items_path()
+        # Resolve in refresh_items (called from on_mount), never here: that is
+        # the single place that handles a resolver failure. Resolving in
+        # __init__ propagates out of ScoutApp.on_mount -> push_screen() and
+        # takes the whole TUI down instead of showing the empty + warning state.
+        self.filepath: Path = UNRESOLVED_PATH
 
     def compose(self) -> ComposeResult:
         yield Header()
