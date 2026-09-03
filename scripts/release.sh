@@ -28,7 +28,14 @@ if [ "${1:-}" = "--finalize" ]; then
     VER="${TAG#v}"
     git fetch -q origin
     # The release PR must be merged first: origin/main's CHANGELOG carries this version.
-    if ! git show "origin/main:CHANGELOG.md" | grep -q "## \[$VER\]"; then
+    #
+    # No pipeline here, deliberately. `git show … | grep -q` kills the writer with
+    # SIGPIPE (141) the instant grep matches, and `pipefail` promotes that 141 to the
+    # pipeline's status — so `!` inverted a *match* into the error branch and
+    # --finalize could never succeed. Feeding grep from a herestring removes the pipe
+    # (and the writer) entirely, so pipefail has nothing to promote.
+    CHANGELOG_MAIN="$(git show "origin/main:CHANGELOG.md" 2>/dev/null || true)"
+    if ! grep -q "## \[$VER\]" <<<"$CHANGELOG_MAIN"; then
         echo "error: origin/main CHANGELOG has no [$VER] section — merge the release PR first" >&2
         exit 1
     fi

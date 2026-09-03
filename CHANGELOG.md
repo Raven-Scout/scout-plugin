@@ -6,6 +6,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`release.sh --finalize` could never succeed** (`scripts/release.sh`) — the "is this version on origin/main yet?" guard piped `git show origin/main:CHANGELOG.md` into `grep -q`. `grep -q` exits the instant it matches, closing the pipe while `git show` is still writing, so `git show` dies of SIGPIPE with status 141; `set -euo pipefail` then makes 141 the *pipeline's* status, and `!` inverts that failure into the error branch. Both outcomes therefore printed `origin/main CHANGELOG has no [X.Y.Z] section — merge the release PR first`: no match → exit 1 (right answer, wrong reason), match → exit 141 (wrong answer). The bug is position-dependent — a match late in the file lets `git show` finish inside the pipe buffer — so it fires hardest on exactly the case that matters, a freshly promoted section at the top of the file. v0.9.0 had to be tagged by hand as a result. The guard now reads the blob into a variable and matches it with a herestring, so there is no pipeline for `pipefail` to poison. (#225)
+- **Transient API failures skipped their retry on a chatty run** (`templates/scripts/claude-with-retry.sh.tmpl`) — same SIGPIPE-under-`pipefail` shape: `tail -50 "$LOG_FILE" | grep -qE "$TRANSIENT_PATTERNS"` returns 141 rather than 0 when the match lands early and the 50-line tail outgrows the pipe buffer, so `! …` reclassified a retryable error as "not classified as transient — no retry", defeating the wrapper. The tail is now snapshotted once and matched from a variable (which also drops a duplicate `tail`). (#225)
+- **Hardened the first-match extraction in rate-limit detection** (`templates/scripts/rate-limit-detect.sh.tmpl`) — `echo "$MATCHES" | head -1 | cut` has the same unbounded-writer/early-reader shape; a 141 there would propagate through `set -e` and be read by the runner as "no rate limit detected". Not reproduced in practice (bash's builtin `echo` usually survives the EPIPE), so this is a latent hardening rather than an observed failure. (#225)
+
 ## [0.9.0] - 2026-09-02
 
 
