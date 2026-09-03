@@ -191,6 +191,52 @@ def test_negative_control_network_error(secrets):
     assert not rep.ok and "getUpdates failed" in rep.fault
 
 
+def test_negative_control_witness_401_cannot_be_read_as_silence(secrets):
+    """The witness itself dies. Pre-fix: 'ok' + a claim of 'genuine silence'.
+
+    All four original negative controls exercise a `getUpdates` fault; none
+    covered `getWebhookInfo` failing. When it does, `result` is absent, so
+    `webhook_url` reads "" and `pending` reads None — and the pending
+    cross-check is `elif not raw_updates and pending:`, where None is falsy.
+    The module then reported the webhook slot as *empty* and pending as None
+    while both were in fact UNKNOWN: silence claimed off a dead instrument.
+    """
+    unauthorized = _resp({"ok": False, "description": "Unauthorized"}, status=401)
+    with patch.object(ti.requests, "get", side_effect=[unauthorized, _resp(_updates())]):
+        rep = ti.read()
+    assert not rep.ok
+    assert "getWebhookInfo failed" in rep.fault
+    assert "UNKNOWN" in rep.fault
+    rendered = ti.render(rep)
+    assert "Genuine silence" not in rendered
+    assert "0 inbound message(s)" not in rendered
+
+
+def test_negative_control_witness_network_error_cannot_be_read_as_silence(secrets):
+    """Same defect via a raised exception rather than a non-200."""
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[ti.requests.RequestException("connection refused"), _resp(_updates())],
+    ):
+        rep = ti.read()
+    assert not rep.ok and "getWebhookInfo failed" in rep.fault
+    assert "Genuine silence" not in ti.render(rep)
+
+
+def test_witness_fault_does_not_mask_a_getupdates_fault(secrets):
+    """When both calls fail, the reported fault names getUpdates.
+
+    A dead witness makes the *silence claim* unusable; a dead getUpdates means
+    nothing was read at all. The second is the stronger statement and must win,
+    or an operator debugs the wrong call.
+    """
+    unauthorized = _resp({"ok": False, "description": "Unauthorized"}, status=401)
+    with patch.object(ti.requests, "get", side_effect=[unauthorized, unauthorized]):
+        rep = ti.read()
+    assert not rep.ok and "getUpdates failed" in rep.fault
+
+
 def test_token_never_appears_in_a_fault_string(secrets):
     """The URL embeds the token; a 401 is exactly what operators debug live."""
     with patch.object(

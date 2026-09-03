@@ -216,7 +216,15 @@ def read(since: str | None = None) -> InboundReport:
     token = _read_secret("telegram-bot-token")
     cutoff = parse_since(since, tz) if since else None
 
+    # getWebhookInfo is the independent witness the whole "empty is not silence"
+    # argument rests on, so its OWN health has to be checked. When the call
+    # fails there is no `result`: `hook_url` reads "" and `pending` reads None,
+    # which are indistinguishable from "no webhook, nothing pending" — the exact
+    # shape of genuine silence. A dead witness must never underwrite that claim.
     hook = _call(token, "getWebhookInfo")
+    witness_error = (
+        None if hook.get("ok") else (hook.get("error") or hook.get("description") or "unknown")
+    )
     hook_result = hook.get("result") or {}
     hook_url = hook_result.get("url") or ""
     pending = hook_result.get("pending_update_count")
@@ -249,13 +257,21 @@ def read(since: str | None = None) -> InboundReport:
         items=shown,
     )
 
-    # Two blocked states that are indistinguishable from silence at the call
-    # site. Both must outrank an empty result, not be reported as one.
+    # Three states that are indistinguishable from silence at the call site.
+    # All must outrank an empty result, not be reported as one. `hook_url` can
+    # only be truthy when the witness answered, so the witness check sits second.
     if hook_url:
         report.status = STATUS_FAULT
         report.fault = (
             f"a webhook is registered ({hook_url}); getUpdates is blocked while one is "
             "set and returns nothing whether or not the user wrote"
+        )
+    elif witness_error is not None:
+        report.status = STATUS_FAULT
+        report.fault = (
+            f"getWebhookInfo failed ({witness_error}) — the webhook slot and the pending "
+            "count are UNKNOWN, not empty, so an empty result here cannot be reported as "
+            "silence. Any items below were still genuinely retrieved."
         )
     elif not raw_updates and pending:
         report.status = STATUS_FAULT
