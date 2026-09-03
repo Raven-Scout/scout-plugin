@@ -101,6 +101,28 @@ def test_install_plist_escapes_xml_metacharacters(tmp_path):
     assert data["EnvironmentVariables"]["HOME"] == str(home)
 
 
+def test_install_plist_tolerates_double_hyphen_paths(tmp_path, monkeypatch):
+    """Paths containing `--` (e.g. a marketplace engine install under the
+    `<owner>--<repo>` layout) must still render a well-formed plist. XML
+    escaping alone can't guarantee this: values substituted into the
+    template's XML comment would make `--` illegal there no matter how they
+    are escaped, so the template must keep placeholders out of comments."""
+    import plistlib
+
+    scoutctl = tmp_path / "repos" / "example-org--scout-plugin" / ".venv" / "bin" / "scoutctl"
+    monkeypatch.setattr("scout.scripts.install_schedule_plist.resolve_scoutctl_bin", lambda: scoutctl)
+    home = tmp_path / "home--with--hyphens"
+    home.mkdir()
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    target = install_plist(home=home, agents_dir=agents)
+
+    with target.open("rb") as f:
+        data = plistlib.load(f)
+    assert data["ProgramArguments"][0] == str(scoutctl)
+    assert data["EnvironmentVariables"]["HOME"] == str(home)
+
+
 def test_install_plist_bootstrap_boots_out_first(tmp_path, monkeypatch):
     """Re-install must bootout the loaded job before bootstrap: launchctl
     bootstrap EIOs on an already-loaded label and has no --force (#48, #23)."""

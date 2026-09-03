@@ -8,6 +8,7 @@ not at runtime, because launchd's plist parser doesn't expand env vars in
 from __future__ import annotations
 
 import os
+import plistlib
 import subprocess
 from html import escape
 from pathlib import Path
@@ -56,11 +57,21 @@ def install_plist(
     # path with `&`, `<`, `>`, `"` (all legal on macOS, e.g. ~/R&D) would
     # otherwise produce malformed XML that launchd silently refuses to load,
     # stopping every scheduled run with no error. (#49)
+    # Escaping only covers <string> content: the replace is whole-file, so the
+    # template must keep the placeholder tokens out of its XML comment — a
+    # substituted path containing `--` (e.g. a marketplace engine install
+    # under an `<owner>--<repo>` dir) is illegal there however it is escaped.
     rendered = (
         TEMPLATE.read_text(encoding="utf-8")
         .replace("__USER_HOME__", escape(str(home), quote=True))
         .replace("__SCOUTCTL_BIN__", escape(str(resolve_scoutctl_bin()), quote=True))
     )
+    # Fail loudly at install time rather than let launchd silently drop the
+    # job on malformed output (#49).
+    try:
+        plistlib.loads(rendered.encode("utf-8"))
+    except Exception as exc:
+        raise ValueError(f"rendered {PLIST_NAME} is not well-formed XML: {exc}") from exc
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
         uid = os.getuid()

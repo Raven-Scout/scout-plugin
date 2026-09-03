@@ -3,8 +3,13 @@
 <!--
   com.scout.heartbeat.plist — runs ~/Scout/scripts/heartbeat.sh every 30 min.
 
-  Installed by `scoutctl schedule install-heartbeat-plist`, which fills
-  __USER_HOME__ at install time. Mirrors the schedule-tick plist pattern.
+  Installed by `scoutctl schedule install-heartbeat-plist`, which fills the
+  USER_HOME placeholder (spelled with surrounding double underscores in the
+  values below) at install time. Mirrors the schedule-tick plist pattern.
+
+  Never write the placeholder token verbatim in this comment: install-time
+  substitution is a whole-file replace, and a substituted path containing a
+  double hyphen is illegal inside an XML comment no matter how it is escaped.
 -->
 <plist version="1.0">
 <dict>

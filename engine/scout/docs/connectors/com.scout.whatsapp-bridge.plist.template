@@ -6,18 +6,21 @@
   and fill in the placeholders below before loading with:
     launchctl load -w ~/Library/LaunchAgents/com.scout.whatsapp-bridge.plist
 
-  Placeholders to replace:
-    __WHATSAPP_MCP_DIR__   Absolute path to the cloned whatsapp-mcp repo.
-                           Recommended default:
-                             /Users/<you>/.local/share/whatsapp-mcp
-                           This must be the parent of the whatsapp-bridge/
-                           directory and must be an absolute path
-                           (`~` does NOT expand inside plists).
-    __USER_HOME__          Output of `echo $HOME`, e.g. /Users/yourname.
-                           Used as a sane fallback for $HOME inside the
-                           launched process; LaunchAgents already inherit
-                           the user but some Go libraries read $HOME
-                           explicitly.
+  Placeholders to replace — spelled with surrounding double underscores in
+  the XML below, written without them here so a global find-and-replace
+  never edits this comment (a path containing a double hyphen would be
+  illegal inside an XML comment):
+    WHATSAPP_MCP_DIR   Absolute path to the cloned whatsapp-mcp repo.
+                       Recommended default:
+                         /Users/<you>/.local/share/whatsapp-mcp
+                       This must be the parent of the whatsapp-bridge/
+                       directory and must be an absolute path
+                       (`~` does NOT expand inside plists).
+    USER_HOME          Output of `echo $HOME`, e.g. /Users/yourname.
+                       Used as a sane fallback for $HOME inside the
+                       launched process; LaunchAgents already inherit
+                       the user but some Go libraries read $HOME
+                       explicitly.
 
   Notes:
     - The bridge binary is `whatsapp-bridge` in the whatsapp-bridge/
