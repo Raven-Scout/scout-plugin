@@ -281,6 +281,34 @@ def read(since: str | None = None) -> InboundReport:
     return report
 
 
+def _append_items(out: list[str], report: InboundReport) -> None:
+    """Render each retained item. Shared by the ok and fault paths — a faulted
+    read still has to hand over whatever it actually retrieved."""
+    for i in report.items:
+        head = f"  [{i['at']}] {i['author']}"
+        if i["kind"] == "reaction":
+            emoji = " ".join(i.get("reactions") or [])
+            out.append(f"{head} — REACTION {emoji} on msg {i.get('on_message_id')}")
+        else:
+            tag = " (edited)" if i["kind"] == "edited_message" else ""
+            out.append(f"{head}{tag}")
+            if i.get("replying_to"):
+                out.append(f"      ↳ replying to: {i['replying_to']!r}")
+            for line in (i["text"] or "<no text>").splitlines() or ["<no text>"]:
+                out.append(f"      {line}")
+        out.append("")
+
+
+def _append_closing_obligation(out: list[str], report: InboundReport) -> None:
+    """The act-on-every-item rule. Travels with the items, on both paths."""
+    out.append('  Every item above must reach a classification or an explicit "no action needed,')
+    out.append("  because —" + '" before the feedback phase closes. A retrieved reply that is not')
+    out.append("  acted on is the same defect as one never retrieved.")
+    if report.pending_update_count:
+        out.append("")
+        out.append(f"  Queue not consumed ({report.pending_update_count} pending) — re-reads are idempotent.")
+
+
 def render(report: InboundReport, since: str | None = None) -> str:
     """Render a report for the session prompt.
 
@@ -292,7 +320,19 @@ def render(report: InboundReport, since: str | None = None) -> str:
 
     if not report.ok:
         out.append(f"  ERROR — {report.fault}")
-        out.append("  This is NOT zero feedback. Nothing was read; do not report a signal count.")
+        if not report.items:
+            out.append("  This is NOT zero feedback. Nothing was read; do not report a signal count.")
+            return "\n".join(out)
+        # The refusal is scoped to the COUNT, never to the items. A fault means
+        # the queue's emptiness cannot be trusted; it does not un-retrieve what
+        # came back. Telegram drops unconsumed updates after ~24h, so a render
+        # that swallows them can be destroying the only copy — and dropping a
+        # retrieved reply is the very defect the closing obligation below names.
+        out.append("  The COUNT is unusable — do not report a signal count from this run.")
+        out.append(f"  But {len(report.items)} item(s) WERE genuinely retrieved and must still be acted on:")
+        out.append("")
+        _append_items(out, report)
+        _append_closing_obligation(out, report)
         return "\n".join(out)
 
     if not report.items:
@@ -311,24 +351,6 @@ def render(report: InboundReport, since: str | None = None) -> str:
     out.append(f"  {report.reported} inbound item(s) — every one is the user (the bot's own sends")
     out.append("  never come back through getUpdates in a private chat).")
     out.append("")
-    for i in report.items:
-        head = f"  [{i['at']}] {i['author']}"
-        if i["kind"] == "reaction":
-            emoji = " ".join(i.get("reactions") or [])
-            out.append(f"{head} — REACTION {emoji} on msg {i.get('on_message_id')}")
-        else:
-            tag = " (edited)" if i["kind"] == "edited_message" else ""
-            out.append(f"{head}{tag}")
-            if i.get("replying_to"):
-                out.append(f"      ↳ replying to: {i['replying_to']!r}")
-            for line in (i["text"] or "<no text>").splitlines() or ["<no text>"]:
-                out.append(f"      {line}")
-        out.append("")
-
-    out.append('  Every item above must reach a classification or an explicit "no action needed,')
-    out.append("  because —" + '" before the feedback phase closes. A retrieved reply that is not')
-    out.append("  acted on is the same defect as one never retrieved.")
-    if report.pending_update_count:
-        out.append("")
-        out.append(f"  Queue not consumed ({report.pending_update_count} pending) — re-reads are idempotent.")
+    _append_items(out, report)
+    _append_closing_obligation(out, report)
     return "\n".join(out)

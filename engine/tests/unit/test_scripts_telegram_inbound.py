@@ -162,7 +162,13 @@ def test_negative_control_webhook_registered_with_real_message(secrets):
     ):
         rep = ti.read()
     assert not rep.ok and "webhook is registered" in rep.fault
-    assert "NOT zero feedback" in ti.render(rep)
+    # The message came back despite the webhook, so the refusal is scoped to the
+    # count and the item is still handed over. (This assertion used to demand
+    # "NOT zero feedback" here, which is the no-items wording — it passed only
+    # because render() discarded the item it was given.)
+    rendered = ti.render(rep)
+    assert "COUNT is unusable" in rendered
+    assert "do the thing" in rendered
 
 
 def test_negative_control_zero_returned_while_pending_nonzero(secrets):
@@ -235,6 +241,50 @@ def test_witness_fault_does_not_mask_a_getupdates_fault(secrets):
     with patch.object(ti.requests, "get", side_effect=[unauthorized, unauthorized]):
         rep = ti.read()
     assert not rep.ok and "getUpdates failed" in rep.fault
+
+
+def test_fault_still_renders_items_that_were_genuinely_retrieved(secrets):
+    """A fault must invalidate the COUNT, not destroy the messages.
+
+    `render()` returned early on any fault and never printed `report.items`,
+    while asserting "Nothing was read" — false whenever a webhook is registered
+    AND getUpdates still returned a real message (the shape of negative control
+    #1). Given the ~24h retention this module documents, that render was
+    potentially the only copy, and dropping it contradicts the file's own
+    closing rule: a retrieved reply that is not acted on is the same defect as
+    one never retrieved.
+    """
+    with patch.object(
+        ti.requests,
+        "get",
+        side_effect=[
+            _resp(_hook(url="https://example.test/hook", pending=1)),
+            _resp(_updates(_message("ship it, but rename the flag"))),
+        ],
+    ):
+        rep = ti.read()
+    assert not rep.ok
+    assert len(rep.items) == 1
+
+    rendered = ti.render(rep)
+    assert "webhook is registered" in rendered           # the fault is still led with
+    assert "ship it, but rename the flag" in rendered    # and the reply survives
+    assert "Alex Example" in rendered
+    assert "Nothing was read" not in rendered            # because something was
+    assert "must still be acted on" in rendered
+    # The closing obligation has to travel with the items it governs.
+    assert "no action needed" in rendered
+
+
+def test_fault_with_no_items_still_refuses_flatly(secrets):
+    """The scoping must not weaken the empty case: nothing read, nothing to act on."""
+    unauthorized = _resp({"ok": False, "description": "Unauthorized"}, status=401)
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), unauthorized]):
+        rep = ti.read()
+    rendered = ti.render(rep)
+    assert not rep.items
+    assert "NOT zero feedback" in rendered
+    assert "Nothing was read" in rendered
 
 
 def test_token_never_appears_in_a_fault_string(secrets):
