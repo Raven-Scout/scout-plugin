@@ -36,6 +36,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from scout import paths
+from scout.scripts._config_scan import scan_overrides
 
 # Defaults mirror heartbeat.sh constants so behavior is preserved when no
 # scout-config.yaml is present.
@@ -53,8 +54,6 @@ EXIT_ERROR = 1
 _TRACKER_FILENAME = "usage-tracker.jsonl"
 _RESEARCH_QUEUE_REL = "knowledge-base/research-queue.md"
 _RESEARCH_QUEUE_DIR_REL = "knowledge-base/research-queue"
-
-_CONFIG_LINE_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\s][^#]*?)?\s*(?:#.*)?$")
 
 # Flat spellings — back-compat with hand-made override files.
 _CONFIG_KEYS = {
@@ -89,10 +88,10 @@ def load_config(config_path: Path) -> HeartbeatConfig:
     """Parse only the off-peak keys heartbeat cares about from scout-config.yaml.
 
     Missing file or unparseable values silently fall back to defaults, matching
-    the bash original's tolerant ``grep | awk`` pattern. The scan is a
-    lightweight two-level reader (still no pyyaml on this hot path): it
-    understands both the nested ``off_peak: {start, end}`` shape /scout-setup
-    writes and the flat ``off_peak_start/off_peak_end`` spellings.
+    the bash original's tolerant ``grep | awk`` pattern. The scan is the shared
+    two-level reader (still no pyyaml on this hot path): it understands both the
+    nested ``off_peak: {start, end}`` shape /scout-setup writes and the flat
+    ``off_peak_start/off_peak_end`` spellings.
     """
     if not config_path.exists():
         return HeartbeatConfig()
@@ -101,26 +100,7 @@ def load_config(config_path: Path) -> HeartbeatConfig:
     except OSError:
         return HeartbeatConfig()
     overrides: dict[str, int] = {}
-    section: str | None = None
-    for line in text.splitlines():
-        m = _CONFIG_LINE_RE.match(line)
-        if not m:
-            continue
-        indent, yaml_key, raw_value = m.group(1), m.group(2), m.group(3)
-        if raw_value is None:
-            # `key:` with no value — a section header at top level.
-            section = yaml_key if not indent else None
-            continue
-        raw_value = raw_value.strip().strip("\"'")
-        if not indent:
-            section = None
-            field_name = _CONFIG_KEYS.get(yaml_key)
-        else:
-            field_name = _NESTED_CONFIG_KEYS.get((section, yaml_key)) if section else None
-            # Indented flat spellings keep working too (hand-made files).
-            field_name = field_name or _CONFIG_KEYS.get(yaml_key)
-        if field_name is None:
-            continue
+    for field_name, raw_value in scan_overrides(text, flat_keys=_CONFIG_KEYS, nested_keys=_NESTED_CONFIG_KEYS).items():
         try:
             overrides[field_name] = int(raw_value)
         except (TypeError, ValueError):

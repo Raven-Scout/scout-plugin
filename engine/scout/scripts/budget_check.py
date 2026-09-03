@@ -17,7 +17,7 @@ unparseable rows are silently skipped (same as the bash original).
 from __future__ import annotations
 
 import json
-import re
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from scout import paths
+from scout.scripts._config_scan import scan_overrides
 
 # Defaults — mirror budget-check.sh defaults so behavior is preserved when no
 # scout-config.yaml is present.
@@ -54,6 +55,21 @@ class BudgetConfig:
         return round(self.window_budget_usd * self.skip_threshold_pct / 100, 2)
 
 
+# Ranges a knob must fall in to be usable. These went live for the first time
+# when the loader was repointed at the vault's scout-config.yaml, so a value
+# that makes the governor nonsensical must be refused rather than enforced:
+# `rate_limit_window_hours: 0` — a plausible spelling of "no window" — yields a
+# $0 window budget and a $0 skip threshold, which silently skips every session
+# from then on, and a negative value yields a negative budget. Out-of-range
+# values fall back to the default with a warning instead.
+_CONFIG_BOUNDS: dict[str, tuple[float, float]] = {
+    "daily_budget_usd": (0.0, float("inf")),  # 0 is a real choice: spend nothing
+    "window_hours": (1, float("inf")),  # a 0-hour rolling window is not a window
+    "skip_threshold_pct": (0.0, 100.0),
+    "failure_backoff_min": (0, float("inf")),
+}
+
+
 @dataclass(frozen=True)
 class BudgetDecision:
     exit_code: int
@@ -67,6 +83,20 @@ class BudgetDecision:
 # Lightweight YAML reader for the four flat scalar keys this script needs.
 # Avoids importing pyyaml on the hot path — and the bash version uses grep+awk
 # for parity reasons. Anything more structured falls through to the default.
+# The parents these keys live under in scout-config.yaml. Matching on
+# (section, key) rather than on the bare key keeps an unrelated subtree from
+# setting the budget: scout-config.yaml doubles as bootstrap state written by
+# several producers, so a bare-key scan would let any `daily_budget_estimate_usd`
+# anywhere in the file win — and, being last-wins, let a stale duplicate quietly
+# override the live one.
+_NESTED_CONFIG_KEYS = {
+    ("plan", "daily_budget_estimate_usd"): ("daily_budget_usd", float),
+    ("plan", "rate_limit_window_hours"): ("window_hours", int),
+    ("thresholds", "skip_threshold_pct"): ("skip_threshold_pct", float),
+    ("thresholds", "failure_backoff_minutes"): ("failure_backoff_min", int),
+}
+
+# Flat top-level spellings — back-compat with hand-made override files.
 _CONFIG_KEYS = {
     "daily_budget_estimate_usd": ("daily_budget_usd", float),
     "rate_limit_window_hours": ("window_hours", int),
@@ -74,14 +104,15 @@ _CONFIG_KEYS = {
     "failure_backoff_minutes": ("failure_backoff_min", int),
 }
 
-_CONFIG_LINE_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\s][^#]*?)\s*(?:#.*)?$")
-
 
 def load_config(config_path: Path) -> BudgetConfig:
     """Parse the four scalar keys this check cares about from scout-config.yaml.
 
     Missing file or unparseable rows fall back to defaults — matches the bash
-    `grep ... | awk` pattern which silently no-ops on missing keys.
+    `grep ... | awk` pattern which silently no-ops on missing keys. The scan is
+    the shared two-level reader, so each key is only honoured under its own
+    section (or spelled flat at top level), and a value outside
+    :data:`_CONFIG_BOUNDS` falls back to its default with a warning.
     """
     overrides: dict[str, Any] = {}
     if not config_path.exists():
@@ -90,19 +121,25 @@ def load_config(config_path: Path) -> BudgetConfig:
         text = config_path.read_text(encoding="utf-8")
     except OSError:
         return BudgetConfig()
-    for line in text.splitlines():
-        m = _CONFIG_LINE_RE.match(line)
-        if not m:
-            continue
-        yaml_key, raw_value = m.group(1), m.group(2).strip().strip("\"'")
-        mapping = _CONFIG_KEYS.get(yaml_key)
-        if mapping is None:
-            continue
-        field_name, caster = mapping
+
+    flat = {k: v[0] for k, v in _CONFIG_KEYS.items()}
+    nested = {k: v[0] for k, v in _NESTED_CONFIG_KEYS.items()}
+    casters = {v[0]: v[1] for v in _CONFIG_KEYS.values()}
+
+    for field_name, raw_value in scan_overrides(text, flat_keys=flat, nested_keys=nested).items():
         try:
-            overrides[field_name] = caster(raw_value)
+            value = casters[field_name](raw_value)
         except (TypeError, ValueError):
             continue
+        low, high = _CONFIG_BOUNDS[field_name]
+        if not (low <= value <= high):
+            print(
+                f"[budget-check] ignoring {field_name}={value}: outside the usable range "
+                f"[{low}, {high}] — using the default",
+                file=sys.stderr,
+            )
+            continue
+        overrides[field_name] = value
     return BudgetConfig(**overrides)
 
 
