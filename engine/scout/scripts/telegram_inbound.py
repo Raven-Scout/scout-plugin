@@ -98,7 +98,7 @@ def _tz() -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def _call(token: str, method: str, **params: object) -> dict[str, Any]:
+def _call(token: str, method: str, **params: Any) -> dict[str, Any]:
     """GET a Bot API method, never leaking the token into an error string.
 
     ``str(RequestException)`` can include the request URL, and the Telegram URL
