@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_from": "scout-plugin@61b12ca",
+  "generated_from": "scout-plugin@237a8ca",
   "connectors": [
     {
       "key": "mcp:claude_ai_Slack",
@@ -54,7 +54,7 @@
     },
     {
       "key": "notify:telegram",
-      "display_name": "Telegram (outbound)",
+      "display_name": "Telegram (outbound + inbound)",
       "tier": "official"
     }
   ]
