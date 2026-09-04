@@ -136,14 +136,43 @@ For each improvement that targets `SKILL.md` (from Step 1d):
 
 ***
 
-### Step 1f: Commit
+### Step 1f: Proactive Enrichment Recall — the "🧠 Help me remember" loop
 
-If Phase 1 made any changes (mistake audit updates, KB fixes, dreaming improvements, applied proposals, new proposals):
+This is the *pull*-capture half of the feedback loop: {{INSTANCE_NAME}} proactively asks {{USER_NAME}} a small, rotating set of questions about facts **no connector can see** — in-person events, decisions, relationships, head-knowledge — and later feeds the answers back into the KB, enriching the graph faster than passive scanning can. It lives in this phase because this phase already harvests in-thread replies (Step 1a) and is the natural place to record a dismissal.
+
+**1. Handle answers & dismissals to the *previous* run's questions** (from the thread replies harvested in Step 1a):
+- **Answered** → capture the fact into the appropriate KB file (cite: "per {{USER_NAME}} enrichment reply on [date]"), and log the round to `knowledge-base/enrichment-qa-log.md`.
+- **Dismissed** ("I don't care" / "you should already know this" / a ❌ on the question) → append the question's distinguishing keyword (a short substring, one per line) to `scripts/enrichment-stoplist.txt` so it can never resurface. Log the round as dismissed.
+
+**2. Generate this run's candidates.** Run the read-only generator (it never writes to the KB):
+
+```bash
+python3 {{SCOUT_DIR}}/scripts/generate-enrichment-questions.py --limit 3 \
+  --exclude "<prior run's surfaced fingerprint>" [--exclude "<another>" ...]
+```
+
+- The persistent stoplist (`scripts/enrichment-stoplist.txt`) is loaded automatically on every run.
+- Pass one `--exclude` per question surfaced in the **previous** run (its topic / source / keyword). This is the **rotation** rule — a question never repeats two runs in a row — made mechanical by the script; do not re-derive it by hand.
+
+**3. Apply the quality rules** (the valuable kernel — the generator enforces most of this, but you are the last gate):
+- **User-only-answerable, not connector-answerable.** Drop any question a connector or research session could resolve (customer/contract status, "who introduced X", SDK/API facts). The bar is "is this a head-fact only {{USER_NAME}} holds?"
+- **No over-suppression to zero.** A constant trickle is the goal. If the generator returns nothing, do **not** ask nothing — hand-mine the day's deltas for one judgment question rather than staying silent.
+- **Self-containment.** A question referencing a specific artifact must carry a link/locator **and** a one-line gist, and keep the artifact title visually distinct from the ask — including on re-surface (never "the question from earlier").
+
+**4. Compose the "🧠 Help me remember" block** into the dreaming wrap DM — the picked questions (typically 1–3), each self-contained per the rule above. This is the only user-facing output of this step; everything else is state.
+
+**Record what was surfaced** to `knowledge-base/enrichment-qa-log.md` so the *next* run can rotate it out (pass it back via `--exclude`) and match answers/dismissals in Step 1a.
+
+***
+
+### Step 1g: Commit
+
+If Phase 1 made any changes (mistake audit updates, KB fixes, dreaming improvements, applied proposals, new proposals, enrichment stoplist/Q&A-log updates):
 
 ```bash
 git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]: feedback processing — <summary of changes>"
 ```
 
-The summary should mention what was processed: e.g., "3 feedback signals, 1 new mistake pattern, 2 KB fixes" or "applied 1 approved proposal, added 2 new proposals."
+The summary should mention what was processed: e.g., "3 feedback signals, 1 new mistake pattern, 2 KB fixes" or "applied 1 approved proposal, added 2 new proposals, 1 enrichment answer captured."
 
-If Phase 1 found no actionable feedback (no reactions, no thread replies in the time window), skip the commit and proceed to Phase 2. Log "No feedback signals found in time window" in the session entry.
+If Phase 1 found no actionable feedback (no reactions, no thread replies in the time window) **and** surfaced no enrichment questions, skip the commit and proceed to Phase 2. Log "No feedback signals found in time window" in the session entry.
