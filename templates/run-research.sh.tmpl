@@ -97,6 +97,12 @@ fi
 # Mode is set by the dispatcher (SCOUT_FORCE_MODE). For manual invocations
 # without SCOUT_FORCE_MODE set, default to "research-manual".
 MODE="${SCOUT_FORCE_MODE:-research-manual}"
+# Exported as SCOUT_MODE so the plugin's Stop hooks (session-tool-log,
+# session-tokens — see hooks/hooks.json) see it inside the claude child
+# process. The hooks deliberately short-circuit when it is unset so that
+# interactive sessions stay silent; without this export every scheduled run
+# looks interactive and no connector telemetry is ever written (#192, #121).
+export SCOUT_MODE="$MODE"
 
 START_TIME=$(date +%s)
 
