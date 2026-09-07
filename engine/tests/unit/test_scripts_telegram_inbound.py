@@ -398,3 +398,195 @@ def test_flatten_handles_a_falsy_edited_message():
     assert flat["update_id"] == 1
     assert flat["text"] == ""
     assert flat["is_bot"] is False
+
+
+# ----- authorship on a FORWARD (#142) --------------------------------------
+#
+# Calibrated on the REAL 2026-09-06 18:25:52 payload, captured from getUpdates
+# while the defect was found — not on invented text. The originator sits in
+# `forward_origin` (Bot API 7.0+) or the legacy `forward_from`, and `from` names
+# only the FORWARDER, so an authorship filter reading `from` attributes the
+# bot's own prose to the user. Because the harvest phase must classify every
+# item it prints, that misattribution lets a run treat its own output as user
+# feedback.
+
+_BOT_ORIGIN = {"id": 8946706252, "is_bot": True, "first_name": "Scout", "username": "eshni_scout_bot"}
+_HUMAN_ORIGIN = {"id": 111, "is_bot": False, "first_name": "Petr"}
+_WRAP_TEXT = "Dreaming wrap - Sat Sep 5, 17:09 to 18:0x CEST\n\nYour one inbox line…"
+
+
+def _forward(*, origin: dict | None = None, legacy: dict | None = None,
+             sender_name: str | None = None, from_chat: dict | None = None,
+             text: str = _WRAP_TEXT) -> dict:
+    """A forwarded message. Each keyword sets ONE of the four origin shapes."""
+    msg = {
+        "message_id": 4212,
+        "date": EPOCH,
+        "from": {"id": 7, "first_name": "Alex", "last_name": "Example", "is_bot": False},
+        "forward_date": EPOCH - 89121,
+        "text": text,
+    }
+    if origin is not None:
+        msg["forward_origin"] = {"type": "user", "sender_user": origin, "date": EPOCH - 89121}
+    if legacy is not None:
+        msg["forward_from"] = legacy
+    if sender_name is not None:
+        msg["forward_sender_name"] = sender_name
+    if from_chat is not None:
+        msg["forward_from_chat"] = from_chat
+    return {"update_id": 1003, "message": msg}
+
+
+def test_forwarded_bot_message_is_not_counted_as_the_user(secrets):
+    """#142's load-bearing assertion, on the real payload: both origin keys present."""
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(real))]):
+        rep = ti.read()
+    assert rep.fetched == 1
+    assert rep.inbound == 0, "Scout's own forwarded prose was counted as the user's"
+    assert rep.reported == 0
+
+
+def test_legacy_forward_from_alone_is_still_detected(secrets):
+    """A reader that knows only `forward_origin` is one API rollback from #142."""
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_forward(legacy=_BOT_ORIGIN)))],
+    ):
+        rep = ti.read()
+    assert rep.inbound == 0
+
+
+def test_modern_forward_origin_alone_is_still_detected(secrets):
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_forward(origin=_BOT_ORIGIN)))],
+    ):
+        rep = ti.read()
+    assert rep.inbound == 0
+
+
+def test_forward_of_a_human_is_kept_in_the_count_but_labelled(secrets):
+    """The filter drops bot-authored text, not forwards. Forwarding is a signal."""
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_forward(origin=_HUMAN_ORIGIN, text="ping")))],
+    ):
+        rep = ti.read()
+    assert rep.inbound == 1
+    assert rep.items[0]["forwarded_from"] == "Petr"
+    assert rep.items[0]["forward_kind"] == "user"
+
+
+def test_hidden_user_forward_is_named_not_read_as_the_user(secrets):
+    """No id means no `is_bot`: UNKNOWN authorship, reported as such."""
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_forward(sender_name="Someone", text="x")))],
+    ):
+        rep = ti.read()
+    assert rep.items[0]["forwarded_from"] == "Someone"
+    assert rep.items[0]["forward_kind"] == "hidden_user"
+
+
+def test_channel_forward_is_titled_and_typed(secrets):
+    chat = {"id": -100, "type": "channel", "title": "Some Channel"}
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_forward(from_chat=chat, text="x")))],
+    ):
+        rep = ti.read()
+    assert rep.items[0]["forwarded_from"] == "Some Channel"
+    assert rep.items[0]["forward_kind"] == "chat"
+
+
+def test_plain_message_carries_no_forward_marker(secrets):
+    """Negative control: the fix must not mark ordinary messages as forwards."""
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(_message()))]):
+        rep = ti.read()
+    assert rep.items[0]["forwarded_from"] is None
+    assert rep.items[0]["forward_kind"] is None
+    assert rep.items[0]["is_bot"] is False
+
+
+def test_reaction_carries_the_forward_keys_as_none(secrets):
+    """One item shape. A renderer reading `forwarded_from` must not KeyError."""
+    rx = {
+        "update_id": 1002,
+        "message_reaction": {
+            "message_id": 42, "date": EPOCH,
+            "user": {"id": 7, "first_name": "Alex", "is_bot": False},
+            "new_reaction": [{"emoji": "👍"}],
+        },
+    }
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(rx))]):
+        rep = ti.read()
+    assert rep.items[0]["forwarded_from"] is None
+
+
+def test_bot_authored_forward_is_reported_separately_not_dropped(secrets):
+    """Excluded from the user count, but surfaced: it says what he pointed at."""
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(real))]):
+        rep = ti.read()
+    assert len(rep.bot_authored_forwards) == 1
+    assert rep.bot_authored_forwards[0]["forwarded_from"] == "Scout"
+
+
+def test_render_never_claims_every_item_is_the_user_when_a_forward_is_present(secrets):
+    """The banner is the defect's public face: it asserted authorship it had not tested."""
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_message("real feedback"), real))],
+    ):
+        rep = ti.read()
+    text = ti.render(rep)
+    assert "every one is the user" not in text
+    assert "FORWARDED" in text
+    assert "Scout" in text
+
+
+def test_render_mentions_a_forward_even_when_the_user_wrote_nothing(secrets):
+    """'0 inbound' with a forwarded wrap unmentioned is true and misleading at once."""
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(ti.requests, "get", side_effect=[_resp(_hook()), _resp(_updates(real))]):
+        rep = ti.read()
+    text = ti.render(rep)
+    assert "0 inbound" in text
+    assert "FORWARDED" in text
+
+
+def test_fault_with_only_a_bot_forward_still_hands_it_over(secrets):
+    """A fault must not swallow a retrieved forward.
+
+    The refusal is scoped to the COUNT, never to what came back. With a webhook
+    registered the queue's emptiness is untrustworthy, but the forward was
+    genuinely retrieved — and Telegram drops unconsumed updates after ~24h, so a
+    render that drops it can be destroying the only copy.
+    """
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook(url="https://example.test/hook")), _resp(_updates(real))],
+    ):
+        rep = ti.read()
+    assert not rep.ok
+    text = ti.render(rep)
+    assert "FORWARDED" in text
+    assert "do not report a signal count" in text
+
+
+def test_cli_json_carries_the_forward_split(secrets):
+    """The JSON consumer must be able to see both populations separately."""
+    real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
+    with patch.object(
+        ti.requests, "get",
+        side_effect=[_resp(_hook()), _resp(_updates(_message("real"), real))],
+    ):
+        res = CliRunner().invoke(cli.app, ["notify", "telegram-read", "--json"])
+    assert res.exit_code == 0
+    payload = json.loads(res.stdout)
+    assert payload["inbound"] == 1
+    assert len(payload["bot_authored_forwards"]) == 1
+    assert payload["bot_authored_forwards"][0]["forwarded_from"] == "Scout"

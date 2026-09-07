@@ -10,11 +10,20 @@ See issue #215.
 Three properties of this surface, each of which changes how the reader must
 behave relative to the Slack path:
 
-1. **Authorship needs no test.** In a private chat ``getUpdates`` returns only
-   *incoming* messages — the bot's own sends never come back. The Slack self-DM
-   footer test must **not** be applied here or it will discard real feedback.
-   ``is_bot`` is still asserted rather than assumed, because a group upgrade
-   would change this silently.
+1. **The SENDER is unambiguous; the AUTHOR is not.** In a private chat
+   ``getUpdates`` returns only *incoming* messages, so every update's ``from``
+   is the user — but ``from`` names the **forwarder**, and a forwarded message
+   was written by somebody else. Forward the bot's own wrap back into the chat
+   and it arrives with ``from`` = the user and the originator in
+   ``forward_origin`` (Bot API 7.0+) or the legacy ``forward_from``. An
+   authorship filter reading ``from`` therefore hands the bot's own prose to the
+   harvest phase as user feedback, and because that phase must classify every
+   item it is shown, the run ends up **extracting signals from its own output**.
+   Authorship is read by :func:`_origin`; a forward is **labelled, never
+   dropped**, because choosing to forward something is itself a signal about
+   what the user is pointing at — it is just not a signal they wrote. The Slack
+   self-DM footer test must **not** be applied here (it would discard real
+   feedback); the forward-origin check is this surface's equivalent.
 2. **Replies arrive with their parent attached** (``reply_to_message``), so one
    call covers standalone messages *and* replies-to-wraps. The two-call
    ``read_channel`` + ``read_thread`` trap does not exist here.
@@ -81,6 +90,11 @@ class InboundReport:
     pending_update_count: int | None = None
     webhook_url: str = ""
     items: list[dict[str, Any]] = field(default_factory=list)
+    # Kept as its own list, never folded into ``items``/``inbound``: a forwarded
+    # bot message is the user POINTING at something, not the user writing. It is
+    # excluded from the count and still surfaced, because dropping it silently
+    # loses a real signal and counting it fabricates one.
+    bot_authored_forwards: list[dict[str, Any]] = field(default_factory=list)
     fault: str | None = None
 
     @property
@@ -131,6 +145,59 @@ def _name(frm: dict[str, Any]) -> str:
     return " ".join(p for p in parts if p) or str(frm.get("id", "?"))
 
 
+def _origin(msg: dict[str, Any]) -> dict[str, Any] | None:
+    """The ORIGINAL author of a forwarded message, or ``None`` if it is not a forward.
+
+    Two shapes, because the Bot API replaced one with the other and still sends
+    both: ``forward_origin`` (7.0+, a tagged union) and the legacy
+    ``forward_from`` / ``forward_sender_name`` / ``forward_from_chat``. Read
+    **both** — a reader that knows only the modern key is one API-version
+    rollback away from the defect returning, and one that knows only the legacy
+    key misses hidden-account forwards, which carry ``forward_origin`` alone.
+
+    Returns ``{"name": str, "is_bot": bool, "kind": str}``. A ``hidden_user``
+    forward has no id and therefore no ``is_bot`` field at all: that is UNKNOWN
+    authorship, not the user's, and it is reported as ``is_bot: False`` with
+    ``kind: "hidden_user"`` so the caller can say so rather than silently assume
+    either way.
+    """
+    fo = msg.get("forward_origin")
+    if isinstance(fo, dict):
+        kind = fo.get("type") or "?"
+        if kind == "user":
+            return {
+                "name": _name(fo.get("sender_user") or {}),
+                "is_bot": bool((fo.get("sender_user") or {}).get("is_bot")),
+                "kind": kind,
+            }
+        if kind == "hidden_user":
+            return {
+                "name": fo.get("sender_user_name") or "<hidden user>",
+                "is_bot": False,
+                "kind": kind,
+            }
+        # chat / channel forwards: an org surface, never the user and never the bot
+        chat = fo.get("sender_chat") or fo.get("chat") or {}
+        return {
+            "name": chat.get("title") or chat.get("username") or "<chat>",
+            "is_bot": False,
+            "kind": kind,
+        }
+    ff = msg.get("forward_from")
+    if isinstance(ff, dict):
+        return {"name": _name(ff), "is_bot": bool(ff.get("is_bot")), "kind": "user"}
+    if msg.get("forward_sender_name"):
+        return {"name": msg["forward_sender_name"], "is_bot": False, "kind": "hidden_user"}
+    if isinstance(msg.get("forward_from_chat"), dict):
+        c = msg["forward_from_chat"]
+        return {
+            "name": c.get("title") or c.get("username") or "<chat>",
+            "is_bot": False,
+            "kind": "chat",
+        }
+    return None
+
+
 def _flatten(update: dict[str, Any], tz: ZoneInfo) -> dict[str, Any] | None:
     """Reduce one update to the fields the harvest phase classifies on."""
     if "message" in update or "edited_message" in update:
@@ -141,13 +208,21 @@ def _flatten(update: dict[str, Any], tz: ZoneInfo) -> dict[str, Any] | None:
         msg = update["edited_message"] if edited else update["message"]
         frm = msg.get("from", {})
         replied = msg.get("reply_to_message")
+        # `from` is the SENDER. On a forward the sender is the user and the AUTHOR
+        # is somebody else, so the origin has to be read before authorship is
+        # decided — asserting `is_bot` one field over is the whole defect.
+        origin = _origin(msg)
         return {
             "kind": "edited_message" if edited else "message",
             "update_id": update.get("update_id"),
             "at": _local(msg.get("date", 0), tz),
             "epoch": msg.get("date", 0),
             "author": _name(frm),
-            "is_bot": bool(frm.get("is_bot")),
+            # The filter's question is "did the USER write this?", so it must be
+            # answered by the originator whenever there is one.
+            "is_bot": bool(origin["is_bot"]) if origin else bool(frm.get("is_bot")),
+            "forwarded_from": origin["name"] if origin else None,
+            "forward_kind": origin["kind"] if origin else None,
             "text": msg.get("text") or msg.get("caption") or "",
             # A reply carries the wrap it answers, so the signal arrives already
             # attached to the output it is feedback ON — which the Slack path has
@@ -164,6 +239,10 @@ def _flatten(update: dict[str, Any], tz: ZoneInfo) -> dict[str, Any] | None:
             "epoch": rx.get("date", 0),
             "author": _name(frm),
             "is_bot": bool(frm.get("is_bot")),
+            # One item shape on both branches: a renderer reading these keys must
+            # not have to know which kind of update it is holding.
+            "forwarded_from": None,
+            "forward_kind": None,
             "text": "",
             "reactions": [r.get("emoji") or r.get("custom_emoji_id", "?") for r in rx.get("new_reaction", [])],
             "on_message_id": rx.get("message_id"),
@@ -241,9 +320,16 @@ def read(since: str | None = None) -> InboundReport:
 
     raw_updates = got.get("result", []) or []
     items = [f for f in (_flatten(u, tz) for u in raw_updates) if f]
+    # `is_bot` is answered by the ORIGINATOR on a forward, so this drops the
+    # bot's own wrap when the user forwards it back.
     inbound = [i for i in items if not i["is_bot"]]
+    echoes = [i for i in items if i["is_bot"]]
     shown = sorted(
         (i for i in inbound if cutoff is None or i["epoch"] >= cutoff),
+        key=lambda i: i["epoch"],
+    )
+    forwards = sorted(
+        (i for i in echoes if cutoff is None or i["epoch"] >= cutoff),
         key=lambda i: i["epoch"],
     )
 
@@ -255,6 +341,7 @@ def read(since: str | None = None) -> InboundReport:
         pending_update_count=pending,
         webhook_url=hook_url,
         items=shown,
+        bot_authored_forwards=forwards,
     )
 
     # Three states that are indistinguishable from silence at the call site.
@@ -281,10 +368,12 @@ def read(since: str | None = None) -> InboundReport:
     return report
 
 
-def _append_items(out: list[str], report: InboundReport) -> None:
+def _append_items(
+    out: list[str], report: InboundReport, items: list[dict[str, Any]] | None = None
+) -> None:
     """Render each retained item. Shared by the ok and fault paths — a faulted
     read still has to hand over whatever it actually retrieved."""
-    for i in report.items:
+    for i in report.items if items is None else items:
         head = f"  [{i['at']}] {i['author']}"
         if i["kind"] == "reaction":
             emoji = " ".join(i.get("reactions") or [])
@@ -292,11 +381,37 @@ def _append_items(out: list[str], report: InboundReport) -> None:
         else:
             tag = " (edited)" if i["kind"] == "edited_message" else ""
             out.append(f"{head}{tag}")
+            if i.get("forwarded_from"):
+                out.append(
+                    f"      ⤴ FORWARDED by {i['author']} — original author: "
+                    f"{i['forwarded_from']} ({i['forward_kind']}). The words below are NOT theirs."
+                )
             if i.get("replying_to"):
                 out.append(f"      ↳ replying to: {i['replying_to']!r}")
             for line in (i["text"] or "<no text>").splitlines() or ["<no text>"]:
                 out.append(f"      {line}")
         out.append("")
+
+
+def _append_bot_forwards(out: list[str], report: InboundReport) -> None:
+    """Render bot-authored forwards under their own banner, outside the count.
+
+    Excluded from the classification set, because classifying the bot's own
+    prose as user feedback would let a run manufacture its own signals. Shown
+    anyway, because a forward is a POINTER — read it as "this is the passage
+    they mean", usually alongside a short reply of their own.
+    """
+    if not report.bot_authored_forwards:
+        return
+    out.append("")
+    out.append(
+        f"  {len(report.bot_authored_forwards)} forwarded BOT message(s) — the user sent these,"
+    )
+    out.append("  the bot WROTE them. Kept out of the count above and out of classification:")
+    out.append("  treating this instance's own prose as user feedback would let the run")
+    out.append("  manufacture the signals it counts. What they ARE is a pointer.")
+    out.append("")
+    _append_items(out, report, report.bot_authored_forwards)
 
 
 def _append_closing_obligation(out: list[str], report: InboundReport) -> None:
@@ -320,7 +435,10 @@ def render(report: InboundReport, since: str | None = None) -> str:
 
     if not report.ok:
         out.append(f"  ERROR — {report.fault}")
-        if not report.items:
+        # Both populations count as "something came back". A fault that swallowed
+        # a retrieved forward would be the same drop this module exists to
+        # prevent, one list over.
+        if not report.items and not report.bot_authored_forwards:
             out.append("  This is NOT zero feedback. Nothing was read; do not report a signal count.")
             return "\n".join(out)
         # The refusal is scoped to the COUNT, never to the items. A fault means
@@ -329,9 +447,11 @@ def render(report: InboundReport, since: str | None = None) -> str:
         # that swallows them can be destroying the only copy — and dropping a
         # retrieved reply is the very defect the closing obligation below names.
         out.append("  The COUNT is unusable — do not report a signal count from this run.")
-        out.append(f"  But {len(report.items)} item(s) WERE genuinely retrieved and must still be acted on:")
+        retrieved = len(report.items) + len(report.bot_authored_forwards)
+        out.append(f"  But {retrieved} item(s) WERE genuinely retrieved and must still be acted on:")
         out.append("")
         _append_items(out, report)
+        _append_bot_forwards(out, report)
         _append_closing_obligation(out, report)
         return "\n".join(out)
 
@@ -346,11 +466,17 @@ def render(report: InboundReport, since: str | None = None) -> str:
         out.append("")
         out.append("  CAVEAT — Telegram drops unconsumed updates after ~24h, so this is a statement")
         out.append("  about the last day only, NOT about the run window if that window is older.")
+        # "0 inbound" with a forwarded wrap sitting unmentioned would be true and
+        # misleading in the same breath.
+        _append_bot_forwards(out, report)
         return "\n".join(out)
 
-    out.append(f"  {report.reported} inbound item(s) — every one is the user (the bot's own sends")
-    out.append("  never come back through getUpdates in a private chat).")
+    out.append(f"  {report.reported} inbound item(s) WRITTEN by the user.")
+    out.append("  The `from` field of a private-chat update is always the user, but that is")
+    out.append("  the SENDER — a forward's author is somebody else, so authorship is read")
+    out.append("  from `forward_origin`/`forward_from`, not from `from`.")
     out.append("")
     _append_items(out, report)
+    _append_bot_forwards(out, report)
     _append_closing_obligation(out, report)
     return "\n".join(out)
