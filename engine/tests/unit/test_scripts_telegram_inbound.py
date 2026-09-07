@@ -267,10 +267,10 @@ def test_fault_still_renders_items_that_were_genuinely_retrieved(secrets):
     assert len(rep.items) == 1
 
     rendered = ti.render(rep)
-    assert "webhook is registered" in rendered           # the fault is still led with
-    assert "ship it, but rename the flag" in rendered    # and the reply survives
+    assert "webhook is registered" in rendered  # the fault is still led with
+    assert "ship it, but rename the flag" in rendered  # and the reply survives
     assert "Alex Example" in rendered
-    assert "Nothing was read" not in rendered            # because something was
+    assert "Nothing was read" not in rendered  # because something was
     assert "must still be acted on" in rendered
     # The closing obligation has to travel with the items it governs.
     assert "no action needed" in rendered
@@ -415,9 +415,14 @@ _HUMAN_ORIGIN = {"id": 111, "is_bot": False, "first_name": "Petr"}
 _WRAP_TEXT = "Dreaming wrap - Sat Sep 5, 17:09 to 18:0x CEST\n\nYour one inbox line…"
 
 
-def _forward(*, origin: dict | None = None, legacy: dict | None = None,
-             sender_name: str | None = None, from_chat: dict | None = None,
-             text: str = _WRAP_TEXT) -> dict:
+def _forward(
+    *,
+    origin: dict | None = None,
+    legacy: dict | None = None,
+    sender_name: str | None = None,
+    from_chat: dict | None = None,
+    text: str = _WRAP_TEXT,
+) -> dict:
     """A forwarded message. Each keyword sets ONE of the four origin shapes."""
     msg = {
         "message_id": 4212,
@@ -450,7 +455,8 @@ def test_forwarded_bot_message_is_not_counted_as_the_user(secrets):
 def test_legacy_forward_from_alone_is_still_detected(secrets):
     """A reader that knows only `forward_origin` is one API rollback from #142."""
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_forward(legacy=_BOT_ORIGIN)))],
     ):
         rep = ti.read()
@@ -459,7 +465,8 @@ def test_legacy_forward_from_alone_is_still_detected(secrets):
 
 def test_modern_forward_origin_alone_is_still_detected(secrets):
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_forward(origin=_BOT_ORIGIN)))],
     ):
         rep = ti.read()
@@ -469,7 +476,8 @@ def test_modern_forward_origin_alone_is_still_detected(secrets):
 def test_forward_of_a_human_is_kept_in_the_count_but_labelled(secrets):
     """The filter drops bot-authored text, not forwards. Forwarding is a signal."""
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_forward(origin=_HUMAN_ORIGIN, text="ping")))],
     ):
         rep = ti.read()
@@ -481,7 +489,8 @@ def test_forward_of_a_human_is_kept_in_the_count_but_labelled(secrets):
 def test_hidden_user_forward_is_named_not_read_as_the_user(secrets):
     """No id means no `is_bot`: UNKNOWN authorship, reported as such."""
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_forward(sender_name="Someone", text="x")))],
     ):
         rep = ti.read()
@@ -492,7 +501,8 @@ def test_hidden_user_forward_is_named_not_read_as_the_user(secrets):
 def test_channel_forward_is_titled_and_typed(secrets):
     chat = {"id": -100, "type": "channel", "title": "Some Channel"}
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_forward(from_chat=chat, text="x")))],
     ):
         rep = ti.read()
@@ -514,7 +524,8 @@ def test_reaction_carries_the_forward_keys_as_none(secrets):
     rx = {
         "update_id": 1002,
         "message_reaction": {
-            "message_id": 42, "date": EPOCH,
+            "message_id": 42,
+            "date": EPOCH,
             "user": {"id": 7, "first_name": "Alex", "is_bot": False},
             "new_reaction": [{"emoji": "👍"}],
         },
@@ -537,7 +548,8 @@ def test_render_never_claims_every_item_is_the_user_when_a_forward_is_present(se
     """The banner is the defect's public face: it asserted authorship it had not tested."""
     real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_message("real feedback"), real))],
     ):
         rep = ti.read()
@@ -567,7 +579,8 @@ def test_fault_with_only_a_bot_forward_still_hands_it_over(secrets):
     """
     real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook(url="https://example.test/hook")), _resp(_updates(real))],
     ):
         rep = ti.read()
@@ -581,7 +594,8 @@ def test_cli_json_carries_the_forward_split(secrets):
     """The JSON consumer must be able to see both populations separately."""
     real = _forward(origin=_BOT_ORIGIN, legacy=_BOT_ORIGIN)
     with patch.object(
-        ti.requests, "get",
+        ti.requests,
+        "get",
         side_effect=[_resp(_hook()), _resp(_updates(_message("real"), real))],
     ):
         res = CliRunner().invoke(cli.app, ["notify", "telegram-read", "--json"])

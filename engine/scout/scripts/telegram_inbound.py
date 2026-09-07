@@ -301,9 +301,7 @@ def read(since: str | None = None) -> InboundReport:
     # which are indistinguishable from "no webhook, nothing pending" — the exact
     # shape of genuine silence. A dead witness must never underwrite that claim.
     hook = _call(token, "getWebhookInfo")
-    witness_error = (
-        None if hook.get("ok") else (hook.get("error") or hook.get("description") or "unknown")
-    )
+    witness_error = None if hook.get("ok") else (hook.get("error") or hook.get("description") or "unknown")
     hook_result = hook.get("result") or {}
     hook_url = hook_result.get("url") or ""
     pending = hook_result.get("pending_update_count")
@@ -368,9 +366,7 @@ def read(since: str | None = None) -> InboundReport:
     return report
 
 
-def _append_items(
-    out: list[str], report: InboundReport, items: list[dict[str, Any]] | None = None
-) -> None:
+def _append_items(out: list[str], report: InboundReport, items: list[dict[str, Any]] | None = None) -> None:
     """Render each retained item. Shared by the ok and fault paths — a faulted
     read still has to hand over whatever it actually retrieved."""
     for i in report.items if items is None else items:
@@ -404,9 +400,7 @@ def _append_bot_forwards(out: list[str], report: InboundReport) -> None:
     if not report.bot_authored_forwards:
         return
     out.append("")
-    out.append(
-        f"  {len(report.bot_authored_forwards)} forwarded BOT message(s) — the user sent these,"
-    )
+    out.append(f"  {len(report.bot_authored_forwards)} forwarded BOT message(s) — the user sent these,")
     out.append("  the bot WROTE them. Kept out of the count above and out of classification:")
     out.append("  treating this instance's own prose as user feedback would let the run")
     out.append("  manufacture the signals it counts. What they ARE is a pointer.")
