@@ -40,3 +40,28 @@ jobs:
         # here checks the canonical file is in sync with the YAML — drift =
         # someone edited schedule.yaml and forgot to regenerate.
         run: .venv/bin/python -m scout.scripts.schedule_snapshot --check --target scout/schedule.snapshot.json
+
+  # Coverage runs once, not across the matrix, for two reasons:
+  #   1. The `[full]` extra is required. Every scout/tui test is gated on
+  #      `pytest.importorskip("textual")`, so a `[dev]`-only install skips the
+  #      whole TUI package and the total drops ~3 points below the gate.
+  #   2. Coverage's tracer skews tests/perf/, which measures scoutctl's cold
+  #      -start latency. Keeping the matrix job coverage-free leaves those
+  #      timings honest.
+  # The threshold itself lives in [tool.coverage.report] fail_under.
+  coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Setup Python
+        run: uv python install 3.12
+      - name: Create venv
+        run: uv venv --python 3.12
+      - name: Install
+        run: uv pip install -e ".[dev,full]"
+      - name: Pytest with coverage
+        run: .venv/bin/pytest tests/ --cov --cov-report=term-missing
