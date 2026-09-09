@@ -142,6 +142,30 @@ def budget_check_cmd(
     raise typer.Exit(budget_run(verbose=verbose))
 
 
+@budget_app.command("show")
+def budget_show_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Emit the effective config as JSON."),
+) -> None:
+    """Print the effective budget config and the gate it computes to."""
+    import json as _json
+
+    from scout.scripts.budget_config import show_payload, warn_if_legacy_dotfile
+
+    payload = show_payload()
+    if warning := warn_if_legacy_dotfile():
+        typer.echo(f"warning: {warning}", err=True)
+
+    if as_json:
+        typer.echo(_json.dumps(payload, indent=2))
+        return
+
+    typer.echo(f"config:  {payload['config_path']} ({payload['source']})")
+    typer.echo(f"daily:   ${payload['daily_usd']:.2f}")
+    typer.echo(f"window:  {payload['window_hours']}h → ${payload['window_budget_usd']:.2f}")
+    typer.echo(f"skip at: {payload['skip_at_pct']:.0f}% → ${payload['skip_threshold_usd']:.2f}")
+    typer.echo(f"backoff: {payload['failure_backoff_minutes']}m after a failed run")
+
+
 # `scoutctl session cc-cache` replaces ~/Scout/scripts/cc-session-cache.sh
 # (#74 + #75). The bash version spawned one python3 cold start per JSONL file
 # in ~/.claude/projects/* plus a 5-stage subprocess pipeline per file — often
