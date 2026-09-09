@@ -21,6 +21,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - **Transient API failures skipped their retry on a chatty run** (`templates/scripts/claude-with-retry.sh.tmpl`) — same SIGPIPE-under-`pipefail` shape: `tail -50 "$LOG_FILE" | grep -qE "$TRANSIENT_PATTERNS"` returns 141 rather than 0 when the match lands early and the 50-line tail outgrows the pipe buffer, so `! …` reclassified a retryable error as "not classified as transient — no retry", defeating the wrapper. The tail is now snapshotted once and matched from a variable (which also drops a duplicate `tail`). (#225)
 - **Hardened the first-match extraction in rate-limit detection** (`templates/scripts/rate-limit-detect.sh.tmpl`) — `echo "$MATCHES" | head -1 | cut` has the same unbounded-writer/early-reader shape; a 141 there would propagate through `set -e` and be read by the runner as "no rate limit detected". Not reproduced in practice (bash's builtin `echo` usually survives the EPIPE), so this is a latent hardening rather than an observed failure. (#225)
 
+### Documentation
+- **Scout vs Meta's "Organizational Second Brain"** (`docs/research/meta-organizational-second-brain.md`) — layer-by-layer comparison against Meta Engineering's 2026-09-02 article. Parity on the text-file substrate and the knowledge/procedure split (`phases/` fragments are Meta's "recipes", composed at install time); Scout ahead on live multi-connector grounding, git-date freshness budgets, the numbered mistake audit, pull-capture, and scheduling/budget/lane-liveness operations; Scout weaker on the evaluation layer — no targeted replay, no regression suite, no fresh-context reviewer of self-edits, and deterministic checks that advise inside the session instead of gating the commit. Ends with a tiered fix list (lint gate → pattern fixtures + blind replay → nightly regression) and five proposed engine next steps. Docs only. (#228)
+
 ## [0.9.0] - 2026-09-02
 
 
