@@ -8,9 +8,15 @@ user:
   company: ""
   display_name: ""
 
-budgets:
-  daily_budget_estimate_usd: 150
-  max_per_session_usd: 20
+# The four knobs `scoutctl budget check` enforces before every scheduled run.
+# These MUST equal BudgetConfig()'s defaults in scout/scripts/budget_check.py —
+# tests/unit/test_budget_defaults_parity.py fails the build if they drift.
+# Override them per-vault with `scoutctl budget set`, not by editing this file.
+budget:
+  daily_usd: 50
+  window_hours: 5
+  skip_at_pct: 80
+  failure_backoff_minutes: 60
 
 thresholds:
   rate_limit_warn_pct: 80

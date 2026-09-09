@@ -142,6 +142,76 @@ def budget_check_cmd(
     raise typer.Exit(budget_run(verbose=verbose))
 
 
+@budget_app.command("show")
+def budget_show_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Emit the effective config as JSON."),
+) -> None:
+    """Print the effective budget config and the gate it computes to."""
+    import json as _json
+
+    from scout.scripts.budget_config import show_payload, warn_if_legacy_dotfile
+
+    payload = show_payload()
+    if warning := warn_if_legacy_dotfile():
+        typer.echo(f"warning: {warning}", err=True)
+
+    if as_json:
+        typer.echo(_json.dumps(payload, indent=2))
+        return
+
+    typer.echo(f"config:  {payload['config_path']} ({payload['source']})")
+    typer.echo(f"daily:   ${payload['daily_usd']:.2f}")
+    typer.echo(f"window:  {payload['window_hours']}h → ${payload['window_budget_usd']:.2f}")
+    typer.echo(f"skip at: {payload['skip_at_pct']:.0f}% → ${payload['skip_threshold_usd']:.2f}")
+    typer.echo(f"backoff: {payload['failure_backoff_minutes']}m after a failed run")
+
+
+@budget_app.command("set")
+def budget_set_cmd(
+    daily_usd: float | None = typer.Option(None, "--daily-usd", help="Daily budget estimate, USD."),
+    window_hours: int | None = typer.Option(None, "--window-hours", help="Rolling window for cost accumulation."),
+    skip_at_pct: float | None = typer.Option(
+        None, "--skip-at-pct", help="Skip a session at this percent of the window budget."
+    ),
+    failure_backoff_minutes: int | None = typer.Option(
+        None, "--failure-backoff-minutes", help="Back off this many minutes after a failed run."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the resulting config as JSON."),
+) -> None:
+    """Write one or more budget knobs to the vault's scout-config.yaml."""
+    import json as _json
+
+    from scout.scripts.budget_config import BudgetWriteError, write_budget
+
+    candidates = {
+        "daily_budget_usd": daily_usd,
+        "window_hours": window_hours,
+        "skip_threshold_pct": skip_at_pct,
+        "failure_backoff_min": failure_backoff_minutes,
+    }
+    updates = {field: value for field, value in candidates.items() if value is not None}
+    if not updates:
+        typer.echo(
+            "nothing to set — pass at least one of --daily-usd, --window-hours, "
+            "--skip-at-pct, --failure-backoff-minutes",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    try:
+        payload = write_budget(updates)
+    except BudgetWriteError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    if as_json:
+        typer.echo(_json.dumps(payload, indent=2))
+        return
+    typer.echo(f"wrote {payload['config_path']}")
+    typer.echo(f"window:  {payload['window_hours']}h → ${payload['window_budget_usd']:.2f}")
+    typer.echo(f"skip at: {payload['skip_at_pct']:.0f}% → ${payload['skip_threshold_usd']:.2f}")
+
+
 # `scoutctl session cc-cache` replaces ~/Scout/scripts/cc-session-cache.sh
 # (#74 + #75). The bash version spawned one python3 cold start per JSONL file
 # in ~/.claude/projects/* plus a 5-stage subprocess pipeline per file — often

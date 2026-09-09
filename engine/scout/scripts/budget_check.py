@@ -62,7 +62,7 @@ class BudgetConfig:
 # $0 window budget and a $0 skip threshold, which silently skips every session
 # from then on, and a negative value yields a negative budget. Out-of-range
 # values fall back to the default with a warning instead.
-_CONFIG_BOUNDS: dict[str, tuple[float, float]] = {
+CONFIG_BOUNDS: dict[str, tuple[float, float]] = {
     "daily_budget_usd": (0.0, float("inf")),  # 0 is a real choice: spend nothing
     "window_hours": (1, float("inf")),  # a 0-hour rolling window is not a window
     "skip_threshold_pct": (0.0, 100.0),
@@ -89,7 +89,7 @@ class BudgetDecision:
 # several producers, so a bare-key scan would let any `daily_budget_estimate_usd`
 # anywhere in the file win — and, being last-wins, let a stale duplicate quietly
 # override the live one.
-_NESTED_CONFIG_KEYS = {
+_LEGACY_NESTED_KEYS = {
     ("plan", "daily_budget_estimate_usd"): ("daily_budget_usd", float),
     ("plan", "rate_limit_window_hours"): ("window_hours", int),
     ("thresholds", "skip_threshold_pct"): ("skip_threshold_pct", float),
@@ -97,41 +97,49 @@ _NESTED_CONFIG_KEYS = {
 }
 
 # Flat top-level spellings — back-compat with hand-made override files.
-_CONFIG_KEYS = {
+_LEGACY_FLAT_KEYS = {
     "daily_budget_estimate_usd": ("daily_budget_usd", float),
     "rate_limit_window_hours": ("window_hours", int),
     "skip_threshold_pct": ("skip_threshold_pct", float),
     "failure_backoff_minutes": ("failure_backoff_min", int),
 }
 
+# The canonical shape: one `budget:` block holding all four knobs, written by
+# `scoutctl budget set` and shipped in scout/defaults/scout-config.yaml. Takes
+# precedence over the legacy spellings above — see load_config_with_source for
+# why that precedence needs two scanner passes rather than one merged map.
+_CANONICAL_NESTED_KEYS = {
+    ("budget", "daily_usd"): ("daily_budget_usd", float),
+    ("budget", "window_hours"): ("window_hours", int),
+    ("budget", "skip_at_pct"): ("skip_threshold_pct", float),
+    ("budget", "failure_backoff_minutes"): ("failure_backoff_min", int),
+}
 
-def load_config(config_path: Path) -> BudgetConfig:
-    """Parse the four scalar keys this check cares about from scout-config.yaml.
+_CASTERS = {field: caster for field, caster in _LEGACY_FLAT_KEYS.values()}
 
-    Missing file or unparseable rows fall back to defaults — matches the bash
-    `grep ... | awk` pattern which silently no-ops on missing keys. The scan is
-    the shared two-level reader, so each key is only honoured under its own
-    section (or spelled flat at top level), and a value outside
-    :data:`_CONFIG_BOUNDS` falls back to its default with a warning.
+# Which key shape supplied the values, reported by load_config_with_source so
+# `budget show` and the app can tell a configured vault from one silently
+# running on the engine's constants.
+SOURCE_VAULT = "vault"
+SOURCE_LEGACY = "legacy"
+SOURCE_DEFAULTS = "defaults"
+
+
+def _coerce(raw: dict[str, str]) -> dict[str, Any]:
+    """Cast scanned strings to their field types, dropping anything unusable.
+
+    Out-of-range values fall back to the default with a warning rather than
+    being enforced: `window_hours: 0` — a plausible spelling of "no window" —
+    yields a $0 window budget and a $0 skip threshold, which would silently skip
+    every session from then on.
     """
-    overrides: dict[str, Any] = {}
-    if not config_path.exists():
-        return BudgetConfig()
-    try:
-        text = config_path.read_text(encoding="utf-8")
-    except OSError:
-        return BudgetConfig()
-
-    flat = {k: v[0] for k, v in _CONFIG_KEYS.items()}
-    nested = {k: v[0] for k, v in _NESTED_CONFIG_KEYS.items()}
-    casters = {v[0]: v[1] for v in _CONFIG_KEYS.values()}
-
-    for field_name, raw_value in scan_overrides(text, flat_keys=flat, nested_keys=nested).items():
+    out: dict[str, Any] = {}
+    for field_name, raw_value in raw.items():
         try:
-            value = casters[field_name](raw_value)
+            value = _CASTERS[field_name](raw_value)
         except (TypeError, ValueError):
             continue
-        low, high = _CONFIG_BOUNDS[field_name]
+        low, high = CONFIG_BOUNDS[field_name]
         if not (low <= value <= high):
             print(
                 f"[budget-check] ignoring {field_name}={value}: outside the usable range "
@@ -139,8 +147,56 @@ def load_config(config_path: Path) -> BudgetConfig:
                 file=sys.stderr,
             )
             continue
-        overrides[field_name] = value
-    return BudgetConfig(**overrides)
+        out[field_name] = value
+    return out
+
+
+def load_config_with_source(config_path: Path) -> tuple[BudgetConfig, str]:
+    """Parse the budget knobs from scout-config.yaml, reporting their provenance.
+
+    The canonical `budget:` block wins over the legacy `plan:`/`thresholds:`
+    spellings. That precedence needs TWO scanner passes: scan_overrides is
+    last-wins within a single pass, so handing it one merged key map would let
+    whichever block appears later in the file win — making the result depend on
+    line order rather than on which spelling is canonical.
+
+    Missing file or unparseable rows fall back to defaults — matches the bash
+    `grep ... | awk` pattern which silently no-ops on missing keys. A value
+    outside :data:`CONFIG_BOUNDS` falls back to its default with a warning.
+    """
+    if not config_path.exists():
+        return BudgetConfig(), SOURCE_DEFAULTS
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return BudgetConfig(), SOURCE_DEFAULTS
+
+    legacy = _coerce(
+        scan_overrides(
+            text,
+            flat_keys={k: v[0] for k, v in _LEGACY_FLAT_KEYS.items()},
+            nested_keys={k: v[0] for k, v in _LEGACY_NESTED_KEYS.items()},
+        )
+    )
+    canonical = _coerce(
+        scan_overrides(
+            text,
+            nested_keys={k: v[0] for k, v in _CANONICAL_NESTED_KEYS.items()},
+        )
+    )
+
+    if canonical:
+        source = SOURCE_VAULT
+    elif legacy:
+        source = SOURCE_LEGACY
+    else:
+        source = SOURCE_DEFAULTS
+    return BudgetConfig(**{**legacy, **canonical}), source
+
+
+def load_config(config_path: Path) -> BudgetConfig:
+    """The four scalar knobs from scout-config.yaml. See load_config_with_source."""
+    return load_config_with_source(config_path)[0]
 
 
 def _iter_tracker_rows(tracker_path: Path) -> Iterable[dict]:
@@ -254,13 +310,22 @@ def run(*, verbose: bool = False, data_dir: Path | None = None) -> int:
     target = data_dir or paths.data_dir()
     tracker_path = paths.logs_dir(target) / "usage-tracker.jsonl"
     config_path = paths.config_path(target)
-    config = load_config(config_path)
+    config, source = load_config_with_source(config_path)
     decision = decide(tracker_path, config)
     if verbose:
         # Say WHICH file supplied the numbers — the silent-defaults fallback
         # is what kept #202 invisible for months.
         state = "" if config_path.exists() else " (missing — using engine defaults)"
         print(f"[budget-check] config: {config_path}{state}")
+        # And WHICH key shape, so a vault still on the pre-canonical spelling
+        # doesn't look configured when it is one `budget set` from being so.
+        if source == SOURCE_LEGACY:
+            print(
+                "[budget-check] values came from the legacy plan:/thresholds: keys — "
+                "`scoutctl budget set` writes the canonical budget: block"
+            )
+        elif source == SOURCE_DEFAULTS:
+            print("[budget-check] no budget: block in the vault — running on engine defaults")
         print(f"[budget-check] {decision.reason}")
         print(
             f"[budget-check] window: {config.window_hours}h, "
@@ -272,8 +337,7 @@ def run(*, verbose: bool = False, data_dir: Path | None = None) -> int:
 
 
 __all__ = [
-    "BudgetConfig",
-    "BudgetDecision",
+    "CONFIG_BOUNDS",
     "DEFAULT_DAILY_BUDGET_USD",
     "DEFAULT_FAILURE_BACKOFF_MIN",
     "DEFAULT_SKIP_THRESHOLD_PCT",
@@ -281,7 +345,13 @@ __all__ = [
     "EXIT_BACKOFF",
     "EXIT_PROCEED",
     "EXIT_SKIP_OVER_BUDGET",
+    "SOURCE_DEFAULTS",
+    "SOURCE_LEGACY",
+    "SOURCE_VAULT",
+    "BudgetConfig",
+    "BudgetDecision",
     "decide",
     "load_config",
+    "load_config_with_source",
     "run",
 ]

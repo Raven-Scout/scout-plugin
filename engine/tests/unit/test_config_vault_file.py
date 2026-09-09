@@ -272,12 +272,12 @@ def test_type_mismatched_section_warns_and_keeps_defaults(
 ) -> None:
     """A scalar where the defaults define a mapping (e.g. ``user: oops``)
     would otherwise clobber the whole subtree for every consumer."""
-    _write_vault_config(fake_data_dir, {"user": "oops", "budgets": 5})
+    _write_vault_config(fake_data_dir, {"user": "oops", "budget": 5})
     cfg = config.load_config(fake_data_dir)
     assert cfg["user"]["timezone"] == config.DEFAULT_TIMEZONE
-    assert cfg["budgets"]["daily_budget_estimate_usd"] == 150
+    assert cfg["budget"]["daily_usd"] == 50
     err = capsys.readouterr().err
-    assert "user" in err and "budgets" in err
+    assert "user" in err and "budget" in err
 
 
 def test_unknown_bootstrap_keys_pass_through_silently(

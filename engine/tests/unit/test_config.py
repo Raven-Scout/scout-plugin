@@ -17,7 +17,7 @@ def _write(path: Path, data: dict) -> None:
 
 def test_load_config_returns_defaults_when_no_user_override(clean_env: None, fake_data_dir: Path) -> None:
     cfg = config.load_config(fake_data_dir)
-    assert "budgets" in cfg
+    assert "budget" in cfg
     assert "thresholds" in cfg
     assert cfg["schema_version"] == 1
 
@@ -25,12 +25,12 @@ def test_load_config_returns_defaults_when_no_user_override(clean_env: None, fak
 def test_user_config_overrides_defaults(clean_env: None, fake_data_dir: Path) -> None:
     _write(
         fake_data_dir / "scout-config.yaml",
-        {"budgets": {"daily_budget_estimate_usd": 999}},
+        {"budget": {"daily_usd": 999}},
     )
     cfg = config.load_config(fake_data_dir)
-    assert cfg["budgets"]["daily_budget_estimate_usd"] == 999
+    assert cfg["budget"]["daily_usd"] == 999
     # Other default keys preserved
-    assert "max_per_session_usd" in cfg["budgets"]
+    assert "window_hours" in cfg["budget"]
 
 
 def test_deep_merge_preserves_sibling_keys(clean_env: None, fake_data_dir: Path) -> None:

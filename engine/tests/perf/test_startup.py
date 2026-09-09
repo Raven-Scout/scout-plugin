@@ -16,6 +16,10 @@ import pytest
 
 HELP_BUDGET_MS = 250
 VERSION_BUDGET_MS = 150
+# `budget show` does real file I/O (vault config + the dotfile probe), so it
+# gets a looser budget than --help — but it sits on an interactive scout-app
+# path, so a heavy import creeping in must still show up here.
+BUDGET_SHOW_BUDGET_MS = 400
 _RUNS = 5
 
 
@@ -61,4 +65,15 @@ def test_scoutctl_version_latency() -> None:
     assert stdout.strip(), "version should emit to stdout"
     assert best_ms < VERSION_BUDGET_MS, (
         f"scoutctl version took {best_ms:.0f}ms (best of {_RUNS}, budget: {VERSION_BUDGET_MS}ms)."
+    )
+
+
+@pytest.mark.perf
+def test_scoutctl_budget_show_latency() -> None:
+    """scout-app calls this when the Settings pane opens."""
+    best_ms, stdout = _best_latency_ms(["budget", "show", "--json"])
+    assert "skip_threshold_usd" in stdout
+    assert best_ms < BUDGET_SHOW_BUDGET_MS, (
+        f"scoutctl budget show took {best_ms:.0f}ms (best of {_RUNS}, "
+        f"budget: {BUDGET_SHOW_BUDGET_MS}ms). Check for heavy top-level imports."
     )
