@@ -6,6 +6,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-09
+
+
 ### Added
 - **`scoutctl budget show` / `budget set`** (`engine/scout/scripts/budget_config.py`, `engine/scout/cli.py`) — the budget knobs the pre-run gate enforces can finally be read and changed without hand-editing YAML. `show` prints the effective config plus the gate it computes to (and `--json`, the contract [scout-app's](https://github.com/Raven-Scout/Scout/pull/105) Settings pane decodes), naming both the file and the key shape that supplied the numbers so a vault running on engine defaults says so instead of looking configured. `set` takes any subset of the four knobs, validates against the same bounds the reader uses, and rewrites **only** the named scalar lines inside the `budget:` block — other subtrees and every comment survive byte-for-byte, which matters because `scout-config.yaml` doubles as bootstrap state written by several producers; a pyyaml round-trip would strip every comment and a whole-file rewrite could drop a subtree a newer bootstrap wrote. Persistence is tmp + `os.replace` behind an mtime guard that re-applies rather than clobbering a concurrent write. Out-of-range values are an *error* here, unlike on the read path where tolerance exists so a mangled vault can never block a run. A partial `set` on a vault with no block appends a **complete** block, filling unnamed knobs from the defaults, so the file states the whole gate rather than a partial override plus invisible defaults. `show` also warns when a dotted `.scout-config.yaml` carries budget keys — that file is read by nothing but reads like live config, which is how a far tighter gate than anyone intended stayed invisible for months. (#235)
 
