@@ -59,6 +59,7 @@ Use the user's connected tools to determine what kind of action this is. The mat
 
 | Type | Tools to use | Signals in the item |
 |------|-------------|-------------------|
+| **Reply** | Read `<SCOUT_DIR>/drafts/<TAG>.md` — **no send tools** | Item has `(reply drafted → [[drafts/<TAG>]])`, or a `drafts/<TAG>.md` with `status: draft` exists for the item's `[#TAG]` |
 | **GitHub** | `gh` CLI (pr view, pr merge, pr review) | PR #, merge, reviewer, CI, GitHub URL |
 | **Slack** | Slack MCP (slack_send_message, slack_read_channel, etc.) | Slack DM, reply, post, thread, channel name |
 | **Calendar** | Google Calendar MCP (create_event, list_events) | Schedule, meeting, invite, calendar |
@@ -77,6 +78,7 @@ Before presenting the item, get current state from the relevant tool. Items writ
 - **Email:** Search the relevant thread for recent replies
 - **Calendar:** List upcoming events to check for conflicts or existing meetings
 - **Research:** Run a WebSearch query relevant to the item, fetch key results with WebFetch, summarize findings
+- **Reply:** Read the draft file `<SCOUT_DIR>/drafts/<TAG>.md` (the `[#TAG]` is the item's tag). Note its `channel`, `to`, `subject`, `status`, and body. Then check the original thread (`thread_ref`) for any new reply — if the user already responded since the draft was written, the loop is closed (see Step 6).
 
 ### Step 3: Present the item
 
@@ -84,7 +86,7 @@ Use this format:
 
 ```
 ### [N/total] Item title
-**Type:** GitHub | Slack | Calendar | Linear | Email | Research | Compound
+**Type:** Reply | GitHub | Slack | Calendar | Linear | Email | Research | Compound
 **Current status:** <what you just found — has anything changed since the action items were written?>
 
 **Recommended action:**
@@ -98,6 +100,24 @@ Use this format:
 **do it** / **skip** / **modify?**
 ```
 
+**For a Reply item**, present the prepared draft so the user can read and send it himself — Scout does not send. Use this variant:
+
+```
+### [N/total] Reply to <to> — <subject or topic>
+**Type:** Reply (<channel>)
+**Current status:** <still owed / user may have already replied — what the thread tail shows>
+
+**Prepared draft** (you send it yourself — Scout never sends):
+To: <to>
+Subject: <subject>        ← omit for chat channels
+---
+<full draft body, verbatim from drafts/<TAG>.md, including any [TBD: ...] markers>
+---
+Original thread: <thread_ref>
+
+**sent** (I've sent it) / **edit: <change>** / **skip** / **dismiss**
+```
+
 ### Step 4: Wait for approval
 
 Do **nothing** until the user responds. Accept:
@@ -105,6 +125,12 @@ Do **nothing** until the user responds. Accept:
 - **"skip"** / **"next"** / **"s"** / **"n"** → move to next item
 - **"done"** / **"stop"** / **"quit"** → end the session, go to summary
 - **Any other text** → treat as a modification (e.g., "change the message to say X", "merge but use squash", "also CC <name>")
+
+**For a Reply item**, the verbs differ (Scout never sends — the user does):
+- **"sent"** / **"odesláno"** / **"done"** → the user has sent it himself; close the loop (Step 5, Reply variant).
+- **"edit: <change>"** / any correction → rewrite the body in `drafts/<TAG>.md`, re-present the updated draft, wait again. Do **not** send.
+- **"dismiss"** → the reply is no longer needed; set `status: dismissed` and mark the item done with that reason.
+- **"skip"** → leave the draft as-is, move on.
 
 ### Step 5: Execute on approval
 
@@ -118,9 +144,17 @@ Do **nothing** until the user responds. Accept:
    ```
 4. Move to the next item.
 
+**Reply variant of Step 5 (no send tool, ever):**
+
+1. **Do NOT call any send tool** — no `slack_send_message`, no Gmail `send_message`, no native draft, no Linear/GitHub comment. The user sends from his own client.
+2. On **"sent"**: set `status: sent` in `drafts/<TAG>.md`; mark the action item `- [x]` with ` — ✅ Reply sent by user`.
+3. On **"edit: …"**: rewrite the body of `drafts/<TAG>.md` (leave `status: draft`), re-present, and wait — no file-done change yet.
+4. On **"dismiss"**: set `status: dismissed` in `drafts/<TAG>.md`; mark the action item `- [x]` with ` — ✅ Reply dismissed (no longer needed)`.
+5. Commit with `work [HH:MM]: <reply to person>` and move on.
+
 ### Step 6: Handle edge cases during the loop
 
-- **Item already done:** If fresh context shows the item is already completed (PR merged by someone else, message already sent, meeting scheduled), mark it complete automatically, tell the user, and move on. Commit with a note that it was auto-resolved.
+- **Item already done:** If fresh context shows the item is already completed (PR merged by someone else, message already sent, meeting scheduled), mark it complete automatically, tell the user, and move on. Commit with a note that it was auto-resolved. **For a Reply item:** if the thread tail shows the user already replied since the draft was written, set the draft's `status: sent`, mark the item done, and skip presenting it.
 - **Item now blocked:** If fresh context reveals a new blocker, note it and skip.
 - **Tool unavailable:** If a tool call fails, explain what happened and offer to skip or retry.
 
@@ -153,5 +187,6 @@ After all items are done or the user says stop:
 
 - **Commit format:** `work [HH:MM]: <summary>` — consistent with `briefing [HH:MM]:`, `consolidation [HH:MM]:`, `dreaming [HH:MM]:`, `research [HH:MM]:`. The format makes the git log readable as an audit trail of who did what and when.
 - **Never take an externally-visible action without explicit approval.** The whole point of this mode is that the user decides.
+- **Reply items are never sent by Scout.** A prepared reply draft (`drafts/<TAG>.md`) is text only — Scout presents it, edits it on request, and flips its `status:`, but the user always sends it from his own client. This holds even under "do all" / "auto": Scout still never calls a send tool.
 - **One item at a time.** Don't batch. Don't skip ahead. Present, wait, execute, commit, next.
 - **If the user says "do all" or "auto"** — still present each item, but execute without waiting for individual approval. The user has given blanket consent for the session. Stop and ask again if anything non-obvious comes up (e.g., a draft that needs judgment on tone or recipient).
