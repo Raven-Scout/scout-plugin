@@ -8,6 +8,7 @@ install_schedule_plist.py for com.scout.heartbeat.plist.
 from __future__ import annotations
 
 import os
+import plistlib
 import subprocess
 from html import escape
 from pathlib import Path
@@ -32,7 +33,16 @@ def install_plist(
     # XML-escape __USER_HOME__: it lands inside <string> elements, and a path
     # with `&`, `<`, `>`, `"` (legal on macOS) would otherwise produce
     # malformed XML that launchd silently refuses to load. (#49)
+    # Escaping only covers <string> content: the replace is whole-file, so the
+    # template must keep the placeholder token out of its XML comment — a
+    # substituted path containing `--` is illegal there however it is escaped.
     rendered = TEMPLATE.read_text(encoding="utf-8").replace("__USER_HOME__", escape(str(home), quote=True))
+    # Fail loudly at install time rather than let launchd silently drop the
+    # job on malformed output (#49).
+    try:
+        plistlib.loads(rendered.encode("utf-8"))
+    except Exception as exc:
+        raise ValueError(f"rendered {PLIST_NAME} is not well-formed XML: {exc}") from exc
     target.write_text(rendered, encoding="utf-8")
     if bootstrap:
         uid = os.getuid()

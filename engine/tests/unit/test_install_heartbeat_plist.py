@@ -74,6 +74,23 @@ def test_install_heartbeat_plist_escapes_xml_metacharacters(tmp_path):
     assert data["EnvironmentVariables"]["HOME"] == str(home)
 
 
+def test_install_plist_tolerates_double_hyphen_paths(tmp_path):
+    """A home path containing `--` must still render a well-formed plist:
+    XML escaping can't protect values substituted into the template's XML
+    comment, where `--` is illegal no matter how it is escaped."""
+    import plistlib
+
+    home = tmp_path / "home--with--hyphens"
+    home.mkdir()
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    target = install_plist(home=home, agents_dir=agents)
+
+    with target.open("rb") as f:
+        data = plistlib.load(f)
+    assert data["EnvironmentVariables"]["HOME"] == str(home)
+
+
 def test_install_plist_bootstrap_boots_out_first(tmp_path, monkeypatch):
     """Re-install must bootout the loaded job before bootstrap: launchctl
     bootstrap EIOs on an already-loaded label and has no --force (#48, #23)."""
