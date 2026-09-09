@@ -94,7 +94,7 @@ def test_wheel_install_runs_scoutctl_and_loads_defaults(tmp_path: Path) -> None:
         "from scout.config import load_config;"
         "cfg = load_config();"
         "json.dump({'schema': cfg.get('schema_version'),"
-        " 'has_budgets': 'budgets' in cfg,"
+        " 'has_budget': 'budget' in cfg,"
         " 'has_thresholds': 'thresholds' in cfg}, sys.stdout)"
     )
     r = subprocess.run(
@@ -104,7 +104,7 @@ def test_wheel_install_runs_scoutctl_and_loads_defaults(tmp_path: Path) -> None:
         text=True,
     )
     probe_out = json.loads(r.stdout)
-    assert probe_out == {"schema": 1, "has_budgets": True, "has_thresholds": True}
+    assert probe_out == {"schema": 1, "has_budget": True, "has_thresholds": True}
 
 
 def test_engine_dir_constant_is_engine_root() -> None:
