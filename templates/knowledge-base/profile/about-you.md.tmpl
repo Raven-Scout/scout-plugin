@@ -1,0 +1,34 @@
+---
+kind: profile
+last_reviewed: {{TODAY_DATE}}
+---
+
+# About {{USER_NAME}}
+
+> **{{INSTANCE_NAME}} maintains this file.** Most of it is *derived* from your activity (connectors + your Claude Code sessions) and kept fresh automatically. Edit any line directly — {{INSTANCE_NAME}} treats your edits as ground truth and will not overwrite them. Lines {{INSTANCE_NAME}} inferred carry a confidence tag (`[single-source]` / `[unverified]`) until corroborated.
+
+## Identity
+
+- **Name:** {{USER_NAME}}
+- **Email:** {{USER_EMAIL}}
+- **Timezone:** {{TIMEZONE}}
+- **Role / title:** <!-- TODO: role — derived from email signature / Slack profile / calendar org, or set via /scout-profile -->
+- **Employer / team:** <!-- TODO: employer-team — derived from connectors -->
+
+## Who matters most
+
+_Top collaborators, derived from interaction frequency and 1:1 cadence. Wikilink to `[[people/<slug>]]`. {{INSTANCE_NAME}} keeps this current; correct it freely._
+
+<!-- TODO: key-people — {{INSTANCE_NAME}} fills this from connector activity -->
+
+## Current focus
+
+_What you're actively spending time on (most-active projects/tickets/threads). {{INSTANCE_NAME}} derives this; it feeds prioritization alongside `[[goals]]`._
+
+<!-- TODO: current-focus — {{INSTANCE_NAME}} fills this from connector activity -->
+
+## Working rhythm
+
+_Meeting density, deep-work windows, and primary channels — derived from calendar and tool traffic. Used to time nudges and respect your focus blocks._
+
+<!-- TODO: working-rhythm — {{INSTANCE_NAME}} fills this from calendar + connector traffic -->

@@ -6,7 +6,7 @@ entity_types:
   person:
     properties:
       required: [name, type]
-      optional: [email, slack_id, github, birthday, role, team, employer, phone]
+      optional: [email, slack_id, github, birthday, role, team, employer, phone, last_interaction]
     relationships:
       - works_with
       - manages

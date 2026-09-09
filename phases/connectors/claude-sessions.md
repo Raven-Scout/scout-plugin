@@ -86,3 +86,11 @@ Narrate the deltas in the run summary, and surface an instance-owned PR that's o
 ### Claim Gate — No "Actively Building X" Without a Cited Signal
 
 Do not assert that {{USER_NAME}} "is actively building / working on X" unless you can cite a concrete signal: a session JSONL with matching prompts, a commit SHA, an open PR, or dirty working-tree files. A session *title* or a single prompt is weak evidence — tie the claim to the tangible artifact, or downgrade it to "{{USER_NAME}} opened a session about X" rather than asserting active work.
+
+### Profile Signal — Feed `knowledge-base/profile/`
+
+Your own sessions are a uniquely good source for the user profile, because they show how {{USER_NAME}} actually works and writes — something the inbound connectors can't see. Stays local (`cc-session-cache` summaries); nothing leaves the machine. While scanning, also harvest, with the same confidence discipline as everywhere else:
+
+- **Identity & focus → `profile/about-you.md`:** recurring projects, domains, and tools across sessions sharpen the "current focus" and role/team fields. Tag inferred claims `[single-source]` until corroborated.
+- **Communication style → `profile/communication.md`:** the language {{USER_NAME}} writes in and the way they phrase requests (terse vs. narrative, direct vs. exploratory) are a strong prior for the reply-language and tone defaults. Treat this as a *signal*, not a confirmed preference — the Dreaming feedback loop, not this scan, is what writes confirmed comms changes.
+- **Candidate goals → `profile/goals.md`:** a theme {{USER_NAME}} returns to across many sessions is a goal candidate — draft it under **Proposed (unconfirmed)** with the sessions as evidence. Never auto-confirm.
