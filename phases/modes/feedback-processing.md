@@ -83,6 +83,8 @@ Based on the classified signals and mistake audit updates, determine what change
 |---|---|---|
 | `knowledge-base/scout-mistake-audit.md` | **Direct edit** | Apply updates from Step 1c immediately |
 | KB files (content corrections) | **Direct edit** | Fix factual errors identified by feedback (e.g., wrong status, wrong person, outdated info) |
+| `knowledge-base/profile/communication.md` | **Direct edit** | This is the channel that *learns* the comms contract. When feedback reveals a **stable** preference about how {{INSTANCE_NAME}} talks (too long/short, wrong tone, wrong language, over/under-notifying, an escalation that should've been autonomous or vice-versa), write it into the contract, cite the feedback, bump `last_reviewed`. One-off reactions aren't enough — only encode a preference that recurs or is stated outright. |
+| `knowledge-base/profile/{about-you,goals}.md` | **Direct edit** | Apply {{USER_NAME}}'s corrections (wrong role/collaborator, a goal confirmed/dropped/reprioritized). Treat a confirmation as ground truth and stop tagging it derived. |
 | `DREAMING.md` | **Direct edit** | Improve dreaming behavior based on patterns (e.g., adjust scoring weights, add checklist items) |
 | `SKILL.md` | **Direct edit (transparency + reversibility)** | Self-apply additive, feedback-aligned, or pattern-closing edits directly, committed with a clear message so the change is reviewable and `git revert`-able. See gate criteria below. |
 | New KB files or structural changes | **Direct edit** | Only if supported by clear evidence from multiple feedback signals |

@@ -70,6 +70,9 @@ Ask each of these in order, waiting for each answer:
 2. "What's your name? (used in commit messages and the KB)"
 3. "What's your email? (used for git config)"
 4. "Timezone? (default: America/New_York)"
+5. **(Optional, skippable)** "How would you like Scout to communicate with you — preferred language, tone/length, and anything it should always check with you before acting on? (Press Enter to skip — Scout fills this from defaults and learns the rest from your feedback. You can set it anytime with `/scout-profile`.)"
+
+Capture the answer to #5 verbatim (or empty if skipped) for Step 3c. Everything else about the user — role, key people, focus, goals — Scout derives from your connectors on its own runs; do **not** ask for them here.
 
 ---
 
@@ -168,6 +171,20 @@ EOF
 ```
 
 Set `ENABLED = True` if the user said yes, `False` if they said no.
+
+---
+
+## Step 3c: Seed the communication contract (only if the user answered Q5)
+
+If the user **skipped** Q5, do nothing here — the seeded `communication.md` defaults stand and Scout learns from feedback.
+
+If they **answered**, open `~/Scout/knowledge-base/profile/communication.md` (already seeded by bootstrap) and fill in only the fields their answer covers, by replacing the matching `<!-- TODO: ... -->` sentinel(s):
+
+- preferred language → the **Language** line
+- tone / length → the **Tone & length** lines
+- what to always check first → the **Always check with {{USER_NAME}} first** line under the autonomy contract
+
+Leave every sentinel they didn't address untouched (Scout fills those from feedback later). Do not invent preferences beyond what they said. Then bump `last_reviewed:` to today. This is the same "post-write into the freshly-created vault" pattern as Step 3b — edit the live file directly; the template is not re-rendered at install time.
 
 ---
 

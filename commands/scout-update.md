@@ -148,6 +148,8 @@ If runner backups appeared (`run-*.sh.bak.*`), tell the user the live runners ha
 - `~/Scout/connector-probes.local.yaml` (custom connector probes) is a user
   file, never templated, so it is preserved untouched across upgrades.
 
+**New profile files.** If this upgrade seeded `knowledge-base/profile/` for the first time (check: the files exist now and `plugin.applied_migrations` includes `profile-files-v1`), tell the user once: "Scout now keeps a user profile — it derives most of it (who you are, who matters, your focus) on its runs. To set how Scout talks to you and confirm your goals, run `/scout-profile`."
+
 ---
 
 ## Auto-update nudge
