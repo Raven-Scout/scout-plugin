@@ -106,9 +106,9 @@ Read `dreaming-proposals.md`. Apply a proposal's change to `SKILL.md` when EITHE
 - its status is `Approved` (required for governance/safety-gating changes), OR
 - its status is `Pending (auto-apply after <date>)` and that date has passed and it is not marked `Rejected`.
 
-For each, apply the change exactly as specified, set status to `Applied — [today's date]`, and commit separately:
+For each, apply the change exactly as specified, set status to `Applied — [today's date]`, and commit separately — explicit paths, never `-A`:
 ```bash
-git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]: applied proposal — <short description>"
+{{SCOUT_DIR}}/scripts/git-safe-commit.sh "dreaming [HH:MM]: applied proposal — <short description>" SKILL.md dreaming-proposals.md dreaming-proposals/ dreaming-proposals-archive.md
 ```
 
 **Engine back-port reminder (every run).** Applying a `SKILL`/`DREAMING`/`RESEARCH` proposal edits only the vault brain file; the same rule must also land in the engine's `phases/` fragments, or the next `/scout-update` re-render will sidecar it. So at the start of this step, scan for **applied proposals whose engine back-port is not yet merged** and, if any are owed, surface a standing reminder in the wrap notification (and carry it as an action item — it must not silently drop):
@@ -138,10 +138,10 @@ For each improvement that targets `SKILL.md` (from Step 1d):
 
 ### Step 1f: Commit
 
-If Phase 1 made any changes (mistake audit updates, KB fixes, dreaming improvements, applied proposals, new proposals):
+If Phase 1 made any changes (mistake audit updates, KB fixes, dreaming improvements, applied proposals, new proposals) — **stage explicit paths through the helper, NEVER bare `git add -A`.** A concurrently-running scheduled session shares this working tree, and `-A` stages *its* half-written files into your commit; the helper refuses `-A` (exit 2), takes a cross-session mutex, and clears provably-stale git locks:
 
 ```bash
-git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]: feedback processing — <summary of changes>"
+{{SCOUT_DIR}}/scripts/git-safe-commit.sh "dreaming [HH:MM]: feedback processing — <summary of changes>" <only the paths THIS run touched>
 ```
 
 The summary should mention what was processed: e.g., "3 feedback signals, 1 new mistake pattern, 2 KB fixes" or "applied 1 approved proposal, added 2 new proposals."

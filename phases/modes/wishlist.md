@@ -86,8 +86,10 @@ After executing (or deciding to skip), update each item file's frontmatter `stat
 
 ### Step 3e: Commit
 
+Explicit paths, never `-A` (see Step 1f):
+
 ```bash
-git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]: wishlist — <description of what was done>"
+{{SCOUT_DIR}}/scripts/git-safe-commit.sh "dreaming [HH:MM]: wishlist — <description of what was done>" <only the paths THIS run touched>
 ```
 
 The description should name the wishlist item: e.g., "wishlist — added architecture decision KB template" or "wishlist — completed sub-task 2/4 for action items format redesign."

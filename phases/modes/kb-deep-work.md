@@ -221,8 +221,10 @@ This gate exists because the easiest failure mode of an automated KB system is b
 
 ### Step 2e: Commit
 
+Explicit paths, never `-A` (see Step 1f):
+
 ```bash
-git -C {{SCOUT_DIR}} add -A && git -C {{SCOUT_DIR}} commit -m "dreaming [HH:MM]: KB deep work — <summary>"
+{{SCOUT_DIR}}/scripts/git-safe-commit.sh "dreaming [HH:MM]: KB deep work — <summary>" <only the paths THIS run touched>
 ```
 
 The summary should describe what was improved: e.g., "deep dive on project-alpha (verified 12 claims, updated status, added 3 decisions)" or "gap hunt: added 4 missing people, created channel entries for 2 new channels."
