@@ -92,6 +92,33 @@ def test_research_excludes_briefing_only_sections():
     assert "Monday Preview" not in research
 
 
+# --- Reply Drafts phase (mode: [briefing, consolidation]) --------------------
+
+
+def test_skill_includes_reply_drafts_phase():
+    skill = _assemble(_config(), "SKILL")
+    assert "Reply Drafts" in skill
+    # The hard no-send constraint must survive assembly.
+    assert "never send" in skill.lower()
+    # The action-item contract marker /scout-work and the macOS app key on.
+    assert "reply drafted" in skill.lower()
+    assert "drafts/<TAG>.md" in skill
+
+
+def test_reply_drafts_runs_after_action_items_in_skill():
+    """Reply Drafts is a synthesis phase — it must render after action-items so
+    it can attach draft pointers to the composed list."""
+    skill = _assemble(_config(), "SKILL")
+    assert skill.index("Archive Old Action Items") < skill.index("Reply Drafts")
+
+
+def test_reply_drafts_excluded_from_dreaming_and_research():
+    dreaming = _assemble(_config(), "DREAMING")
+    research = _assemble(_config(), "RESEARCH")
+    assert "Reply Drafts" not in dreaming
+    assert "Reply Drafts" not in research
+
+
 # --- Runner mode-signal plumbing ---------------------------------------------
 
 

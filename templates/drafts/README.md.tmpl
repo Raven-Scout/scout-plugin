@@ -1,0 +1,76 @@
+# Reply Drafts
+
+This directory holds **prepared reply drafts** — one markdown file per open conversational
+loop where you owe someone an answer. {{INSTANCE_NAME}} writes these during briefing and
+consolidation runs (see the *Reply Drafts* phase). You review them in `/scout-work` or in the
+Scout macOS app, then **send them yourself**.
+
+**Autonomous runs never send anything** — briefing/consolidation only *prepare* these draft files.
+Delivery happens only when **you** explicitly ask, in the Scout app or via `/scout-reply`:
+- a **Slack** draft can be **sent** into its thread (with a confirmation — a Slack send is real), and
+- an **email** draft can be turned into a **Gmail draft** to review and send from Gmail (never auto-sent).
+
+Until you act, a draft is just text in a file.
+
+## File shape — `drafts/<TAG>.md`
+
+`<TAG>` matches the `[#TAG]` of the corresponding action item, so the obligation is tracked in
+the daily action-items list while the draft body lives here.
+
+```
+---
+tag: NAHSEND
+channel: email            # email | slack | linear | github | whatsapp
+loop_type: direct-debt    # direct-debt | promise-answered
+to: "Jan Novák <jan@firma.cz>"
+cc: "Petra Malá <petra@firma.cz>"   # other thread recipients to keep; omit if none
+thread_ref: "https://mail.google.com/mail/u/0/#inbox/<thread-id>"
+subject: "Re: Rozpočet Q3"          # email/PR title; omit for chat channels
+status: draft             # draft | sent | dismissed
+created: 2026-06-29
+context_answer_ref: ""    # permalink to the answer that arrived (promise-answered only)
+---
+
+Ahoj Jane,
+
+<the drafted reply, grounded only in the thread + knowledge base. Anything unknown is
+marked [TBD: ...] for you to fill in before sending.>
+```
+
+**The body is plain, sendable text.** For email / Slack / WhatsApp there is **no markdown** in the
+body (no `**bold**`, `#` headings, `-` bullets, backticks, or HTML comments) — it must look right
+when sent as-is. Markdown is only used for `linear` / `github` drafts, which render it. Recipients,
+CC, and subject live in the frontmatter, never inside the body.
+
+**`[TBD: …]` markers are fill-in fields.** Anything {{INSTANCE_NAME}} couldn't determine is left in
+the body as `[TBD: <what to supply>]`. In the Scout app (and `/scout-work`) each one shows as a
+labeled input; typing a value replaces the whole `[TBD: …]` with your text in the body, so the reply
+reads cleanly. Fill them in before sending.
+
+**Context block — summary + thread.** After the reply, separated by a `<!-- scout:context -->`
+marker, each draft carries a `## Summary` (what the topic is about) and a `## Thread` list of the
+relevant messages (`- [date] Sender: one line`). The app renders these as two collapsible sections
+under the draft so you can see what you're replying to. This block lives **after** the marker, so it
+is never sent or copied — it is context only.
+
+## Fields
+
+| Field | Meaning |
+|---|---|
+| `tag` | Stable id, mirrors the action item `[#TAG]`. |
+| `channel` | Where the reply is owed: `email`, `slack`, `linear`, `github`, `whatsapp`. |
+| `loop_type` | `direct-debt` (someone asked, you haven't replied) or `promise-answered` (you promised → asked elsewhere → the answer arrived). |
+| `to` | Recipient (name + address/handle when known). |
+| `cc` | Other thread recipients to keep on the reply (email/PR). Omitted when none. |
+| `thread_ref` | Link/permalink/thread id to the original conversation. |
+| `subject` | Email subject or PR/issue title. Omit for chat. |
+| `status` | `draft` (awaiting you), `sent` (you sent it), `dismissed` (no longer needed). |
+| `created` | Date the draft was prepared. |
+| `context_answer_ref` | For `promise-answered`: link to the answer that unblocked the reply. |
+
+## Lifecycle
+
+- New loops → a `status: draft` file is created.
+- You send the reply yourself, then mark it `sent` (in `/scout-work` or the app).
+- No longer relevant → `dismissed`.
+- `sent` / `dismissed` files older than 7 days are moved to `drafts/archive/`.
