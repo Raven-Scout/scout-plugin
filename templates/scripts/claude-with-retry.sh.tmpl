@@ -31,6 +31,9 @@
 #   SCOUT_RETRY_MAX=2          total attempts (default: 2 → 1 retry)
 #   SCOUT_RETRY_BACKOFF_S=60   base backoff seconds (default 60; scales linearly: 60s, 120s, ...)
 #   SCOUT_RETRY_DISABLE=1      single-attempt mode (legacy behavior)
+#   SCOUT_AUTH_ALERT_INTERVAL_S=86400
+#                              minimum seconds between auth-failure desktop
+#                              notifications (default: one a day)
 #
 # Exit code: the exit code of the final attempt.
 
@@ -58,6 +61,46 @@ TRANSIENT_PATTERNS='socket connection was closed unexpectedly|Unable to connect 
 # line, since a rejected credential blocks EVERY scheduled run until fixed.
 AUTH_PATTERNS='Failed to authenticate|Invalid authentication credentials|API Error: 40[13]|40[13] Unauthorized|40[13] Forbidden|OAuth token (has )?expired'
 
+# The auth banner lands in the session log, which nobody reads while scheduled
+# runs fail for weeks — so an auth failure also raises a desktop notification.
+# Local on purpose: osascript / notify-send work without the rejected credential,
+# unlike anything routed through Claude or a connector. The marker sits next to
+# the run logs and holds the epoch of the last alert; a successful run removes it,
+# so the next expiry alerts straight away.
+AUTH_ALERT_INTERVAL_S="${SCOUT_AUTH_ALERT_INTERVAL_S:-86400}"
+AUTH_ALERT_MARKER="$(dirname "$LOG_FILE")/.auth-alert-sent"
+
+# Best-effort: never changes the wrapper's exit code.
+notify_auth_failure() {
+    local now last=0 sent=0
+    local title="{{INSTANCE_NAME}} can't run"
+    local body="Your Claude login expired. Open Terminal and run claude to log in again."
+    now="$(date +%s)"
+    if [ -f "$AUTH_ALERT_MARKER" ]; then
+        last="$(cat "$AUTH_ALERT_MARKER" 2>/dev/null || true)"
+        case "$last" in ''|*[!0-9]*) last=0 ;; esac
+    fi
+    if [ $(( now - last )) -lt "$AUTH_ALERT_INTERVAL_S" ]; then
+        echo "    Desktop notification suppressed (one was sent in the last ${AUTH_ALERT_INTERVAL_S}s)." >> "$LOG_FILE"
+        return 0
+    fi
+    if command -v osascript >/dev/null 2>&1; then
+        # Title and body go in as argv, never into the AppleScript source.
+        printf '%s\n' 'on run argv' \
+            '    display notification (item 2 of argv) with title (item 1 of argv) sound name "Basso"' \
+            'end run' \
+            | osascript - "$title" "$body" >/dev/null 2>&1 && sent=1
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send --urgency=critical "$title" "$body" >/dev/null 2>&1 && sent=1
+    fi
+    if [ "$sent" -eq 1 ]; then
+        { echo "$now" > "$AUTH_ALERT_MARKER"; } 2>/dev/null || true
+        echo "    Desktop notification sent." >> "$LOG_FILE"
+    else
+        echo "    No desktop notification: osascript / notify-send missing or failed." >> "$LOG_FILE"
+    fi
+}
+
 attempt=1
 exit_code=0
 while :; do
@@ -69,12 +112,8 @@ while :; do
     "$CLAUDE_BIN" "$@" >> "$LOG_FILE" 2>&1 || exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then
+        rm -f "$AUTH_ALERT_MARKER"
         exit 0
-    fi
-
-    if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
-        echo "=== Retry exhausted: $MAX_ATTEMPTS attempts, last exit $exit_code ===" >> "$LOG_FILE"
-        exit "$exit_code"
     fi
 
     # Snapshot the tail once, then match against the variable. `tail … | grep -q`
@@ -85,18 +124,30 @@ while :; do
     # `|| true` keeps an unreadable log from aborting the wrapper under `set -e`,
     # so the real claude exit code still reaches the caller (prior behavior).
     LOG_TAIL="$(tail -50 "$LOG_FILE" 2>/dev/null || true)"
-    if ! grep -qE "$TRANSIENT_PATTERNS" <<<"$LOG_TAIL"; then
-        if grep -qE "$AUTH_PATTERNS" <<<"$LOG_TAIL"; then
-            {
-                echo "=== Authentication failure (HTTP 401/403) — no retry (exit $exit_code) ==="
-                echo "    Claude Code's API credentials were rejected. This blocks every scheduled {{INSTANCE_NAME}} run until re-authenticated."
-                echo "    Re-authenticate the claude binary this runner uses ($CLAUDE_BIN):"
-                echo "      - interactive: run 'claude' once and complete login, or"
-                echo "      - headless:    run 'claude setup-token' and expose CLAUDE_CODE_OAUTH_TOKEN to this runner's environment."
-                echo "    Then verify before the next scheduled run:  $CLAUDE_BIN -p 'hello' --model opus"
-            } >> "$LOG_FILE"
-            exit "$exit_code"
-        fi
+    is_transient=0
+    grep -qE "$TRANSIENT_PATTERNS" <<<"$LOG_TAIL" && is_transient=1
+
+    # Auth is classified before the attempts check: single-attempt mode, or a
+    # retry that dies on auth, must still get the banner and the notification.
+    if [ "$is_transient" -eq 0 ] && grep -qE "$AUTH_PATTERNS" <<<"$LOG_TAIL"; then
+        {
+            echo "=== Authentication failure (HTTP 401/403) — no retry (exit $exit_code) ==="
+            echo "    Claude Code's API credentials were rejected. This blocks every scheduled {{INSTANCE_NAME}} run until re-authenticated."
+            echo "    Re-authenticate the claude binary this runner uses ($CLAUDE_BIN):"
+            echo "      - interactive: run 'claude' once and complete login, or"
+            echo "      - headless:    run 'claude setup-token' and expose CLAUDE_CODE_OAUTH_TOKEN to this runner's environment."
+            echo "    Then verify before the next scheduled run:  $CLAUDE_BIN -p 'hello' --model opus"
+        } >> "$LOG_FILE"
+        notify_auth_failure || true
+        exit "$exit_code"
+    fi
+
+    if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+        echo "=== Retry exhausted: $MAX_ATTEMPTS attempts, last exit $exit_code ===" >> "$LOG_FILE"
+        exit "$exit_code"
+    fi
+
+    if [ "$is_transient" -eq 0 ]; then
         echo "=== Failure not classified as transient — no retry (exit $exit_code) ===" >> "$LOG_FILE"
         exit "$exit_code"
     fi
