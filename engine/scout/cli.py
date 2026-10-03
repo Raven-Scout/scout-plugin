@@ -71,6 +71,15 @@ def _register_action_items() -> None:
 _register_action_items()
 
 
+def _register_planning() -> None:
+    from scout.planning.cli import app as planning_app
+
+    app.add_typer(planning_app, name="planning")
+
+
+_register_planning()
+
+
 hook_app = typer.Typer(help="PostToolUse / lifecycle hook entry points (invoked by Claude Code).")
 app.add_typer(hook_app, name="hook")
 

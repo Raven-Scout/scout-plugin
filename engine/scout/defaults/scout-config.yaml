@@ -32,6 +32,28 @@ auto_update:
   enabled: false
   channel: stable
 
+# Day planning for /scout-plan. MUST equal PlanningSettings()'s defaults in
+# scout/planning/settings.py; tests/unit/test_planning_settings.py fails the
+# build if they drift. Times are quoted: YAML 1.1 reads a bare 09:00 as a
+# base-60 integer.
+planning:
+  work_start: "09:00"
+  work_end: "17:00"
+  increment_minutes: 15
+  capacity_pct: 65
+  buffer: 1.25
+  new_work_buffer: 1.5
+  deep_block_minutes: 90
+  batch_block_minutes: 45
+  meeting_gap_minutes: 15
+  calibration_min_samples: 5
+  calibration_window: 20
+  calibration_min_factor: 0.75
+  calibration_max_factor: 2.5
+  event_title_prefix: "[Scout]"
+  event_visibility: private
+  event_availability: busy
+
 # Agent-session index (scoutctl session index). Spec: scout-app
 # docs/superpowers/specs/2026-09-08-agent-sessions-design.md §4.11.
 # NOTE: `sessions:` is the budget block in older vaults — this is a separate key.

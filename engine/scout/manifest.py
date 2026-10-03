@@ -72,6 +72,8 @@ def build_manifest() -> EngineManifest:
             # Agent-session index (scoutctl session index / list). scout-app's
             # Sessions page gates on this flag before shelling out.
             "agent_sessions_v1": True,
+            # /scout-plan: estimate/block/actual markers, `scoutctl planning`.
+            "planning_v1": True,
             # Event triggers (docs/specs/event-triggers.md). Opt-in: flips
             # True once the polling matcher + dedup/cooldown are verified
             # across a week of live runs.

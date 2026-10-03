@@ -134,6 +134,7 @@ Or run interactive sessions in the current conversation:
 
 ```
 /scout-work           # Walk through today's action items one at a time, approve each action
+/scout-plan           # Plan the day: estimates on a 15-minute grid, calendar blocks after you approve, learns from actual times
 /scout-meta-review    # System-level audit — are sessions running, is the mistake audit trending well, are proposals flowing?
 ```
 
@@ -317,6 +318,7 @@ scout-plugin/
     scout-update.md         -- Upgrade plugin + vault (existing installs)
     scout-status.md         -- Dashboard command
     scout-work.md           -- Interactive work session (in-conversation)
+    scout-plan.md           -- Interactive day planning with calendar blocks (in-conversation)
     scout-meta-review.md    -- System-level diagnostic audit (in-conversation)
   skills/
     scout-briefing/         -- Launch a briefing session (background)

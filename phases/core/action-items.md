@@ -166,6 +166,19 @@ Good vs bad (anonymized):
     ✅    - Refs: [[people/alex]] · [[PROJ-3026]] · example-org/repo#7056 · #XREF
     ❌  - [ ] [#REPLYX] 🟡 **Reply to Alex — purchase Q still open (Thu 4:55 PM: "1/8 to 1/2") PROJ-3026** _(carries)_ — …
 
+### Hard Rule: Plan Markers Carry Verbatim
+
+`/scout-plan` writes up to three machine sub-bullets under a task, always in this order and only through `scoutctl action-items set-estimate | set-block | set-actual | clear-block | clear-plan`:
+
+    - [ ] [#REPLYX] **Reply to Alex about her purchase question**
+      - estimate: 45m (raw: 30m, kind: comms)
+      - block: 2026-09-30 10:00-10:45 (event: abc123)
+      - actual: 1h (2026-09-30)
+
+- When you carry a task forward, move it to another section (including Recently Completed when it is done), or rewrite the file in full, copy these lines **verbatim**, directly under the task line, in the same order. Never re-author, merge, round, translate or drop them, and never fold them into the `- Refs:` sub-bullet. They are the one exception to the single-Refs-line rule because the apps and the planner parse them.
+- Never write, edit or remove them yourself. If one looks wrong, say so in the digest and leave it.
+- A past `block:` without an `actual:` is data the estimate feedback loop still needs. Keep it until the task is done and the user has logged the time with `/scout-plan review`.
+
 ### Hard Rule — Trim by Demotion, Never by Omission
 
 When the list grows long, achieve focus by **reprioritizing**, never by hiding items from view. "Don't overwhelm me" and "don't drop my items" are both real constraints — resolve the tension by demotion *within* view, not omission *from* view.
@@ -318,6 +331,12 @@ For each carryover item from the previous action-items file:
 ```
 
 This is the file-side counterpart of the wrap-DM continuity line (see the notification phase) — the DM opens with the throughline; this section carries the reasoning.
+
+**Day-planning line.** When the engine advertises `planning_v1` (`scoutctl manifest show`), check today's plan with `scoutctl action-items list --json --with-plan --include-done` (a task checked off after its block still needs its actual time). Add at most one Focus bullet:
+- items carry a `block:` dated before today with no `actual:` -> `**Log yesterday's actual times**: run /scout-plan review (N blocks)`;
+- otherwise, no open item carries a `block:` dated today -> `**Plan the day**: run /scout-plan (N open to-dos, none scheduled)`.
+
+Skip it in weekend briefings and when the user has already planned today.
 
 ## Mandatory Cross-Check
 

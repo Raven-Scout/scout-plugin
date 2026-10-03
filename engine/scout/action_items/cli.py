@@ -12,6 +12,7 @@ import datetime as _dt
 import json as _json
 import sys
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -226,6 +227,134 @@ def cli_render(
     sys.stdout.write(render(target))
 
 
+def _daily_target(path: Path | None) -> tuple[Path | None, _dt.date | None]:
+    """A daily-file path argument pins the data dir (its grandparent) and the date (its stem)."""
+    if path is None:
+        return None, None
+    try:
+        return path.parent.parent, _dt.date.fromisoformat(path.stem.removeprefix("action-items-"))
+    except ValueError as e:
+        raise ActionItemError(f"unrecognized daily filename: {path.name}") from e
+
+
+def _require_one_selector(command: str, subject: str | None, by_id: str | None) -> None:
+    if (subject is None) == (by_id is None):
+        raise ActionItemError(f"{command} requires exactly one of --subject or --by-id")
+
+
+def _duration_minutes(text: str, flag: str) -> int:
+    from scout.planning.durations import parse_duration
+
+    try:
+        return parse_duration(text)
+    except ValueError as e:
+        raise ActionItemError(f"{flag}: invalid duration {text!r} (use e.g. 15m, 45m, 1h, 1h15m)") from e
+
+
+_SUBJECT_HELP = "Substring of task title (legacy fallback)."
+_BY_ID_HELP = "Stable [#TAG] id (2-8 [A-Z0-9], >=1 letter)."
+_PATH_HELP = "Daily markdown file (default: today). When given, its grandparent is the data dir."
+
+
+@app.command("set-estimate")
+def cli_set_estimate(
+    duration: str = typer.Argument(..., help="Planned time on the grid, e.g. 45m or 1h15m."),
+    raw: str | None = typer.Option(None, "--raw", help="The estimate before the buffer or calibration factor."),
+    kind: str | None = typer.Option(None, "--kind", help="Kind of work, e.g. deep, shallow, comms, review."),
+    subject: str | None = typer.Option(None, "--subject", help=_SUBJECT_HELP),
+    by_id: str | None = typer.Option(None, "--by-id", help=_BY_ID_HELP),
+    path: Path | None = typer.Argument(None, help=_PATH_HELP),
+) -> None:
+    """Write or replace the `- estimate:` marker under a task (/scout-plan)."""
+    from scout.action_items.plan_marks import set_estimate
+
+    _require_one_selector("set-estimate", subject, by_id)
+    minutes = _duration_minutes(duration, "duration")
+    raw_minutes = _duration_minutes(raw, "--raw") if raw is not None else None
+    data_dir, date = _daily_target(path)
+    set_estimate(
+        minutes=minutes,
+        raw_minutes=raw_minutes,
+        kind=kind,
+        by_id=by_id,
+        by_subject=subject,
+        date=date,
+        data_dir=data_dir,
+    )
+
+
+@app.command("set-block")
+def cli_set_block(
+    day: str = typer.Option(..., "--date", help="YYYY-MM-DD of the calendar block."),
+    start: str = typer.Option(..., "--start", help="HH:MM, on the planning grid."),
+    end: str = typer.Option(..., "--end", help="HH:MM, on the planning grid."),
+    event_id: str | None = typer.Option(None, "--event-id", help="Calendar event id of the block."),
+    subject: str | None = typer.Option(None, "--subject", help=_SUBJECT_HELP),
+    by_id: str | None = typer.Option(None, "--by-id", help=_BY_ID_HELP),
+    path: Path | None = typer.Argument(None, help=_PATH_HELP),
+) -> None:
+    """Write or replace the `- block:` marker under a task (/scout-plan)."""
+    from scout.action_items.plan_marks import set_block
+
+    _require_one_selector("set-block", subject, by_id)
+    data_dir, date = _daily_target(path)
+    set_block(
+        day=day,
+        start=start,
+        end=end,
+        event_id=event_id,
+        by_id=by_id,
+        by_subject=subject,
+        date=date,
+        data_dir=data_dir,
+    )
+
+
+@app.command("clear-block")
+def cli_clear_block(
+    subject: str | None = typer.Option(None, "--subject", help=_SUBJECT_HELP),
+    by_id: str | None = typer.Option(None, "--by-id", help=_BY_ID_HELP),
+    path: Path | None = typer.Argument(None, help=_PATH_HELP),
+) -> None:
+    """Remove the `- block:` marker from a task, if it has one."""
+    from scout.action_items.plan_marks import clear_block
+
+    _require_one_selector("clear-block", subject, by_id)
+    data_dir, date = _daily_target(path)
+    clear_block(by_id=by_id, by_subject=subject, date=date, data_dir=data_dir)
+
+
+@app.command("clear-plan")
+def cli_clear_plan(
+    subject: str | None = typer.Option(None, "--subject", help=_SUBJECT_HELP),
+    by_id: str | None = typer.Option(None, "--by-id", help=_BY_ID_HELP),
+    path: Path | None = typer.Argument(None, help=_PATH_HELP),
+) -> None:
+    """Remove every plan marker (estimate, block, actual) from a task."""
+    from scout.action_items.plan_marks import clear_plan
+
+    _require_one_selector("clear-plan", subject, by_id)
+    data_dir, date = _daily_target(path)
+    clear_plan(by_id=by_id, by_subject=subject, date=date, data_dir=data_dir)
+
+
+@app.command("set-actual")
+def cli_set_actual(
+    duration: str = typer.Argument(..., help="Time the task really took, on the grid, e.g. 1h."),
+    on: str | None = typer.Option(None, "--on", help="YYYY-MM-DD the work happened (default: today)."),
+    subject: str | None = typer.Option(None, "--subject", help=_SUBJECT_HELP),
+    by_id: str | None = typer.Option(None, "--by-id", help=_BY_ID_HELP),
+    path: Path | None = typer.Argument(None, help=_PATH_HELP),
+) -> None:
+    """Record the `- actual:` time and add the sample to the estimate calibration log."""
+    from scout.action_items.plan_marks import set_actual
+
+    _require_one_selector("set-actual", subject, by_id)
+    minutes = _duration_minutes(duration, "duration")
+    data_dir, date = _daily_target(path)
+    set_actual(minutes=minutes, on=on, by_id=by_id, by_subject=subject, date=date, data_dir=data_dir)
+
+
 @app.command("list")
 def cli_list(
     path: Path | None = typer.Argument(None),
@@ -233,14 +362,17 @@ def cli_list(
     priority: str | None = typer.Option(None, "--priority"),
     section: str | None = typer.Option(None, "--section"),
     json_out: bool = typer.Option(False, "--json"),
+    with_plan: bool = typer.Option(False, "--with-plan", help="With --json: add each item's estimate/block/actual."),
 ) -> None:
     from scout import paths
     from scout.action_items.list import format_items, list_items
 
+    if with_plan and not json_out:
+        raise typer.BadParameter("--with-plan needs --json", param_hint="--with-plan")
     target = path or paths.action_items_daily_path()
     items = list_items(target, include_done=include_done, priority=priority, section=section)
     if json_out:
-        payload = [
+        payload: list[dict[str, Any]] = [
             {
                 "title": i.title,
                 "priority": i.priority,
@@ -250,6 +382,11 @@ def cli_list(
             }
             for i in items
         ]
+        if with_plan:
+            from scout.action_items.plan_marks import read_plan_marks
+
+            for row, item in zip(payload, items, strict=True):
+                row["plan"] = read_plan_marks(target, task_line_number=item.line_number).to_json_dict()
         sys.stdout.write(_json.dumps(payload) + "\n")
     else:
         sys.stdout.write(format_items(items))
