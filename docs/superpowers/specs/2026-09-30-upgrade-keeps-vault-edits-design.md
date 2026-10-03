@@ -37,7 +37,8 @@ still lost on the next upgrade, with no warning.
 Out of scope:
 - The assembled `SKILL.md`, `DREAMING.md` and `RESEARCH.md` keep their sidecar
   policy, and a pending sidecar still blocks the upgrade. `scoutctl phases backport`
-  covers these files.
+  covers these files. (Superseded 2026-10-02: a pending brain-file sidecar only
+  skips that file; see `2026-10-02-brain-sidecars-never-block-upgrade-design.md`.)
 - `.gitignore` stays append-only merged (#251).
 - The install-only seeds are never overwritten, as before.
 

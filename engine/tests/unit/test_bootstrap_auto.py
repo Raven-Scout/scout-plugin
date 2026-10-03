@@ -52,12 +52,33 @@ def test_detect_configured_vault_is_upgrade(tmp_path):
     assert detect(tmp_path / "Scout").action is AutoAction.UPGRADE
 
 
-def test_detect_pending_sidecar_is_refused(tmp_path):
+def test_detect_pending_parser_sidecar_is_refused(tmp_path):
+    """Only a parser.py sidecar an older engine left still blocks the upgrade."""
+    vault = tmp_path / "Scout"
+    (vault / "knowledge-base" / "ontology").mkdir(parents=True)
+    (vault / "scout-config.yaml").write_text("instance_name: x\n")
+    (vault / "knowledge-base" / "ontology" / "parser.py.proposed-merge").write_text("<<<<<<<\n")
+    plan = detect(vault)
+    assert plan.action is AutoAction.REFUSED and "parser.py.proposed-merge" in plan.reason
+
+
+def test_detect_pending_brain_sidecar_still_upgrades(tmp_path):
+    """A pending brain-file sidecar only skips that file, so it doesn't stop
+    an unattended upgrade."""
     (tmp_path / "Scout").mkdir()
     (tmp_path / "Scout" / "scout-config.yaml").write_text("instance_name: x\n")
     (tmp_path / "Scout" / "SKILL.md.proposed-merge").write_text("<<<<<<<\n")
-    plan = detect(tmp_path / "Scout")
-    assert plan.action is AutoAction.REFUSED and "sidecar" in plan.reason
+    assert detect(tmp_path / "Scout").action is AutoAction.UPGRADE
+
+
+def test_run_reports_a_skipped_brain_file(tmp_path):
+    vault = tmp_path / "Scout"
+    run(_cfg(vault))
+    (vault / "DREAMING.md.proposed-merge").write_text("pending\n")
+    result, code = run(_cfg(vault))
+    assert result["action"] == "upgrade"
+    assert result["skipped"] == ["DREAMING.md.proposed-merge"]
+    assert code == 1  # the pending sidecar keeps the doctor yellow
 
 
 def test_detect_nonempty_non_vault_is_refused(tmp_path):
@@ -109,6 +130,7 @@ def test_result_dict_has_the_contract_keys(tmp_path):
         "conflicts",
         "backups",
         "snapshots_recorded",
+        "skipped",
         "pointer",
         "vault_edits",
         "mutated",

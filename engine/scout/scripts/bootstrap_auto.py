@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from scout.scripts.bootstrap import (
-    _CAT_MERGE_FILES,
     BootstrapConfig,
     InstallResult,
     MigrateLegacyResult,
     UpgradeResult,
     _is_legacy_vault,
     _vault_exists,
+    blocking_sidecars,
     install,
     install_incomplete,
     migrate_legacy,
@@ -48,12 +48,6 @@ class Plan:
     reason: str
 
 
-def pending_sidecars(vault: Path) -> list[str]:
-    names = [f"{n}.md.proposed-merge" for n in ("SKILL", "DREAMING", "RESEARCH")]
-    names += [f"{rel}.proposed-merge" for rel in _CAT_MERGE_FILES]
-    return [n for n in names if (vault / n).exists()]
-
-
 def _is_effectively_empty(vault: Path) -> bool:
     """True iff every entry in `vault` is Finder-authored metadata.
 
@@ -70,7 +64,9 @@ def detect(vault: Path) -> Plan:
         return Plan(AutoAction.INSTALL, "no vault: directory missing or empty")
     if not vault.is_dir():
         return Plan(AutoAction.REFUSED, f"{vault} exists and is not a directory")
-    sidecars = pending_sidecars(vault)
+    # Only these make `upgrade` refuse; a pending brain-file sidecar just
+    # skips that file and is reported as `skipped`.
+    sidecars = blocking_sidecars(vault)
     if sidecars:
         return Plan(
             AutoAction.REFUSED,
@@ -130,6 +126,7 @@ def result_dict(
         "conflicts": list(getattr(result, "conflicts", None) or []),
         "backups": list(getattr(result, "backups", None) or []),
         "snapshots_recorded": list(getattr(result, "snapshots_recorded", None) or []),
+        "skipped": list(getattr(result, "skipped", None) or []),
         "vault_edits": [
             {
                 "path": e.path,

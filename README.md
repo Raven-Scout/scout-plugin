@@ -494,7 +494,7 @@ Check run logs in `.scout-logs/`. Verify your schedule is active with `launchctl
 Connect it on claude.ai (or `gh auth login` for GitHub), add its key (`slack`, `calendar`, `email`, `linear`, `github`, `granola`, `drive`, `claude_sessions`) to `connectors.enabled` in `~/Scout/scout-config.yaml` — plus any input it needs under `connectors.inputs` (e.g. `user_slack_id`) — then run `/scout-update`. The upgrade reassembles your skill files to include that connector's phase modules, keeping your edits.
 
 **I want to customize the skill file.**
-Edit `SKILL.md`, `DREAMING.md`, or `RESEARCH.md` directly in your Scout directory. `/scout-update` 3-way merges plugin improvements into your edited files; wherever it can't merge safely it leaves a `*.md.proposed-merge` sidecar for you to review instead of overwriting. The plugin never overwrites your skill files without asking.
+Edit `SKILL.md`, `DREAMING.md`, or `RESEARCH.md` directly in your Scout directory. `/scout-update` 3-way merges plugin improvements into your edited files; wherever it can't merge safely it leaves a `*.md.proposed-merge` sidecar for you to review instead of overwriting, and the rest of the upgrade still runs. Once the file is the version you want, `scoutctl bootstrap resolve SKILL.md` records it so later plugin changes merge into it. A skill file you never edited simply takes the new version; the plugin never overwrites your edits.
 
 **How do I queue research topics?**
 Add a file to `knowledge-base/research-queue/` (e.g. `knowledge-base/research-queue/<date>-<topic-slug>.md`) with frontmatter (`title`, `status: open`, `priority`, `date`) describing what to research. Scout picks it up during the next research session.

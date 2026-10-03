@@ -80,7 +80,7 @@ SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 
 ---
 
-## Step 0: Pre-flight (refuse if no vault, no venv, pending sidecars, or mismatched venv)
+## Step 0: Pre-flight (refuse if no vault, no venv, or mismatched venv; note pending sidecars)
 
 Run:
 
@@ -97,13 +97,14 @@ SCOUTCTL="$NEW_ROOT/.venv/bin/scoutctl"
 
 test -f "$HOME/Scout/.scout-state/install-incomplete" && { echo "INSTALL_INCOMPLETE"; exit 0; }
 test -f "$HOME/Scout/scout-config.yaml" || { echo "NO_VAULT"; exit 0; }
-# Any one sidecar blocks the upgrade. parser.py's can only be one an older
-# engine left behind; current upgrades park parser.py conflicts instead.
-PENDING=""
-for f in SKILL.md DREAMING.md RESEARCH.md knowledge-base/ontology/parser.py; do
-  if [ -e "$HOME/Scout/$f.proposed-merge" ]; then PENDING="$PENDING $f.proposed-merge"; fi
+# A parser.py sidecar can only be one an older engine left behind (current
+# upgrades park parser.py conflicts instead); it still makes the upgrade refuse.
+test -e "$HOME/Scout/knowledge-base/ontology/parser.py.proposed-merge" && { echo "BLOCKING_SIDECAR"; exit 0; }
+# Pending brain-file sidecars don't block the upgrade (it skips just those
+# files), but the user should hear about them before it runs.
+for f in "$HOME/Scout/"{SKILL,DREAMING,RESEARCH}.md.proposed-merge; do
+    if [ -e "$f" ]; then echo "PENDING_SIDECAR:$(basename "$f")"; fi
 done
-if [ -n "$PENDING" ]; then echo "PENDING_SIDECARS:$PENDING"; exit 0; fi
 test -x "$SCOUTCTL" || { echo "VENV_MISSING:$NEW_ROOT"; exit 0; }
 
 # Verify the venv is editable-installed FROM this plugin checkout.
@@ -121,7 +122,8 @@ EOF
 
 - `INSTALL_INCOMPLETE`: "The Scout install at `~/Scout/` was interrupted before it finished, so there is nothing to upgrade yet. Run `/scout-setup` to finish it — it resumes the interrupted install rather than starting over." Stop here (`bootstrap upgrade` refuses a vault in this state).
 - `NO_VAULT`: "No Scout vault found at `~/Scout/`. Run `/scout-setup` for a fresh install."
-- `PENDING_SIDECARS:<files>`: "Unresolved merge conflicts from a prior `/scout-update`:" — list the sidecar files (paths are relative to `~/Scout/`). Then: "Edit each file to remove conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), then run `mv <file>.proposed-merge <file>` for each. Then re-run `/scout-update`." A `knowledge-base/ontology/parser.py.proposed-merge` was left by an older engine; the vault's `parser.py` is the one running, so either merge the sidecar into it as above, or delete the sidecar: this upgrade then retries the merge itself and parks any conflict under `.scout-state/drift/` without blocking.
+- `BLOCKING_SIDECAR`: "`knowledge-base/ontology/parser.py.proposed-merge` was left by an older engine, and it blocks the upgrade. The vault's `parser.py` is the one running, so either merge the sidecar into it (remove the conflict markers `<<<<<<<`, `=======`, `>>>>>>>`, then `mv knowledge-base/ontology/parser.py.proposed-merge knowledge-base/ontology/parser.py`), or delete the sidecar: the upgrade then retries the merge itself and parks any conflict under `.scout-state/drift/` without blocking. Then re-run `/scout-update`."
+- `PENDING_SIDECAR:<file>` (zero or more lines): informational, not a refusal. Tell the user: "`<file>` from an earlier upgrade is still unresolved. This upgrade will leave `<file without .proposed-merge>` exactly as it is and update everything else; resolve the sidecar (see Step 3) and the next upgrade picks the file up again." Then act on the line that follows, `READY` or one of the refusals below.
 - `VENV_MISSING:<plugin-root>`: "Engine venv missing at `<plugin-root>/.venv/`. Install it with:" then show:
   ```
   bash "$NEW_ROOT/scripts/install-venv.sh"
@@ -185,7 +187,11 @@ Capture exit code (0 = green, 1 = yellow, 2 = red) and stdout/stderr.
 ## Step 3: Report
 
 - If exit 0: "Upgrade complete. Doctor: green. New version recorded."
-- If exit 1: list every `warning:` line. Highlight any `conflict (sidecar):` rows — these are the SKILL/DREAMING/RESEARCH files the user must merge by hand. Provide the resolution instructions: edit the sidecar, `mv X.md.proposed-merge X.md`, re-run `/scout-update`.
+- If exit 1: list every `warning:` line, then explain the brain-file rows:
+  - `conflict (sidecar): X.md.proposed-merge` — this upgrade wrote a sidecar and left `X.md` running unchanged. If the sidecar has conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), the vault and the plugin changed the same lines. If it has no markers, it's the plugin's full version, proposed because the vault's `X.md` wasn't written by the plugin (for example, a vault migrated with `migrate-legacy`); adopting it replaces the vault's version, so review the diff first.
+  - `skipped (sidecar pending): X.md.proposed-merge` — a sidecar from an earlier upgrade is still there, so this upgrade left `X.md` alone and updated everything else. There's no need to re-run `/scout-update` straight away: once it's resolved, the next upgrade merges `X.md` against whatever plugin version is current then.
+
+  To resolve either kind: make `X.md` the version the user wants (for example `mv X.md.proposed-merge X.md` and remove any markers, or merge the parts they want into `X.md` by hand), then run `"$SCOUTCTL" bootstrap resolve X.md`. That records the plugin's version as the merge base, so later edits to `X.md` (a dreaming run applying a proposal, say) merge cleanly with the next plugin change, and it removes the sidecar. It refuses while conflict markers remain. Deleting the sidecar without `resolve` means "decide later": the next upgrade proposes the same change again.
 - If exit 2: list every `error:` line. Suggest `scoutctl bootstrap doctor` for a clean read of the current state.
 
 Then report every `vault edit <outcome>: <file> — …` line. These are the vault's own edits to plugin-owned files (scripts, hooks, runners, `render.py`, `parser.py`); none of them blocks a later upgrade:
@@ -198,6 +204,8 @@ Then report every `vault edit <outcome>: <file> — …` line. These are the vau
   - A `parser.py` conflict with no recorded base ("no record of the last render") can't be checked, so plain `--resolve` refuses it; after merging by hand, settle it with `--resolve <file> --drop-update`.
 - `error`: the file couldn't be read or written (permissions, a locked file). It was left untouched and everything else upgraded. Report the reason shown.
 - `replaced` (with a `backup:` path): this was the vault's first upgrade with no record of the last render, and the file matched no release, so the plugin's version was installed and the vault's copy parked at `.scout-state/drift/<file>.vault`. `scoutctl bootstrap drift --diff` shows what the copy had; dismiss it with `scoutctl bootstrap drift --resolve <file>`, or copy it back over `<file>` to keep its edit (later upgrades then protect it).
+
+If a `backup: .scout-state/drift/X.md.vault` line appears for a brain file (`SKILL.md`, `DREAMING.md`, `RESEARCH.md`), tell the user that `X.md` took the plugin's new version on the strength of its assembly header alone (a vault last upgraded before Scout recorded which snapshots it wrote), so the replaced copy was parked there. This happens at most once per file. Compare with `diff .scout-state/drift/X.md.vault X.md`, then dismiss it with `scoutctl bootstrap drift --resolve X.md`.
 
 - `~/Scout/connector-probes.local.yaml` (custom connector probes) is a user
   file, never templated, so it is preserved untouched across upgrades.
@@ -222,7 +230,7 @@ EOF
 ```
 
 - If `AUTO_UPDATE_ON`: nothing to say — auto-updates are already configured.
-- If `AUTO_UPDATE_OFF`: tell the user once: "Auto-updates are off — I can turn them on so Scout keeps itself current (sidecar-clean upgrades only; you'll be pinged on conflict; your own edits to Scout's scripts are kept). Want me to enable it?"
+- If `AUTO_UPDATE_OFF`: tell the user once: "Auto-updates are off — I can turn them on so Scout keeps itself current (a skill file with a conflict is left as it is and you'll be pinged; everything else still updates, and your own edits to Scout's scripts are kept). Want me to enable it?"
 
 If the user agrees, turn it on with `scoutctl config set-auto-update`. It rewrites only the `auto_update` block of `~/Scout/scout-config.yaml` (adding it if absent, keeping an existing channel) and leaves every other line and comment as it was. Do **not** write this file with a pyyaml load-and-dump — that deletes every comment in it.
 

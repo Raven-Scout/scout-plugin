@@ -55,8 +55,9 @@ def test_upgrade_idempotent_after_install(tmp_path):
     assert new_cfg["plugin"]["version_at_last_setup"] == "0.4.0"  # unchanged
 
 
-def test_upgrade_sidecar_on_conflict(tmp_path):
-    """Vault edits + plugin edits at same SKILL.md location → sidecar."""
+def test_upgrade_proposes_when_the_snapshot_was_changed_by_hand(tmp_path):
+    """Vault edits + a snapshot changed outside the engine → the plugin's
+    version goes to a sidecar; live is untouched."""
     plugin = Path(__file__).parent.parent.parent.parent
     vault = tmp_path / "Scout"
     install(_config(vault, plugin_root=plugin))
@@ -78,13 +79,16 @@ def test_upgrade_sidecar_on_conflict(tmp_path):
     assert any("SKILL.md" in c for c in result.conflicts)
 
 
-def test_upgrade_refuses_with_pending_sidecar(tmp_path):
+def test_upgrade_runs_with_a_pending_brain_sidecar(tmp_path):
+    """A pending brain-file sidecar skips that file instead of refusing the
+    whole upgrade (it used to stall unattended auto-update)."""
     plugin = Path(__file__).parent.parent.parent.parent
     vault = tmp_path / "Scout"
     install(_config(vault, plugin_root=plugin))
     (vault / "SKILL.md.proposed-merge").write_text("# pending\n")
-    with pytest.raises(RuntimeError, match="proposed-merge"):
-        upgrade(_config(vault, plugin_root=plugin))
+    result = upgrade(_config(vault, plugin_root=plugin))
+    assert result.skipped == ["SKILL.md.proposed-merge"]
+    assert (vault / "SKILL.md.proposed-merge").read_text() == "# pending\n"
 
 
 def test_upgrade_keeps_a_runner_hand_edit_in_place(tmp_path):

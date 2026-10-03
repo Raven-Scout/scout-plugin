@@ -128,7 +128,7 @@ Confirm with the user: "Proceed with these connectors? Or pause to enable more f
 
 Ask the user:
 
-> "Should Scout keep itself up to date automatically? When on, scheduled runs apply sidecar-clean upgrades and ping you if a change needs manual review. (You can change this later via `/scout-update`.)"
+> "Should Scout keep itself up to date automatically? When on, scheduled runs apply upgrades and ping you if a change needs manual review. (You can change this later via `/scout-update`.)"
 
 Wait for a yes/no answer. Pass it to the install in Step 4 as `--auto-update` (yes) or `--no-auto-update` (no); `bootstrap install` writes it into `~/Scout/scout-config.yaml` as `auto_update.enabled` (channel `stable`). Do NOT edit the config file by hand or with an inline `python3` script — the system `python3` on stock macOS has no PyYAML.
 

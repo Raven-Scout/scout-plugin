@@ -145,18 +145,27 @@ flowchart LR
   style engine fill:none,stroke:#8A8A8A,stroke-dasharray:6 4
 ```
 
-**Upgrade merge rules** (`_stage_cat4_upgrade`), per brain file, with
-`base` = last-assembled snapshot, `ours` = fresh assembly, `theirs` = live file:
+**Upgrade merge rules** (`_stage_cat4_upgrade`, decided by `scripts/brain_merge.py`),
+per brain file, with `base` = last-assembled snapshot, `ours` = fresh assembly,
+`theirs` = live file. `last-assembled/provenance.json` records which snapshots
+the engine wrote (hash-checked) and which `migrate-legacy` seeded from live;
+`last-assembled/proposed/` keeps the assembly behind each pending sidecar:
 
 | Situation | Result |
 |---|---|
+| `<file>.md.proposed-merge` pending | Skip this file; the rest of the upgrade runs |
 | `ours == theirs` | Advance the snapshot only |
-| `base == theirs` and `ours != theirs` | Write `<file>.md.proposed-merge`; live and snapshot untouched. Deliberately conservative after a fast-forward once wiped a customized vault |
+| `theirs` is a proposal adopted verbatim | Write `ours` to live; advance the snapshot |
+| `base` not known to be the plugin's (seeded, edited by hand, missing) | `ours` to the sidecar; live and snapshot untouched. A fast-forward over a seeded snapshot once wiped a customized vault |
+| `base == theirs` | Write `ours` to live; advance the snapshot |
 | Both diverged, `git merge-file` clean | Write the merge to the live file; advance the snapshot |
 | Both diverged, conflicts | Conflict-marked text to the sidecar; live and snapshot untouched |
 
-Any pending sidecar blocks the next `bootstrap upgrade` until the owner resolves
-it. The same policy protects `knowledge-base/ontology/parser.py`.
+`scoutctl bootstrap resolve <file>` records a resolved sidecar's proposal as
+the new merge base. A pending brain-file sidecar only skips that file. The
+plugin-owned scripts and `parser.py` follow the drift policy instead
+(`scripts/vault_drift.py`), which never blocks; only a `parser.py.proposed-merge`
+an older engine left behind still blocks the next `bootstrap upgrade`.
 
 ## Engine: scheduling, session preparation and telemetry
 

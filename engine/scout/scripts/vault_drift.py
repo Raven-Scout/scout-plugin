@@ -331,6 +331,13 @@ def _park(vault: Path, rel: str, content: str) -> Path:
         n += 1
 
 
+def park_vault_copy(vault: Path, rel: str, content: str) -> Path:
+    """Park a vault copy an upgrade is about to replace, for a file outside the
+    managed set (an assembled brain file). ``scan`` reports it as *replaced*
+    and ``resolve`` dismisses it, like any other parked ``.vault`` copy."""
+    return _park(vault, rel, content)
+
+
 def reconcile(
     vault: Path,
     rel: str,

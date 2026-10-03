@@ -6,7 +6,7 @@
 3. Managed files    — plugin-owned scripts, hooks, runners, render.py, parser.py;
                       a vault's edits are kept, merged or parked (vault_drift)
 4. .gitignore       — append-only merge
-5. Cat 4 assembled  — SKILL/DREAMING/RESEARCH (3-way merge on upgrade)
+5. Cat 4 assembled  — SKILL/DREAMING/RESEARCH (3-way merge on upgrade; see brain_merge)
 6. Job lifecycle    — launchd / cron
 7. Version stamp    — scout-config.yaml plugin.version_*
 8. Doctor smoke     — runs bootstrap_doctor.run_doctor
@@ -26,7 +26,7 @@ from pathlib import Path
 import yaml
 
 from scout import config as scout_config
-from scout.scripts import vault_drift
+from scout.scripts import brain_merge, vault_drift
 from scout.scripts.bootstrap_doctor import DoctorReport, run_doctor
 from scout.scripts.bootstrap_lock import (
     acquire_lock_with_wait,
@@ -83,10 +83,12 @@ class InstallResult:
 class UpgradeResult:
     vault: Path
     doctor: DoctorReport
-    # Blocking <file>.proposed-merge sidecars (the assembled brain files).
+    # <file>.proposed-merge sidecars this upgrade wrote.
     conflicts: list[str] = field(default_factory=list)
     # Vault copies an upgrade replaced, parked under .scout-state/drift/.
     backups: list[str] = field(default_factory=list)
+    # Brain-file sidecars already pending: the upgrade left that file alone.
+    skipped: list[str] = field(default_factory=list)
     # Every vault edit to a managed file the upgrade kept, merged, or parked.
     vault_edits: list[VaultEdit] = field(default_factory=list)
     pointer: Path | None = None
@@ -416,7 +418,7 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
     """Assemble SKILL/DREAMING/RESEARCH from phase files."""
     vars_ = _template_vars(cfg)
     phases_root = cfg.plugin_root / "phases"
-    bodies: list[str] = [f"# {kind}\n\n**BASE_DIR:** `{cfg.vault}`\n"]
+    bodies: list[str] = [brain_merge.assembly_header(kind, cfg.vault)]
     # Map assembly target → which modes this assembly is consumed by.
     # SKILL.md is read by BOTH briefing- and consolidation-type runs (run-scout.sh
     # auto-detects which); DREAMING.md by dreaming runs only; RESEARCH.md by
@@ -460,69 +462,160 @@ def _assemble(cfg: BootstrapConfig, kind: str) -> str:
     return "\n\n".join(bodies)
 
 
+def _snapshot_dir(cfg: BootstrapConfig) -> Path:
+    return cfg.vault / ".scout-state" / "last-assembled"
+
+
+def _write_provenance(snapshot_dir: Path, records: dict[str, brain_merge.Provenance]) -> None:
+    _atomic_write(snapshot_dir / brain_merge.PROVENANCE_FILE, brain_merge.dumps_provenance(records))
+
+
 def _stage_cat4_install(cfg: BootstrapConfig) -> None:
     """Stage 5 (install): assemble + write live + write snapshot."""
-    snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
+    snapshot_dir = _snapshot_dir(cfg)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    for kind in ("SKILL", "DREAMING", "RESEARCH"):
+    records: dict[str, brain_merge.Provenance] = {}
+    for kind in brain_merge.BRAIN_KINDS:
         content = _assemble(cfg, kind)
         _atomic_write(cfg.vault / f"{kind}.md", content)
         _atomic_write(snapshot_dir / f"{kind}.md", content)
+        records[f"{kind}.md"] = brain_merge.Provenance.assembled(content)
+    _write_provenance(snapshot_dir, records)
 
 
-def _stage_cat4_upgrade(cfg: BootstrapConfig) -> list[str]:
-    """Stage 5 (upgrade): 3-way merge with sidecar policy.
+def _proposed_path(snapshot_dir: Path, name: str) -> Path:
+    return snapshot_dir / brain_merge.PROPOSED_DIR / name
 
-    Outcomes per file:
-      1. ``ours == theirs`` — no plugin change vs live. Update snapshot to
-         ``ours`` (rebases the merge baseline forward), don't touch live.
-      2. ``ours != theirs`` and 3-way merge clean — merge result written to
-         live; snapshot advanced to ``ours``.
-      3. 3-way merge reports conflicts — write conflict-marked output to
-         ``<name>.md.proposed-merge`` sidecar; live + snapshot untouched.
-      4. ``base == theirs and ours != theirs`` (no recorded vault edits but
-         plugin diverged) — write ``ours`` to sidecar; live + snapshot
-         untouched. This protects legacy-migrated vaults (where snapshot was
-         seeded equal to current live with no edit history) AND fresh vaults
-         that haven't been edited yet, so phase-content changes surface as
-         a review prompt instead of a silent overwrite.
 
-    Replaces the previous "fast-forward to ours when base==theirs" behavior,
-    which silently wiped legacy vault content. See M3 live-vault incident.
+@dataclass
+class _Cat4Outcome:
+    conflicts: list[str] = field(default_factory=list)  # sidecars written this run
+    skipped: list[str] = field(default_factory=list)  # already-pending sidecars
+    backups: list[str] = field(default_factory=list)  # parked copies of live files replaced on the fingerprint alone
+
+
+def _stage_cat4_upgrade(cfg: BootstrapConfig) -> _Cat4Outcome:
+    """Stage 5 (upgrade): reconcile each brain file with its fresh assembly.
+
+    ``brain_merge.decide`` picks the action per file; see its module docstring
+    and docs/superpowers/specs/2026-10-02-brain-sidecars-never-block-upgrade-design.md.
+    In short: a pending sidecar skips only that file; live is fast-forwarded
+    or merged only over a snapshot the plugin is known to have written;
+    anything else gets the plugin's version as a ``<KIND>.md.proposed-merge``
+    sidecar with live and snapshot untouched (the M3-incident guard). The
+    snapshot advances only once live has absorbed the assembly, which is what
+    ``phases backport`` diffs against.
+
+    Provenance is persisted after each file, so a failure on a later file
+    can't leave an earlier, already-advanced snapshot without its record.
     """
-    snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
+    snapshot_dir = _snapshot_dir(cfg)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    conflicts: list[str] = []
-    for kind in ("SKILL", "DREAMING", "RESEARCH"):
+    records = brain_merge.load_provenance(snapshot_dir)
+    out = _Cat4Outcome()
+    for kind in brain_merge.BRAIN_KINDS:
+        name = f"{kind}.md"
         ours = _assemble(cfg, kind)
-        live = cfg.vault / f"{kind}.md"
+        live = cfg.vault / name
         theirs = live.read_text(encoding="utf-8") if live.exists() else ours
-        snap = snapshot_dir / f"{kind}.md"
-        base = snap.read_text(encoding="utf-8") if snap.exists() else theirs
-        sidecar = cfg.vault / f"{kind}.md.proposed-merge"
+        snap = snapshot_dir / name
+        base = snap.read_text(encoding="utf-8") if snap.exists() else None
+        proposed_path = _proposed_path(snapshot_dir, name)
+        proposed = proposed_path.read_text(encoding="utf-8") if proposed_path.exists() else None
+        sidecar = cfg.vault / brain_merge.sidecar_name(kind)
+        prov = records.get(name, brain_merge.Provenance())
 
-        if ours == theirs:
-            # Plugin produced the same content the vault has. Snapshot
-            # advances to ours; no live update needed.
-            _atomic_write(snap, ours)
+        action = brain_merge.decide(
+            kind, ours=ours, theirs=theirs, base=base, prov=prov, proposed=proposed, sidecar_pending=sidecar.exists()
+        )
+        if action is brain_merge.Action.SKIP:
+            out.skipped.append(sidecar.name)
             continue
+        new_live = theirs
+        proposal: str | None = None  # what goes to the sidecar, if anything
+        if action is brain_merge.Action.FAST_FORWARD:
+            new_live = ours
+        elif action is brain_merge.Action.PROPOSE:
+            proposal = ours
+        elif action is brain_merge.Action.MERGE:
+            assert base is not None  # decide() merges only over a snapshot that exists
+            result = three_way_merge(base=base, ours=ours, theirs=theirs)
+            if result.conflicts:
+                proposal = result.content
+            else:
+                new_live = result.content
+        # ADVANCE: live already equals ours.
 
-        if base == theirs:
-            # No recorded vault edits vs base, but plugin diverged. Treat as
-            # "needs user review" rather than silent overwrite — write sidecar.
-            _atomic_write(sidecar, ours)
-            conflicts.append(sidecar.name)
+        if proposal is not None:
+            # The assembly is kept so `bootstrap resolve` can make it the base.
+            _atomic_write(proposed_path, ours)
+            _atomic_write(sidecar, proposal)
+            out.conflicts.append(sidecar.name)
             continue
+        if new_live != theirs:
+            if prov.snapshot is None and theirs != proposed:
+                # Only the fingerprint vouches for the base (a vault from before
+                # provenance): park the file being replaced, once, like any
+                # vault copy an upgrade replaces.
+                parked = vault_drift.park_vault_copy(cfg.vault, name, theirs)
+                out.backups.append(parked.relative_to(cfg.vault).as_posix())
+            _atomic_write(live, new_live)
+        # Live has absorbed ``ours``: it becomes the merge base.
+        _atomic_write(snap, ours)
+        records[name] = brain_merge.Provenance.assembled(ours)
+        _write_provenance(snapshot_dir, records)
+        proposed_path.unlink(missing_ok=True)
+    return out
 
-        # Both sides changed vs base — actual 3-way merge needed.
-        result = three_way_merge(base=base, ours=ours, theirs=theirs)
-        if not result.conflicts:
-            _atomic_write(live, result.content)
-            _atomic_write(snap, ours)
-        else:
-            _atomic_write(sidecar, result.content)
-            conflicts.append(sidecar.name)
-    return conflicts
+
+@dataclass(frozen=True)
+class ResolveResult:
+    name: str  # "SKILL.md"
+    recorded_base: bool  # the proposal behind the sidecar became the merge base
+    removed_sidecar: bool
+
+
+def resolve_brain_file(vault: Path, kind: str) -> ResolveResult:
+    """Record that the vault's ``<KIND>.md`` is now the resolution of its sidecar.
+
+    The user has made the live file the version they want (moved the sidecar
+    into place, merged it by hand, or kept their own). The assembly the
+    sidecar was built from becomes the merge base, so the next upgrade merges
+    only later plugin changes into the resolution, and the sidecar is removed.
+    A sidecar an older engine left has no recorded assembly: it is removed and
+    the base stays, so the next upgrade merges the file again.
+
+    Raises ``ValueError`` while the live file holds conflict markers, or when
+    there is nothing to resolve; ``FileNotFoundError`` if the live file is missing.
+    """
+    name = f"{kind}.md"
+    live = vault / name
+    sidecar = vault / brain_merge.sidecar_name(kind)
+    snapshot_dir = vault / ".scout-state" / "last-assembled"
+    proposed_path = _proposed_path(snapshot_dir, name)
+    if not live.exists():
+        raise FileNotFoundError(f"{name} is missing from {vault}")
+    if brain_merge.has_conflict_markers(live.read_text(encoding="utf-8")):
+        raise ValueError(f"{name} still has conflict markers (<<<<<<< / >>>>>>>); finish the merge first")
+    if not proposed_path.exists() and not sidecar.exists():
+        raise ValueError(f"nothing to resolve for {name}: no pending sidecar or recorded proposal")
+    lock = vault / ".scout-logs" / ".scout-session.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    acquire_lock_with_wait(lock)
+    try:
+        recorded = proposed_path.exists()
+        if recorded:
+            proposal = proposed_path.read_text(encoding="utf-8")
+            _atomic_write(snapshot_dir / name, proposal)
+            records = brain_merge.load_provenance(snapshot_dir)
+            records[name] = brain_merge.Provenance.assembled(proposal)
+            _write_provenance(snapshot_dir, records)
+            proposed_path.unlink()
+        removed = sidecar.exists()
+        sidecar.unlink(missing_ok=True)
+    finally:
+        release_lock(lock)
+    return ResolveResult(name=name, recorded_base=recorded, removed_sidecar=removed)
 
 
 def _stage_jobs_install(cfg: BootstrapConfig) -> None:
@@ -759,17 +852,19 @@ def _refuse_interrupted_install(vault: Path) -> None:
         )
 
 
-def _refuse_pending_sidecars(vault: Path) -> None:
-    pending = [
-        f"{n}.md.proposed-merge"
-        for n in ("SKILL", "DREAMING", "RESEARCH")
-        if (vault / f"{n}.md.proposed-merge").exists()
-    ]
-    pending += [
+def blocking_sidecars(vault: Path) -> list[str]:
+    """Pending sidecars that make ``upgrade`` refuse: the ``_CAT_MERGE_FILES``
+    ones. A pending brain-file sidecar only skips that file
+    (``brain_merge.pending_brain_sidecars``)."""
+    return [
         f"{vault_rel}.proposed-merge"
         for vault_rel in _CAT_MERGE_FILES
         if (vault / f"{vault_rel}.proposed-merge").exists()
     ]
+
+
+def _refuse_pending_sidecars(vault: Path) -> None:
+    pending = blocking_sidecars(vault)
     if pending:
         raise RuntimeError(
             f"Unresolved proposed-merge sidecar(s): {pending}. "
@@ -880,7 +975,8 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         # never get one written, and the dispatcher silently falls back
         # to the packaged default.
         _stage_seed_schedule(cfg)
-        conflicts = _stage_cat4_upgrade(cfg)
+        cat4 = _stage_cat4_upgrade(cfg)
+        conflicts = cat4.conflicts
         _stage_jobs_install(cfg)
         _stage_install_scoutctl_shim(cfg)
         _stage_version_stamp(cfg, is_upgrade=True)
@@ -892,7 +988,8 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         vault=cfg.vault,
         doctor=report,
         conflicts=conflicts,
-        backups=_parked_copies(vault_edits),
+        backups=_parked_copies(vault_edits) + cat4.backups,
+        skipped=cat4.skipped,
         vault_edits=vault_edits,
         pointer=pointer,
     )
@@ -906,8 +1003,9 @@ def migrate_legacy(cfg: BootstrapConfig) -> MigrateLegacyResult:
     Actions (in order):
       1. Acquire global lock.
       2. Snapshot current SKILL.md / DREAMING.md / RESEARCH.md to
-         ``.scout-state/last-assembled/`` as the merge baseline. Live files
-         never touched.
+         ``.scout-state/last-assembled/`` as the merge baseline, recorded as
+         *seeded* so no upgrade ever overwrites or merges over them (the M3
+         incident). Live files never touched.
       3. Write the managed files (scripts, hooks, runners, …) rendered against
          the user-provided cfg vars. A file no release shipped (a customised
          legacy runner) is parked under ``.scout-state/drift/`` first.
@@ -937,14 +1035,17 @@ def migrate_legacy(cfg: BootstrapConfig) -> MigrateLegacyResult:
     snapshots_recorded: list[str] = []
     try:
         # 1. Establish snapshots from current live cat-4 files.
-        snapshot_dir = cfg.vault / ".scout-state" / "last-assembled"
+        snapshot_dir = _snapshot_dir(cfg)
         snapshot_dir.mkdir(parents=True, exist_ok=True)
-        for kind in ("SKILL", "DREAMING", "RESEARCH"):
+        records: dict[str, brain_merge.Provenance] = {}
+        for kind in brain_merge.BRAIN_KINDS:
             live = cfg.vault / f"{kind}.md"
             if live.exists():
                 content = live.read_text(encoding="utf-8")
                 _atomic_write(snapshot_dir / f"{kind}.md", content)
+                records[f"{kind}.md"] = brain_merge.Provenance.seeded(content)
                 snapshots_recorded.append(f"{kind}.md")
+        _write_provenance(snapshot_dir, records)
         # 2. Seed .scout-state/schedule.yaml if missing. Legacy Plan-5-era
         #    vaults never explicitly wrote this file; the live dispatcher
         #    silently falls back to packaged defaults. Make the vault copy

@@ -1393,6 +1393,9 @@ def _register_bootstrap() -> None:
             typer.echo(f"snapshots recorded: {', '.join(payload.get('snapshots_recorded') or []) or 'none'}")
         for c in payload.get("conflicts", []):
             typer.echo(f"  conflict (sidecar): {c}", err=True)
+        for sk in payload.get("skipped", []):
+            live_name = sk.removesuffix(".proposed-merge")
+            typer.echo(f"  skipped (sidecar pending): {sk} — {live_name} left as is until it is resolved", err=True)
         # migrate-legacy prints these on stdout (its pre-E3 quirk), upgrade on stderr.
         to_err = action != "migrate-legacy"
         edits = payload.get("vault_edits") or []
@@ -1550,6 +1553,42 @@ def _register_bootstrap() -> None:
             json_out=json_out,
         )
         raise typer.Exit(code=result.doctor.exit_code)
+
+    @bootstrap_app.command("resolve")
+    def cli_bootstrap_resolve(
+        files: list[str] = typer.Argument(..., help="SKILL.md, DREAMING.md and/or RESEARCH.md"),
+    ) -> None:
+        """Record a brain file's sidecar as resolved.
+
+        Make the live file the version you want first (e.g. move the sidecar into
+        place and remove any conflict markers). The plugin assembly behind the
+        sidecar becomes the merge base, so the next upgrade merges only later
+        plugin changes into your resolution; the sidecar is removed.
+        """
+        from scout import paths as _paths
+        from scout.scripts.bootstrap import resolve_brain_file
+        from scout.scripts.brain_merge import BRAIN_KINDS
+
+        kinds = [f.upper().removesuffix(".MD") for f in files]
+        unknown = [f for f, k in zip(files, kinds, strict=True) if k not in BRAIN_KINDS]
+        if unknown:
+            expected = "expected SKILL.md, DREAMING.md or RESEARCH.md"
+            typer.echo(f"not a brain file: {', '.join(unknown)} ({expected})", err=True)
+            raise typer.Exit(code=2)
+        vault = _paths.data_dir()
+        failed = False
+        for kind in kinds:
+            try:
+                r = resolve_brain_file(vault, kind)
+            except (ValueError, FileNotFoundError) as e:
+                typer.echo(f"refused: {e}", err=True)
+                failed = True
+                continue
+            if r.recorded_base:
+                typer.echo(f"resolved: {r.name} — the next upgrade merges plugin changes into it")
+            else:
+                typer.echo(f"resolved: {r.name} — sidecar removed; the next upgrade merges it again")
+        raise typer.Exit(code=1 if failed else 0)
 
     @bootstrap_app.command("doctor")
     def cli_bootstrap_doctor(

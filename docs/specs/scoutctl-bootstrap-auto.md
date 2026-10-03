@@ -47,7 +47,8 @@ Add `scoutctl bootstrap auto` — a single command that:
 | `$SCOUT_DIR/.scout-state/install-incomplete` exists (an install that failed partway) | `install` (resumes it) |
 | `$SCOUT_DIR/.scout-state/` exists, `scout-config.yaml` missing | `migrate-legacy` |
 | `$SCOUT_DIR/scout-config.yaml` exists | `upgrade` |
-| Pending `*.md.proposed-merge` sidecars present | refuse with sidecar-resolution hint (current behavior) |
+| Pending `parser.py.proposed-merge` sidecar present | refuse with sidecar-resolution hint (what `upgrade` does) |
+| Pending brain-file `*.md.proposed-merge` sidecars present | `upgrade`, which skips just those files and reports them as `skipped` |
 
 ### Flag surface
 
@@ -129,7 +130,8 @@ underneath is one file. The engine doesn't lose any of `install`,
 - Legacy vault (`.scout-state/` present, no `scout-config.yaml`) →
   dispatches to `migrate-legacy`.
 - Plan-8 vault → dispatches to `upgrade`.
-- Pending sidecar → refuses with the same message `upgrade` uses today.
+- Pending `parser.py` sidecar → refuses with the same message `upgrade` uses.
+- Pending brain-file sidecar → upgrades; the file is reported as `skipped`.
 - `--dry-run` prints state and action without mutating.
 - Re-run after an install reads the persisted connector inputs back as
   prompt defaults (verified via stdin scripting).
