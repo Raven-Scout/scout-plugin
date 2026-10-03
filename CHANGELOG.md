@@ -31,6 +31,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - **The connector-health roll-up no longer needs a vault helper** (`templates/run-*.sh.tmpl`, `engine/scout/scripts/connector_health_report.py`) — each runner calls `scoutctl connector-health-report` itself, and the report now says when `connector-health.md` was **not** rewritten (no scheduled-run records in the window) and may be showing stale alerts. A vault's own `scripts/connector-health-rollup.sh` is no longer called and can be deleted.
 
 ### Fixed
+- **`/scout-update` and a re-run of `install.sh` switch the registered plugin version** (`commands/scout-update.md`, `install.sh`): on an existing install, `claude plugin install` only unpacks the new cache and leaves the registry on the old version, so the plugin-root resolver handed back the old plugin and the vault was upgraded against its templates. Both now run `claude plugin update scout@scout-plugin` right after the install. This is the stale-registry half of #234; the resolver half shipped in #258.
 - **An upgrade never silently loses a vault's edit to a plugin-owned file** (`engine/scout/scripts/bootstrap.py`, `engine/scout/scripts/vault_drift.py`). Before this, an upgrade handled a vault's own edits like this:
   - Cat-1 files (scripts, hooks, `render.py`, `recurring-task-status.py`) were overwritten with no backup and no warning.
   - Runners were replaced after being copied to `run-*.sh.bak.<date>`, so the live runner lost the edit.

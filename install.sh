@@ -47,6 +47,8 @@ echo "Adding the Scout marketplace…"
 claude plugin marketplace add "$MARKETPLACE" 2>/dev/null || claude plugin marketplace update scout-plugin
 echo "Installing the Scout plugin…"
 claude plugin install "$PLUGIN_ID"
+# On a re-run, install leaves the old version registered; update switches it.
+claude plugin update "$PLUGIN_ID" >/dev/null 2>&1 || true
 
 # Resolve the installed plugin root. `claude plugin list --json` has emitted both a
 # top-level list and a {"plugins": {...}} map across versions — accept either.

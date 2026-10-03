@@ -47,6 +47,9 @@ if [ -d "$HOME/scout-plugin/.git" ]; then
 else
   claude plugin marketplace update scout-plugin || true
   claude plugin install scout@scout-plugin || true
+  # On an existing install, install only unpacks the new cache and keeps the old version
+  # registered, so the resolver below would hand back the old plugin. update switches it.
+  claude plugin update scout@scout-plugin || true
   echo "REFRESHED_MARKETPLACE"
 fi
 EOF
