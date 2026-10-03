@@ -1,0 +1,15 @@
+# enrichment-stoplist.txt — persistent suppression list for the "🧠 Help me remember" loop.
+#
+# One suppression substring per line (case-insensitive). Any candidate enrichment
+# question whose topic / question / source contains a line here is suppressed on
+# EVERY run — permanently, unlike the one-run --exclude rotation.
+#
+# Two classes of never-ask topics belong here:
+#   (a) capabilities {{INSTANCE_NAME}} already instruments — asking about them reads as
+#       "the assistant doesn't know its own system".
+#   (b) questions {{USER_NAME}} has explicitly dismissed in-thread ("I don't care" /
+#       "you should already know this"). The dreaming run appends the keyword here.
+#
+# Blank lines and `#` comments are ignored. This file is vault-owned: it is seeded
+# once on install and never overwritten on upgrade, so it accumulates your own
+# suppressions over time. Shipped empty on purpose — a fresh install starts clean.
