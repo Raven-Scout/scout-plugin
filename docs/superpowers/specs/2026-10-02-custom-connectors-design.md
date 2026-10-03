@@ -123,7 +123,7 @@ connectors:
 | `preset` | no | Name of a shipped preset (§2). Supplies default `focus`/`when` text. |
 | `inbound` / `outbound` / `lookup` | at least one | Activity block. `tools`: non-empty list of MCP tool names or `{bash: "<cmd>"}`. `focus` (inbound/outbound) or `when` (lookup): one or two sentences. Required unless the preset supplies it. |
 | `notes` | no | Free text appended to every rendered section for this connector. |
-| `needs_user_input` | no | List of input names; values are collected by the wizard and stored in `scout-config.yaml` `connectors.inputs`, exactly like shipped connectors. Rendered as `{{INPUT_<NAME>}}`. |
+| `needs_user_input` | no | List of input names (`^[a-z][a-z0-9_]*$`); values are collected by the wizard and stored in `scout-config.yaml` `connectors.inputs` as `<key>__<name>` (§3). Rendered as `{{INPUT_<NAME>}}`. |
 | `required_in_types` | no | Slot types where a failure is critical. Default `[]` — a custom connector never pages unless opted in. |
 
 ### Invariants (enforced by validation)
@@ -137,10 +137,11 @@ connectors:
   name `server: Microsoft_365`; they are distinct connectors with one health row
   (§5).
 - **No secrets in this file.** Inputs live in `scout-config.yaml`; tool lists and
-  prose only here. Validation rejects strings carrying a well-known credential
-  prefix (`xox[abp]-`, `ghp_`, `gho_`, `github_pat_`, `sk-`, `lin_api_`) or a
-  `Bearer ` header; `{{INPUT_…}}` placeholders are the only way to reference an
-  input.
+  prose only here. Validation rejects any string containing a well-known
+  credential prefix (`xox[abp]-`, `ghp_`, `gho_`, `github_pat_`, `sk-`,
+  `lin_api_`) followed by 8+ token characters and not preceded by a letter or
+  digit (so `task-list` passes), or `Bearer <12+ chars>`; `{{INPUT_…}}`
+  placeholders are the only way to reference an input.
 
 ## 2. Assembly
 
@@ -197,7 +198,10 @@ Assembly has a second consumer that must stay in lockstep:
 mirrors `_assemble`'s sources and gating to map live-vault hunks back to phase
 sections. It must render the same custom sections, or every custom section in a
 live `SKILL.md` would be reported as an unmapped vault edit. Both should call one
-shared custom renderer.
+shared custom renderer. A vault hunk that maps into a custom section is reported
+`needs-review` ("edit `connectors.custom.yaml` instead") and is never written into
+the shipped `phases/custom/` template — that template is shared by every
+connector and every user.
 
 A malformed `connectors.custom.yaml` does not abort assembly: each invalid
 connector is skipped with a stderr warning (same graceful-degradation policy as an
@@ -218,36 +222,53 @@ every add a manual review. A dedicated apply path fixes it:
    the user's own `SKILL.md` edits. Clean → write live, advance snapshot to
    `after`. Conflict → sidecar.
 3. If `before != snapshot` (the plugin changed underneath), do not mix the two
-   changes: write the definition, write `after` to the sidecar, and tell the user to
-   run `/scout-update`, which picks up both.
+   changes: save the definition and config, leave `SKILL.md` untouched, and tell
+   the user to run `/scout-update`, whose normal cat-4 merge picks up both. (Not a
+   sidecar: `upgrade` refuses to run while any sidecar is pending, so a sidecar
+   here would block the very command the user is told to run.)
+
+Order of operations: assemble and apply first, then write `connectors.custom.yaml`
+and `scout-config.yaml`. Applying from the on-disk "before" state makes a re-run
+after an interrupted add converge instead of silently no-op'ing.
 
 This answers #152's open "enable → re-render" question for custom connectors.
-**Coordinate with #251**, which also edits the cat-4 upgrade path; the apply path
-should reuse whatever merge helper #251 lands rather than fork it.
+#251 (merged) did not change the cat-4 path; its `_dump_keeping_comments` is what
+add/remove use to update `connectors.enabled` without dropping config comments.
+Add/remove hold the vault session lock, like `bootstrap upgrade`, because
+scheduled sessions read `SKILL.md` and auto-commit the vault.
 
 ## 3. `scoutctl` contract (what the app will call)
 
-All commands accept `--vault` (default: resolved data dir), emit JSON with `--json`,
-and use stable exit codes: `0` ok, `2` validation error (JSON lists every error with
-a field path), `3` applied-to-sidecar (needs `/scout-update`), `1` other failure.
+The vault resolves like every other `scoutctl` command (`SCOUT_DATA_DIR`, else
+`~/Scout`). The `custom` subcommands always print one JSON object
+(`{"status": …, "key": …, "issues": [{"path", "message"}], …}`) and use stable exit
+codes: `0` applied, `2` invalid (every issue listed with a field path) or probe
+failed, `3` saved but not yet live (plugin drift → run `/scout-update`, or a merge
+conflict → resolve `SKILL.md.proposed-merge`), `1` other failure.
 
 | Command | Behavior |
 |---|---|
-| `connectors custom add (--file F \| --json -) [--dry-run] [--unverified]` | Validate; write/replace the entry in `connectors.custom.yaml`; add the key to `connectors.enabled`; run the §2 apply path. Bash probes are run here (fail → exit 2 unless `--unverified`). `--dry-run` prints the sections it would render and changes nothing. |
-| `connectors custom remove <key>` | Remove the entry and the key from `connectors.enabled`; run the apply path. |
-| `connectors custom validate [--file F]` | Validate without writing. |
-| `connectors list --json` | Merged roster: shipped + custom, each with `source: shipped\|custom`, `enabled`, `display_name`, `health_key`, activities. |
-| `connectors presets --json` | Preset names with their default text per activity. |
+| `connectors custom add --file F [--input NAME=VALUE …] [--dry-run] [--unverified]` | `F` is one connector mapping with a `key` field (`-` = stdin; YAML or JSON). Validate; run a bash probe (fail → exit 2 unless `--unverified`); apply (§2); write/replace the entry in `connectors.custom.yaml`; add the key to `connectors.enabled`; store inputs. `--dry-run` returns the sections it would render and writes nothing. |
+| `connectors custom remove KEY` | Apply the removal; drop the entry, the enabled key, and the connector's inputs. |
+| `connectors custom validate --file F` | Validate a single definition without writing. |
+| `connectors custom list` | Definitions: key, display name, enabled, server, health key, preset, declared activities, plus any issues in the file. |
+| `connectors list --json` | The health roster (shipped + derived custom rows): key, display name, tier, `required_in_types`. This is what the app merges over its bundled snapshot. |
+| `connectors presets` | Preset names with their default text per activity (JSON). |
+
+**Inputs** are stored in `scout-config.yaml` `connectors.inputs` as
+`<key>__<name>` (so two connectors can both ask for `workspace_id`) and rendered
+into that connector's sections as `{{INPUT_<NAME>}}`. `add` fails with exit 2 if a
+`needs_user_input` name has neither an `--input` nor a stored value.
 
 **Verification boundary.** `scoutctl` can execute bash probes but cannot call MCP
 tools — only a Claude session can. The wizard therefore calls the MCP probe tool
 itself before invoking `add`. The app path (future) adds with `--unverified`; the
-first scheduled session's connector-health log is the verification, and
-`connectors list` reports `verified: false` until a successful call is logged.
+first scheduled session's connector-health log is the verification.
 
-`bootstrap install` gains `--custom-connectors-file F`, which validates and writes
-`connectors.custom.yaml` into the new vault before the first assembly, and adds
-those keys to the enabled set.
+`bootstrap install` gains `--custom-connectors-file F` (a `connectors.custom.yaml`
+body) and repeatable `--custom-input KEY.NAME=VALUE`. Install validates the file
+before touching the vault (exit 2 on any issue), writes it before the first
+assembly, adds its keys to the enabled set, and stores the inputs.
 
 ## 4. Wizard flow
 
@@ -289,11 +310,14 @@ the user's choice; or "sign in first, then `/scout-connect`".
 
 - **Roster.** `connectors.load_registry` derives one entry per unique `server` from
   `connectors.custom.yaml`, keyed `mcp:<server>` — exactly what
-  `connector_log.classify` emits for `mcp__<server>__…`. `display_name` is the
-  server name humanized unless every connector on it shares one display name;
-  `tier: custom` (new `Tier` member); `required_in_types` is the union of its
-  connectors' values (default `[]`); remediation is a generic "reconnect at
-  claude.ai/settings/connectors or `/mcp`".
+  `connector_log.classify` emits for `mcp__<server>__…`. `display_name` joins the
+  display names of the connectors on that server ("Microsoft Teams, Outlook");
+  `tier: custom` (new `Tier` member); `capabilities: [inbound]` (the roster's
+  `outbound` means "Scout pushes out", which custom connectors never do);
+  `required_in_types` is the union of its connectors' values (default `[]`);
+  remediation is a generic "reconnect at claude.ai/settings/connectors or `/mcp`".
+  Shipped and overlay rows win on key collision. A bash-probed connector gets one
+  row keyed by the connector key, which is what `_bash_key` maps its binary to.
 - **Bash connectors.** `connector_log._bash_key` additionally maps the first token
   of each custom bash probe/tool to the connector key (loaded once per hook
   process from the vault file; missing/invalid file → current behavior).
@@ -301,8 +325,10 @@ the user's choice; or "sign in first, then `/scout-connect`".
   entries after the overlay; overlay wins on key collision (existing rule).
 - **Desktop app (follow-up PR in `Raven-Scout/Scout`, not this spec's scope):**
   `ConnectorHealthService` merges `scoutctl connectors list --json` over the
-  bundled snapshot so custom rows show real names; the snapshot decoder accepts
-  `tier: custom` (and should accept unknown tiers generally). An "Add connector"
+  bundled snapshot so custom rows show real names. The snapshot itself is
+  official-tier only by design (`connectors_snapshot.build_snapshot`), so custom
+  rows never enter it; `connectors list --json` is their only channel, and the
+  app's decoder for that output must accept `tier: custom`. An "Add connector"
   sheet calling `connectors custom add --unverified` follows the app-managed engine
   work (Scout#115 / #104).
 
@@ -324,7 +350,8 @@ Unit (engine):
 - Apply path: clean vault (fast path), vault with user `SKILL.md` edits (merge
   keeps them), plugin drift (`before != snapshot` → sidecar, exit 3), remove.
 - Roster/probe derivation: shared server → one roster row; bash connector key in
-  `_bash_key`; `tier: custom` round-trips through `connectors.snapshot.json`.
+  `_bash_key`; custom rows never appear in `connectors.snapshot.json`; a
+  malformed custom file never breaks the roster, the hook, or the health report.
 - Key invariant test (`test_connector_key_invariant.py`) extended to custom keys.
 
 Fixtures follow `CLAUDE.md`: generic server names (`example_suite`, `dataplat`),
@@ -348,5 +375,3 @@ Fixtures follow `CLAUDE.md`: generic server names (`example_suite`, `dataplat`),
   `focus` edits like any other KB tuning.
 - **Tool names drift** when an MCP server renames tools. The probe fails, health
   shows the server degraded, and `/scout-connect <key>` re-derives the definition.
-- **Overlap with #251** in the cat-4 merge code — sequence after it or rebase onto
-  it; do not fork the merge helper.
