@@ -17,7 +17,7 @@ This is the self-improvement loop. Harvest feedback from {{USER_NAME}}'s reactio
 Read the bot's DM conversation with {{USER_NAME}} using `slack_read_channel` with channel_id `{{USER_SLACK_ID}}`.
 
 **Determine the time window:**
-1. Check the Recent Sessions table in `knowledge-base.md` for the last dreaming session entry.
+1. Check the newest shard(s) in `knowledge-base/session-log/` for the last dreaming row.
 2. If a previous dreaming entry exists, look back to that timestamp.
 3. If no previous dreaming entry exists (first run), look back 24 hours from now.
 

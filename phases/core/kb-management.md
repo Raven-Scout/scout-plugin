@@ -63,6 +63,8 @@ The KB is the **persistent memory** of this system. Action items are ephemeral (
 
 ### When to Create New KB Files
 
+**Most new knowledge is a topic or source note, not a new project.** Follow the KB WRITE PROTOCOL table: events → `knowledge-base/sources/`, durable facts → `knowledge-base/topics/<domain>/`. The rules below govern project pages and entity files only.
+
 **Create a new project file when:**
 - A new workstream appears that has its own meetings, issues, AND people (all three — not just one)
 - {{USER_NAME}} is actively making decisions about it (not just watching)
@@ -183,9 +185,9 @@ Applies to **every** audit in every mode — the consolidation KB audit, KG-inte
 
 ### Session Log Row (mandatory every run)
 
-**Every briefing, consolidation, dreaming, or research run must append a new row to the Recent Sessions table in `knowledge-base.md`.** Editing only the "Last updated" header is not enough — a run that only bumps the header leaves the next run blind to what just happened, and silently shrinks the institutional memory the dreaming run uses to pick audit targets.
+**Every briefing, consolidation, dreaming, or research run must append one row to this month's shard, `knowledge-base/session-log/YYYY-MM.md`** (create it with a table header if it doesn't exist yet; `knowledge-base/session-log.md` is the index that links the shards). A run that skips the row leaves the next run blind to what just happened.
 
-Row shape: date · session type (time, manual/scheduled) · 1–2 sentence summary of material findings · commit hash. When writing the row pre-commit, use `pending` for the hash; back-fill the short hash when possible (the dreaming run also picks up `pending` entries and back-fills them).
+Row shape, **≤ 500 characters**: date · session type (time, manual/scheduled) · one sentence of material findings with `[[links]]` to the notes changed · commit hash. Write `pending` for the hash pre-commit; back-fill it when possible (dreaming also back-fills `pending`). The detail lives in the notes and the commit message, not the row.
 
 ### Cross-Reference Integrity
 
@@ -200,9 +202,10 @@ The KB's value depends on its graph being connected. Rules:
 
 ### What the KB is NOT
 
-- **Not a log.** Don't append timestamped entries forever. Update the current state in-place. Git history preserves the timeline.
-- **Not a copy of your sources.** The KB synthesizes information from multiple sources into a coherent picture. Don't dump raw data — interpret it.
-- **Not a task list.** Action items live in `action-items/`. The KB tracks the *context* that makes action items meaningful (project state, people, decisions), not the items themselves. (Exception: project files may have a short "Current Action Items" section for project-specific tasks.)
+- **Not a log.** Don't append timestamped entries. Update the current state in place; git history preserves the timeline. Real logs (session log, mistake audit, queues) are sharded by month or item, and each shard has a budget.
+- **Not a copy of your sources.** Source notes hold what a source *said*; topic notes hold what is *known*, with citations. Don't dump raw data into topic or project pages.
+- **Not a task list.** Action items live in `action-items/`. The KB tracks the *context* that makes action items meaningful, and each action item links to it.
+- **Not a place for big files.** Budgets are enforced at commit time; see the KB WRITE PROTOCOL.
 
 ### Naming Convention
 

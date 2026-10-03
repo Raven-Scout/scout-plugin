@@ -431,6 +431,7 @@ def render_health_md(
     alertable: dict[str, Connector],
     alerts: list[Alert],
     records: list[dict[str, Any]],
+    lint_overrides: int | None = None,
 ) -> str:
     recent = session_list[-DEFAULT_MATRIX_DEPTH:]
     recent_ids = [sid for sid, _ in recent]
@@ -442,6 +443,7 @@ def render_health_md(
         "",
         f"**Last updated:** {now.astimezone(_zone()).strftime('%Y-%m-%d %H:%M %Z')}",
         f"**Window:** last 14 days, scheduled scout runs only (`{len(recent)}` of `{len(session_list)}` shown).",
+        *([f"**KB lint overrides (14d):** {lint_overrides}"] if lint_overrides is not None else []),
         "",
     ]
 
@@ -588,6 +590,12 @@ def fire_macos_notification(alerts: list[Alert]) -> None:
 # ----- top-level entry -----------------------------------------------------
 
 
+def _lint_override_count(log_dir: Path, now: datetime) -> int:
+    from scout.kb.lint import override_count
+
+    return override_count(log_dir, days=DEFAULT_WINDOW_DAYS, now=now)
+
+
 def run(
     *,
     data_dir: Path | None = None,
@@ -650,6 +658,7 @@ def run(
             alertable=alertable,
             alerts=alerts,
             records=records,
+            lint_overrides=_lint_override_count(log_dir, n),
         ),
         encoding="utf-8",
     )

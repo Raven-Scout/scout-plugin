@@ -112,6 +112,26 @@
         "body": "APPROVED"
       },
       "_note": "Digit-led 5-char tag with one trailing letter — accepted (has a letter); pure-digit would be rejected as a GitHub ref."
+    },
+    {
+      "name": "one-line-item-with-prefix-and-link",
+      "line": "- [ ] [#K7QX] 🔴 **Send Acme readout deck to Alex** — due 2026-10-07 · waiting on Zoë · → [[topics/acme/readout-2026-10-09]] #ACMEREAD",
+      "expected": {
+        "short_prefix": "K7QX",
+        "subject": "🔴 **Send Acme readout deck to Alex**",
+        "plain_subject": "🔴 Send Acme readout deck to Alex",
+        "body": "due 2026-10-07 · waiting on Zoë · → [[topics/acme/readout-2026-10-09]] #ACMEREAD"
+      }
+    },
+    {
+      "name": "one-line-item-no-prefix",
+      "line": "- [ ] 🟡 **Renew passport** — due 2026-11-15 · → [[personal/task-passport-renewal]]",
+      "expected": {
+        "short_prefix": null,
+        "subject": "🟡 **Renew passport**",
+        "plain_subject": "🟡 Renew passport",
+        "body": "due 2026-11-15 · → [[personal/task-passport-renewal]]"
+      }
     }
   ]
 }

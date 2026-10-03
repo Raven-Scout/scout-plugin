@@ -18,10 +18,9 @@ Use `TZ="$(scripts/scout-tz.sh)" date '+%H:%M'` for the timestamp (default: `Ame
 
 ## Step 4b: Session Entry
 
-Add to `knowledge-base.md` Recent Sessions table:
-```markdown
-| [Date] | Research (~[time]) | [Brief: targets researched, key findings, entities updated] |
-```
+Add one row (≤ 500 chars) to this month's shard `knowledge-base/session-log/YYYY-MM.md`:
+
+`| YYYY-MM-DD | HH:MM | Research | <one sentence: targets researched, key findings, entities updated, with [[links]]> | <commit> |`
 
 ## Step 4c: Session Cost
 

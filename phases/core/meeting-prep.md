@@ -123,9 +123,9 @@ Fill the `## Synthesis` section:
 a. **Decisions** → meeting home file Key Decisions + project files. Include `[[meeting-slug/YYYY-MM-DD]]` as source.
 b. **Action items** → daily action-items file with `Source: [[meeting-slug/YYYY-MM-DD]]`. Apply standard cross-check.
 c. **Running Themes** → update home file.
-d. **Recent Sessions** → add row to home file.
+d. **Session log** → add one row (≤ 500 chars) to this month's shard `knowledge-base/session-log/YYYY-MM.md`, linking the meeting home file.
 e. **Today's Meetings table** → update status from `upcoming` to `done`.
 
 ### Step 4: Handle missing notes
 
-If no manual notes AND no transcript, add `[no notes captured]` to home file's Recent Sessions. Do not fabricate.
+If no manual notes AND no transcript, add `[no notes captured]` to this month's session-log shard row. Do not fabricate.

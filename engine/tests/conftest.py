@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -65,3 +67,42 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
         if key.startswith("SCOUT_"):
             monkeypatch.delenv(key, raising=False)
+
+
+# ---- kb lint: throwaway git vault --------------------------------------------
+
+
+@dataclass
+class KbRepo:
+    root: Path
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True).stdout
+
+    def write(self, rel: str, text: str) -> Path:
+        p = self.root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+        return p
+
+    def stage(self, rel: str, text: str) -> None:
+        self.write(rel, text)
+        self.git("add", "--", rel)
+
+    def commit(self, msg: str = "c") -> None:
+        self.git("commit", "-q", "--no-verify", "-m", msg)
+
+
+@pytest.fixture
+def kb_repo(tmp_path: Path) -> KbRepo:
+    repo = KbRepo(tmp_path / "vault")
+    (repo.root / "knowledge-base").mkdir(parents=True)
+    (repo.root / "action-items").mkdir()
+    repo.git("init", "-q", "-b", "main")
+    repo.git("config", "user.email", "t@example.com")
+    repo.git("config", "user.name", "T")
+    repo.git("config", "commit.gpgsign", "false")
+    repo.git("config", "core.quotepath", "false")
+    repo.stage("README.md", "vault\n")
+    repo.commit("init")
+    return repo

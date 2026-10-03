@@ -26,9 +26,14 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   - **`scripts/session-lane-liveness.py`** — once a day, flags a session type that has stopped producing commits (DARK), or that fires but commits nothing (FIRING-BUT-SILENT). Lanes are the slot types in the vault's schedule. A commit counts as a lane's output when its subject names the lane, or, because only the dreaming and research phases prescribe such a subject, when it lands inside a run of that lane recorded by `run-outcome.sh`. A lane with no output is judged only once its runs have been recorded for its whole dark budget, so a fresh install does not alarm; budgets widen to fit a lane's scheduled gaps; the macOS notification passes lane names as argv, not AppleScript source.
 
   Like every plugin-owned file, they are managed by the drift policy below: an upgrade keeps a vault's edit to its copy, merging it with the plugin's update when both changed. A vault that already carries its own hand copies of these helpers gets the plugin's version on its first upgrade to this version, with its copy parked under `.scout-state/drift/` and named in a doctor note (`scoutctl bootstrap drift` shows it).
+- `scoutctl kb lint` — pre-commit ratchet for vault structure: over-budget files may not grow, run-diary headings and mega-lines are blocked (report mode by default; `kb_lint.mode: block` to enforce), plus `--report` and a `--lossless-*` split check.
+- `scoutctl kb install-hook` and a bootstrap stage that installs the fail-open pre-commit hook.
+- KB WRITE PROTOCOL phase: source notes → topic notes → project pages.
 
 ### Changed
 - **The connector-health roll-up no longer needs a vault helper** (`templates/run-*.sh.tmpl`, `engine/scout/scripts/connector_health_report.py`) — each runner calls `scoutctl connector-health-report` itself, and the report now says when `connector-health.md` was **not** rewritten (no scheduled-run records in the window) and may be showing stale alerts. A vault's own `scripts/connector-health-rollup.sh` is no longer called and can be deleted.
+- `action-items materialize` carries items only; run narration is dropped (verbatim fallback whenever any item's status or priority would change).
+- Scout Digest moves to `action-items/digests/YYYY-MM-DD.md`; session-log rows go to monthly shards.
 
 ### Fixed
 - **An upgrade never silently loses a vault's edit to a plugin-owned file** (`engine/scout/scripts/bootstrap.py`, `engine/scout/scripts/vault_drift.py`). Before this, an upgrade handled a vault's own edits like this:

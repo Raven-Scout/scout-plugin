@@ -46,3 +46,52 @@ agent_sessions:
   use_gh: true
   desktop_support_dir: null
   claude_home: null
+
+# KB lint — `scoutctl kb lint`, run by the vault's git pre-commit hook.
+# Budgets: the first matching glob wins; `bytes: null` = no size budget.
+# Per-vault extra budgets go in a top-level `kb_budgets: {glob: bytes}` map,
+# which is checked BEFORE these defaults. Mode `report` logs findings and
+# never blocks; `block` refuses the commit (override: SCOUT_LINT_OVERRIDE).
+kb_lint:
+  mode: report
+  max_line_chars: 1500
+  max_line_chars_strict: 500
+  exclude_globs:
+    - "action-items/archive/**"
+    - "**/extracted/**"
+  strict_line_globs:
+    - "action-items/action-items-*.md"
+    - "knowledge-base/session-log/**"
+  topic_globs:
+    - "knowledge-base/topics/**"
+  log_globs:
+    - "knowledge-base/session-log.md"
+    - "knowledge-base/session-log/**"
+    - "knowledge-base/scout-mistake-audit.md"
+    - "knowledge-base/scout-mistake-audit/**"
+    - "knowledge-base/research-queue.md"
+    - "knowledge-base/research-queue/**"
+    - "knowledge-base/review-queue.md"
+    - "knowledge-base/review-queue/**"
+    - "knowledge-base/decisions-log.md"
+    - "knowledge-base/projects/*/decision-log.md"
+    - "knowledge-base/projects/*/decision-log/**"
+    - "knowledge-base/projects/*/nav-history.md"
+    - "knowledge-base/projects/*/nav-history/**"
+    - "action-items/digests/**"
+  budgets:
+    - {glob: "action-items/action-items-*.md", bytes: 61440}
+    - {glob: "action-items/digests/**", bytes: 30720}
+    - {glob: "action-items/**", bytes: 15360}
+    - {glob: "knowledge-base/sources/**", bytes: 8192}
+    - {glob: "knowledge-base/topics/**", bytes: 10240}
+    - {glob: "knowledge-base/people/**", bytes: 10240}
+    - {glob: "knowledge-base/ontology/**", bytes: 10240}
+    - {glob: "knowledge-base/personal/**", bytes: 10240}
+    - {glob: "knowledge-base/session-log/**", bytes: 98304}
+    - {glob: "knowledge-base/scout-mistake-audit/**", bytes: 51200}
+    - {glob: "knowledge-base/research-queue/**", bytes: 51200}
+    - {glob: "knowledge-base/review-queue/**", bytes: 51200}
+    - {glob: "knowledge-base/projects/*/decision-log/**", bytes: 51200}
+    - {glob: "knowledge-base/projects/*/nav-history/**", bytes: 51200}
+    - {glob: "knowledge-base/**", bytes: 15360}

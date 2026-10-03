@@ -732,3 +732,24 @@ def test_cleanup_old_jsonl_works_under_bracket_path(tmp_path):
     cleanup_old_jsonl(log_dir, retain_days=30, now=now)
     # File is older than 30 days → must be deleted
     assert not old_file.exists(), "cleanup_old_jsonl using glob.glob() silently misses files in bracket paths"
+
+
+def test_health_md_reports_kb_lint_overrides(fake_data_dir, monkeypatch):
+    monkeypatch.setattr(chr_mod, "_default_now", _frozen_now)
+    log_dir = fake_data_dir / ".scout-logs"
+    _seed_session(
+        log_dir,
+        sid="s1",
+        mode="morning-briefing",
+        ts=_frozen_now() - timedelta(hours=2),
+        calls={"mcp:claude_ai_Slack": (1, 0)},
+    )
+    (log_dir / "lint-overrides.log").write_text(
+        json.dumps({"ts": (_frozen_now() - timedelta(days=1)).isoformat(), "reason": "r"})
+        + "\n"
+        + json.dumps({"ts": (_frozen_now() - timedelta(days=3)).isoformat(), "reason": "r"})
+        + "\n"
+    )
+    chr_mod.run(data_dir=fake_data_dir)
+    body = (fake_data_dir / "knowledge-base" / "connector-health.md").read_text()
+    assert "**KB lint overrides (14d):** 2" in body

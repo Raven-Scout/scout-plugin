@@ -552,6 +552,23 @@ def _stage_install_scoutctl_shim(cfg: BootstrapConfig) -> None:
     install_scoutctl_shim(home=Path.home())
 
 
+def _stage_install_git_hook(cfg: BootstrapConfig) -> None:
+    """Install the kb-lint pre-commit hook when the vault is a git repo.
+
+    Never fatal: a foreign pre-commit hook is left alone with a warning, and a
+    vault that is not (yet) a git repo is skipped — the git-setup phase inits
+    it on the first session and the next /scout-update installs the hook.
+    """
+    if not (cfg.vault / ".git").exists():
+        return
+    from scout.kb.hook import HookConflict, install_hook
+
+    try:
+        install_hook(cfg.vault, scoutctl=str(cfg.plugin_root / ".venv" / "bin" / "scoutctl"))
+    except HookConflict as e:
+        print(f"warning: {e}", file=sys.stderr)
+
+
 def _stage_seed_schedule(cfg: BootstrapConfig) -> None:
     """Seed .scout-state/schedule.yaml from plugin defaults (install only)."""
     src = cfg.plugin_root / "engine" / "scout" / "defaults" / "schedule.yaml"
@@ -756,6 +773,7 @@ def install(cfg: BootstrapConfig) -> InstallResult:
         _stage_cat4_install(cfg)
         _stage_jobs_install(cfg)
         _stage_install_scoutctl_shim(cfg)
+        _stage_install_git_hook(cfg)
         _stage_version_stamp(cfg, is_upgrade=False)
     finally:
         release_lock(lock)
@@ -812,6 +830,7 @@ def upgrade(cfg: BootstrapConfig) -> UpgradeResult:
         conflicts = _stage_cat4_upgrade(cfg)
         _stage_jobs_install(cfg)
         _stage_install_scoutctl_shim(cfg)
+        _stage_install_git_hook(cfg)
         _stage_version_stamp(cfg, is_upgrade=True)
     finally:
         release_lock(lock)
